@@ -71,7 +71,6 @@ async function main() {
   }
 
   // 3. load prompt + render
-  // script lives in .github/scripts/, prompt lives in .github/ — go up one level
   const promptTemplate = await readFile(new URL('../ai-review-prompt.md', import.meta.url), 'utf8')
   const userPrompt = promptTemplate
     .replace('{{DIFF}}', `\n\`\`\`diff\n${diff}\n\`\`\``) +
@@ -104,7 +103,7 @@ async function main() {
 
   // 5. find bot's previous review comment and update or create new
   const commentHeader = '## 🤖 AI Code Review'
-  const finalBody = `${commentHeader} (${modelId})\n\n${reviewText}\n\n---\n<sub>Reviewed commit \`${process.env.GITHUB_SHA ?? 'HEAD'}\` · model \`${modelId}\` via \`${baseUrl}\`.</sub>`
+  const finalBody = `${commentHeader}\n\n${reviewText}`
 
   const listUrl = `https://api.github.com/repos/${repo}/issues/${prNumber}/comments?per_page=100`
   const headers = {

@@ -13,6 +13,8 @@ jobs:
   review:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      HAS_KEY: ${{ secrets.LLM_API_KEY != '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,6 +27,7 @@ jobs:
           node-version: '20'
 
       - name: Install Anthropic SDK
+        if: env.HAS_KEY == 'true'
         run: |
           cd .github/scripts
           npm init -y >/dev/null
@@ -32,8 +35,10 @@ jobs:
 
       - name: Run AI reviewer
         id: reviewer
+        if: env.HAS_KEY == 'true'
         working-directory: .github/scripts
         env:
+          HAS_KEY: 'true'
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           BASE_URL: ${{ vars.LLM_BASE_URL }}
           MODEL_ID: ${{ vars.LLM_MODEL_ID }}
