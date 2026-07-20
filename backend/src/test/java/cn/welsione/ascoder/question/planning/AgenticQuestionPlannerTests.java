@@ -1,12 +1,17 @@
 package cn.welsione.ascoder.question.planning;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
+import cn.welsione.ascoder.runtime.application.RuntimeSettingsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * 验证混合规划器只在需要时调用 Planner Agent，并在输出非法时回退规则规划。
@@ -15,6 +20,7 @@ class AgenticQuestionPlannerTests {
 
     private DefaultQuestionPlanner rulePlanner;
     private QuestionPlanValidator validator;
+    private RuntimeSettingsService runtimeSettings;
 
     @BeforeEach
     void setUp() {
@@ -34,13 +40,25 @@ class AgenticQuestionPlannerTests {
                 new GeneralExplanationStrategy()
         ), kw);
         validator = new QuestionPlanValidator();
+        runtimeSettings = mock(RuntimeSettingsService.class);
+        // 默认值：enabled=true, confidence=0.65, ambiguous=0.82
+        lenient().when(runtimeSettings.readBoolean(eq("agent.query-planner-enabled"))).thenReturn(true);
+        lenient().when(runtimeSettings.readDouble(eq("agent.query-planner-confidence-threshold"))).thenReturn(0.65);
+        lenient().when(runtimeSettings.readDouble(eq("agent.query-planner-ambiguous-threshold"))).thenReturn(0.82);
+    }
+
+    private AgenticQuestionPlanner newPlanner(List<QuestionPlanningAgent> agents, boolean enabled,
+                                              double confidence, double ambiguous) {
+        when(runtimeSettings.readBoolean("agent.query-planner-enabled")).thenReturn(enabled);
+        when(runtimeSettings.readDouble("agent.query-planner-confidence-threshold")).thenReturn(confidence);
+        when(runtimeSettings.readDouble("agent.query-planner-ambiguous-threshold")).thenReturn(ambiguous);
+        return new AgenticQuestionPlanner(rulePlanner, agents, validator, runtimeSettings);
     }
 
     @Test
     void lowConfidencePlanCanBeReplacedByValidAgentDraft() {
         FakePlanningAgent agent = new FakePlanningAgent(validBugDraft());
-        AgenticQuestionPlanner planner = new AgenticQuestionPlanner(
-                rulePlanner, List.of(agent), validator, true, 0.65, 0.82);
+        AgenticQuestionPlanner planner = newPlanner(List.of(agent), true, 0.65, 0.82);
 
         QuestionPlan plan = planner.plan("帮我整体看一下这个模块", "developer");
 
@@ -54,8 +72,7 @@ class AgenticQuestionPlannerTests {
     @Test
     void highConfidencePlanDoesNotCallAgent() {
         FakePlanningAgent agent = new FakePlanningAgent(validBugDraft());
-        AgenticQuestionPlanner planner = new AgenticQuestionPlanner(
-                rulePlanner, List.of(agent), validator, true, 0.65, 0.82);
+        AgenticQuestionPlanner planner = newPlanner(List.of(agent), true, 0.65, 0.82);
 
         QuestionPlan plan = planner.plan("这个项目的后端入口类是什么？", "developer");
 
@@ -68,8 +85,7 @@ class AgenticQuestionPlannerTests {
         AgentQuestionPlanDraft draft = validBugDraft();
         draft.setType("NO_SUCH_TYPE");
         FakePlanningAgent agent = new FakePlanningAgent(draft);
-        AgenticQuestionPlanner planner = new AgenticQuestionPlanner(
-                rulePlanner, List.of(agent), validator, true, 0.65, 0.82);
+        AgenticQuestionPlanner planner = newPlanner(List.of(agent), true, 0.65, 0.82);
 
         QuestionPlan plan = planner.plan("帮我整体看一下这个模块", "developer");
 
@@ -81,8 +97,7 @@ class AgenticQuestionPlannerTests {
     @Test
     void disabledPlannerNeverCallsAgent() {
         FakePlanningAgent agent = new FakePlanningAgent(validBugDraft());
-        AgenticQuestionPlanner planner = new AgenticQuestionPlanner(
-                rulePlanner, List.of(agent), validator, false, 0.65, 0.82);
+        AgenticQuestionPlanner planner = newPlanner(List.of(agent), false, 0.65, 0.82);
 
         QuestionPlan plan = planner.plan("帮我整体看一下这个模块", "developer");
 

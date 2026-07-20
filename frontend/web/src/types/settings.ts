@@ -1,1 +1,8 @@
-export type Section = 'repositories' | 'skills' | 'tools' | 'agents' | 'llm-providers' | 'mcp'
+export type Section =
+  | 'repositories'
+  | 'skills'
+  | 'tools'
+  | 'agents'
+  | 'llm-providers'
+  | 'mcp'
+  | 'general'

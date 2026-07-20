@@ -1,7 +1,7 @@
 package cn.welsione.ascoder.question.planning;
 
+import cn.welsione.ascoder.runtime.application.RuntimeSettingsService;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
@@ -9,6 +9,10 @@ import java.util.List;
 
 /**
  * 混合问题规划器，在规则规划不确定时调用 Planner Agent，并以规则结果作为兜底。
+ *
+ * <p>Query Planner 开关与阈值通过设置页热改：{@code agent.query-planner-enabled}、
+ * {@code agent.query-planner-confidence-threshold}、
+ * {@code agent.query-planner-ambiguous-threshold}。</p>
  */
 @Slf4j
 @Primary
@@ -18,22 +22,16 @@ public class AgenticQuestionPlanner implements QuestionPlanner {
     private final DefaultQuestionPlanner rulePlanner;
     private final QuestionPlanningAgent planningAgent;
     private final QuestionPlanValidator validator;
-    private final boolean enabled;
-    private final double confidenceThreshold;
-    private final double ambiguousThreshold;
+    private final RuntimeSettingsService runtimeSettings;
 
     AgenticQuestionPlanner(DefaultQuestionPlanner rulePlanner,
                            List<QuestionPlanningAgent> planningAgents,
                            QuestionPlanValidator validator,
-                           @Value("${ascoder.agent.query-planner-enabled:false}") boolean enabled,
-                           @Value("${ascoder.agent.query-planner-confidence-threshold:0.65}") double confidenceThreshold,
-                           @Value("${ascoder.agent.query-planner-ambiguous-threshold:0.82}") double ambiguousThreshold) {
+                           RuntimeSettingsService runtimeSettings) {
         this.rulePlanner = rulePlanner;
         this.planningAgent = planningAgents.isEmpty() ? null : planningAgents.get(0);
         this.validator = validator;
-        this.enabled = enabled;
-        this.confidenceThreshold = confidenceThreshold;
-        this.ambiguousThreshold = ambiguousThreshold;
+        this.runtimeSettings = runtimeSettings;
     }
 
     @Override
@@ -70,9 +68,11 @@ public class AgenticQuestionPlanner implements QuestionPlanner {
     }
 
     private boolean shouldUseAgent(QuestionPlan plan, String question) {
-        if (!enabled) {
+        if (!runtimeSettings.readBoolean("agent.query-planner-enabled")) {
             return false;
         }
+        double confidenceThreshold = runtimeSettings.readDouble("agent.query-planner-confidence-threshold");
+        double ambiguousThreshold = runtimeSettings.readDouble("agent.query-planner-ambiguous-threshold");
         if (plan.getConfidence() < confidenceThreshold) {
             return true;
         }

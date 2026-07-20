@@ -8,9 +8,9 @@ import cn.welsione.ascoder.agent.domain.LlmProviderType;
 import cn.welsione.ascoder.agent.domain.ResolvedModelConfig;
 import cn.welsione.ascoder.agent.port.ChatModelFactory;
 import cn.welsione.ascoder.common.exception.InvalidStateException;
+import cn.welsione.ascoder.runtime.application.RuntimeSettingsService;
 import io.agentscope.core.model.AnthropicChatModel;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -33,45 +33,17 @@ public class LlmProviderModelFactory implements ChatModelFactory {
     private final LlmProviderService llmProviderService;
     private final List<ChatModelBuilderStrategy> builderStrategies;
     private final List<ConnectionTestStrategy> connectionTestStrategies;
-    private final Duration timeout;
-    private final Duration toolTimeout;
-    private final int maxIters;
-    private final int codeResearcherMaxIters;
-    private final int impactAnalyzerMaxIters;
-    private final int roleSpecialistMaxIters;
-    private final int modelMaxAttempts;
-    private final int toolMaxAttempts;
-    private final boolean planningEnabled;
-    private final int planMaxSubtasks;
+    private final RuntimeSettingsService runtimeSettings;
 
     public LlmProviderModelFactory(
             LlmProviderService llmProviderService,
             List<ChatModelBuilderStrategy> builderStrategies,
             List<ConnectionTestStrategy> connectionTestStrategies,
-            @Value("${ascoder.agent.timeout-seconds}") long timeoutSeconds,
-            @Value("${ascoder.agent.tool-timeout-seconds:${ascoder.agent.timeout-seconds}}") long toolTimeoutSeconds,
-            @Value("${ascoder.agent.max-iters}") int maxIters,
-            @Value("${ascoder.agent.code-researcher-max-iters}") int codeResearcherMaxIters,
-            @Value("${ascoder.agent.impact-analyzer-max-iters}") int impactAnalyzerMaxIters,
-            @Value("${ascoder.agent.role-specialist-max-iters:8}") int roleSpecialistMaxIters,
-            @Value("${ascoder.agent.model-max-attempts}") int modelMaxAttempts,
-            @Value("${ascoder.agent.tool-max-attempts}") int toolMaxAttempts,
-            @Value("${ascoder.agent.planning-enabled}") boolean planningEnabled,
-            @Value("${ascoder.agent.plan-max-subtasks}") int planMaxSubtasks
-    ) {
+            RuntimeSettingsService runtimeSettings) {
         this.llmProviderService = llmProviderService;
         this.builderStrategies = builderStrategies;
         this.connectionTestStrategies = connectionTestStrategies;
-        this.timeout = Duration.ofSeconds(timeoutSeconds);
-        this.toolTimeout = Duration.ofSeconds(toolTimeoutSeconds);
-        this.maxIters = maxIters;
-        this.codeResearcherMaxIters = codeResearcherMaxIters;
-        this.impactAnalyzerMaxIters = impactAnalyzerMaxIters;
-        this.roleSpecialistMaxIters = roleSpecialistMaxIters;
-        this.modelMaxAttempts = modelMaxAttempts;
-        this.toolMaxAttempts = toolMaxAttempts;
-        this.planningEnabled = planningEnabled;
-        this.planMaxSubtasks = planMaxSubtasks;
+        this.runtimeSettings = runtimeSettings;
     }
 
     @Override
@@ -105,43 +77,46 @@ public class LlmProviderModelFactory implements ChatModelFactory {
     }
 
     public Duration timeout() {
-        return timeout;
+        // agent.timeout-seconds 未列入白名单，统一使用 tool-timeout-seconds 作为兜底
+        long s = runtimeSettings.readInt("agent.tool-timeout-seconds");
+        return Duration.ofSeconds(s);
     }
 
     public Duration toolTimeout() {
-        return toolTimeout;
+        long s = runtimeSettings.readInt("agent.tool-timeout-seconds");
+        return Duration.ofSeconds(s);
     }
 
     public int maxIters() {
-        return maxIters;
+        return runtimeSettings.readInt("agent.max-iters");
     }
 
     public int codeResearcherMaxIters() {
-        return codeResearcherMaxIters;
+        return runtimeSettings.readInt("agent.code-researcher-max-iters");
     }
 
     public int impactAnalyzerMaxIters() {
-        return impactAnalyzerMaxIters;
+        return runtimeSettings.readInt("agent.impact-analyzer-max-iters");
     }
 
     public int roleSpecialistMaxIters() {
-        return roleSpecialistMaxIters;
+        return runtimeSettings.readInt("agent.role-specialist-max-iters");
     }
 
     public int modelMaxAttempts() {
-        return modelMaxAttempts;
+        return runtimeSettings.readInt("agent.model-max-attempts");
     }
 
     public int toolMaxAttempts() {
-        return toolMaxAttempts;
+        return runtimeSettings.readInt("agent.tool-max-attempts");
     }
 
     public boolean planningEnabled() {
-        return planningEnabled;
+        return runtimeSettings.readBoolean("agent.planning-enabled");
     }
 
     public int planMaxSubtasks() {
-        return planMaxSubtasks;
+        return runtimeSettings.readInt("agent.plan-max-subtasks");
     }
 
     private ResolvedModelConfig resolveDefaultProvider() {

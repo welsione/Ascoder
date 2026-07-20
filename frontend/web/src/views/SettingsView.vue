@@ -7,6 +7,7 @@ import SkillSection from '../components/settings/SkillSection.vue'
 import ToolSection from '../components/settings/ToolSection.vue'
 import AgentSection from '../components/settings/AgentSection.vue'
 import LlmProviderSection from '../components/settings/LlmProviderSection.vue'
+import GeneralSection from '../components/settings/GeneralSection.vue'
 import type { Section } from '../types/settings'
 
 const route = useRoute()
@@ -17,6 +18,7 @@ function normalizeSection(value: string | undefined): Section {
   if (value === 'tool' || value === 'tools') return 'tools'
   if (value === 'agents') return 'agents'
   if (value === 'llm-providers') return 'llm-providers'
+  if (value === 'general') return 'general'
   if (value === 'mcp') return 'mcp'
   return 'repositories'
 }
@@ -41,6 +43,9 @@ const sectionMeta = computed(() => {
   if (section.value === 'llm-providers') {
     return { title: '模型供应商', description: '管理 LLM 供应商配置与连接状态，确保问答功能可用。' }
   }
+  if (section.value === 'general') {
+    return { title: '通用设置', description: '运行时调参与默认值管理，立即对后续请求生效。' }
+  }
   return { title: 'MCP 管理', description: '配置代理可调用的外部工具服务，扩展问答时的执行能力。' }
 })
 </script>
@@ -61,6 +66,7 @@ const sectionMeta = computed(() => {
       <ToolSection v-else-if="section === 'tools'" />
       <AgentSection v-else-if="section === 'agents'" />
       <LlmProviderSection v-else-if="section === 'llm-providers'" />
+      <GeneralSection v-else-if="section === 'general'" />
       <section v-else class="surface-panel settings-block settings-disabled-panel">
         <div class="section-heading">
           <div>

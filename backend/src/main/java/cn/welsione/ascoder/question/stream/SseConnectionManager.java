@@ -1,8 +1,8 @@
 package cn.welsione.ascoder.question.stream;
 
+import cn.welsione.ascoder.runtime.application.RuntimeSettingsService;
 import lombok.extern.slf4j.Slf4j;
 import jakarta.annotation.PreDestroy;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -15,6 +15,10 @@ import java.util.concurrent.*;
  *
  * <p>持有独立的推理线程池和心跳调度器，所有 emitter 通过 {@link #closeEmitter(Long)} 统一释放，
  * 避免回调缺失导致的内存泄漏。</p>
+ *
+ * <p>{@code sse-timeout-seconds} 与 {@code heartbeat-interval-seconds} 在
+ * 设置页修改后，<b>只对后续新建的 emitter 生效</b>；线程池相关参数（core / max / queue）
+ * 需要重启进程生效。</p>
  */
 @Slf4j
 @Component
@@ -25,18 +29,13 @@ class SseConnectionManager {
     private final Map<Long, EmitterEntry> emitters = new ConcurrentHashMap<>();
     final ExecutorService agentExecutor;
     private final ScheduledExecutorService heartbeatScheduler = Executors.newSingleThreadScheduledExecutor();
-    private final long sseTimeoutMillis;
-    private final long heartbeatIntervalMillis;
+    private final RuntimeSettingsService runtimeSettings;
 
-    SseConnectionManager(
-            @Value("${ascoder.agent.sse-timeout-seconds:600}") long sseTimeoutSeconds,
-            @Value("${ascoder.agent.heartbeat-interval-seconds:30}") long heartbeatIntervalSeconds,
-            @Value("${ascoder.agent.stream-core-threads:2}") int coreThreads,
-            @Value("${ascoder.agent.stream-max-threads:16}") int maxThreads,
-            @Value("${ascoder.agent.stream-queue-capacity:64}") int queueCapacity
-    ) {
-        this.sseTimeoutMillis = sseTimeoutSeconds * 1000;
-        this.heartbeatIntervalMillis = heartbeatIntervalSeconds * 1000;
+    SseConnectionManager(RuntimeSettingsService runtimeSettings) {
+        this.runtimeSettings = runtimeSettings;
+        int coreThreads = runtimeSettings.readInt("agent.stream-core-threads");
+        int maxThreads = runtimeSettings.readInt("agent.stream-max-threads");
+        int queueCapacity = runtimeSettings.readInt("agent.stream-queue-capacity");
         if (coreThreads < 1 || maxThreads < coreThreads || queueCapacity < 1) {
             throw new IllegalArgumentException("Agent 流式执行池配置非法");
         }
@@ -59,12 +58,20 @@ class SseConnectionManager {
         );
     }
 
+    private long sseTimeoutMillis() {
+        return runtimeSettings.readInt("agent.sse-timeout-seconds") * 1000L;
+    }
+
+    private long heartbeatIntervalMillis() {
+        return runtimeSettings.readInt("agent.heartbeat-interval-seconds") * 1000L;
+    }
+
     SseEmitter createEmitter(Long questionId) {
-        SseEmitter emitter = new SseEmitter(sseTimeoutMillis);
+        SseEmitter emitter = new SseEmitter(sseTimeoutMillis());
         ScheduledFuture<?> heartbeat = heartbeatScheduler.scheduleAtFixedRate(
                 () -> sendHeartbeat(questionId),
-                heartbeatIntervalMillis,
-                heartbeatIntervalMillis,
+                heartbeatIntervalMillis(),
+                heartbeatIntervalMillis(),
                 TimeUnit.MILLISECONDS
         );
         EmitterEntry entry = new EmitterEntry(emitter, heartbeat, System.currentTimeMillis());
@@ -133,7 +140,7 @@ class SseConnectionManager {
     private void sweepStaleEmitters() {
         long now = System.currentTimeMillis();
         emitters.forEach((id, entry) -> {
-            if (now - entry.createdAt > sseTimeoutMillis * 2L) {
+            if (now - entry.createdAt > sseTimeoutMillis() * 2L) {
                 log.warn("巡检发现过期 SSE emitter，强制清理，questionId={}", id);
                 removeAndDispose(id);
             }

@@ -26,6 +26,7 @@ function currentSection(): Section {
   if (s === 'tool' || s === 'tools') return 'tools'
   if (s === 'agents') return 'agents'
   if (s === 'llm-providers') return 'llm-providers'
+  if (s === 'general') return 'general'
   if (s === 'mcp') return s
   return 'repositories'
 }
@@ -116,6 +117,18 @@ function navigate(section: Section) {
           模型供应商
         </span>
         <small>{{ llmProviderStore.enabledProviders.length }} 个已启用</small>
+      </button>
+      <button
+        class="settings-nav-item"
+        :class="{ active: currentSection() === 'general' }"
+        type="button"
+        @click="navigate('general')"
+      >
+        <span>
+          <SlidersHorizontal class="inline-icon" aria-hidden="true" :size="16" :stroke-width="1.8" />
+          通用设置
+        </span>
+        <small>运行时调参</small>
       </button>
       <button
         class="settings-nav-item"
