@@ -71,7 +71,8 @@ async function main() {
   }
 
   // 3. load prompt + render
-  const promptTemplate = await readFile('.github/ai-review-prompt.md', 'utf8')
+  // script lives in .github/scripts/, prompt lives in .github/ — go up one level
+  const promptTemplate = await readFile(new URL('../ai-review-prompt.md', import.meta.url), 'utf8')
   const userPrompt = promptTemplate
     .replace('{{DIFF}}', `\n\`\`\`diff\n${diff}\n\`\`\``) +
     `\n\n实际 PR 标题：${prTitle}\n\n实际 PR 描述：\n${prBody || '(无)'}\n\n改动文件清单：\n${fileList}\n`
