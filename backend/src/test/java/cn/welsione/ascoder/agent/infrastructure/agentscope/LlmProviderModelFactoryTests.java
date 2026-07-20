@@ -7,6 +7,7 @@ import cn.welsione.ascoder.agent.domain.LlmProvider;
 import cn.welsione.ascoder.agent.domain.LlmProviderType;
 import cn.welsione.ascoder.agent.domain.ResolvedModelConfig;
 import cn.welsione.ascoder.common.exception.InvalidStateException;
+import cn.welsione.ascoder.runtime.application.RuntimeSettingsService;
 import io.agentscope.core.model.AnthropicChatModel;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,8 +16,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
-import java.time.Duration;
-import java.util.Collections;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -43,6 +42,9 @@ class LlmProviderModelFactoryTests {
     @Mock
     private AnthropicChatModel mockModel;
 
+    @Mock
+    private RuntimeSettingsService runtimeSettings;
+
     private LlmProvider defaultProvider() {
         LlmProvider provider = new LlmProvider();
         provider.setId(1L);
@@ -55,6 +57,8 @@ class LlmProviderModelFactoryTests {
         provider.setTimeoutSeconds(240L);
         provider.setDefault(true);
         provider.setEnabled(true);
+        provider.setBuiltin(false);
+        provider.setSortOrder(0);
         return provider;
     }
 
@@ -64,40 +68,20 @@ class LlmProviderModelFactoryTests {
                 llmProviderService,
                 List.of(anthropicStrategy),
                 List.of(connectionTestStrategy),
-                240L, 300L, 12, 100, 8, 8, 2, 1, true, 10
+                runtimeSettings
         );
     }
 
     @Test
-    void createModelWithDefaultProvider() {
-        LlmProviderModelFactory factory = factoryWithAnthropic();
-        when(llmProviderService.getDefault()).thenReturn(defaultProvider());
-        when(anthropicStrategy.build(any(ResolvedModelConfig.class))).thenReturn(mockModel);
-        AgentConfig config = new AgentConfig();
-
-        AnthropicChatModel model = factory.createModel(config);
-
-        assertSame(mockModel, model);
-        verify(anthropicStrategy).build(argThat(resolved ->
-                resolved.getApiKey().equals("test-api-key")
-                        && resolved.getBaseUrl().equals("https://api.example.com/anthropic")
-                        && resolved.getModelId().equals("test-model")
-                        && resolved.getMaxTokens().equals(4000)
-                        && resolved.getProviderType() == LlmProviderType.ANTHROPIC_COMPATIBLE
-        ));
-    }
-
-    @Test
-    void createModelWithSpecificProvider() {
+    void createModelUsesAgentConfigProviderId() {
         LlmProviderModelFactory factory = factoryWithAnthropic();
         LlmProvider provider = defaultProvider();
         provider.setId(2L);
-        provider.setName("Claude");
-        provider.setModelId("claude-3-5-sonnet");
         when(llmProviderService.getDecrypted(2L)).thenReturn(provider);
         when(anthropicStrategy.build(any(ResolvedModelConfig.class))).thenReturn(mockModel);
         AgentConfig config = new AgentConfig();
         config.setLlmProviderId(2L);
+        config.setModelId("claude-3-5-sonnet");
 
         AnthropicChatModel model = factory.createModel(config);
 
@@ -197,7 +181,7 @@ class LlmProviderModelFactoryTests {
                 llmProviderService,
                 List.of(anthropicStrategy),
                 List.of(connectionTestStrategy),
-                240L, 300L, 12, 100, 8, 8, 2, 1, true, 10
+                runtimeSettings
         );
         LlmProvider provider = defaultProvider();
         provider.setProviderType(LlmProviderType.OPENAI_COMPATIBLE);
@@ -239,42 +223,42 @@ class LlmProviderModelFactoryTests {
     }
 
     @Test
-    void timeoutReturnsConfiguredValue() {
+    void toolTimeoutReturnsValueFromRuntimeSettings() {
+        when(runtimeSettings.readInt("agent.tool-timeout-seconds")).thenReturn(300);
         LlmProviderModelFactory factory = new LlmProviderModelFactory(
-                llmProviderService, Collections.emptyList(), Collections.emptyList(),
-                240L, 300L, 12, 100, 8, 8, 2, 1, true, 10);
-        assertEquals(Duration.ofSeconds(240), factory.timeout());
+                llmProviderService, List.of(), List.of(), runtimeSettings);
+        assertEquals(java.time.Duration.ofSeconds(300), factory.toolTimeout());
     }
 
     @Test
-    void toolTimeoutReturnsConfiguredValue() {
+    void maxItersReturnsValueFromRuntimeSettings() {
+        when(runtimeSettings.readInt("agent.max-iters")).thenReturn(12);
         LlmProviderModelFactory factory = new LlmProviderModelFactory(
-                llmProviderService, Collections.emptyList(), Collections.emptyList(),
-                240L, 300L, 12, 100, 8, 8, 2, 1, true, 10);
-        assertEquals(Duration.ofSeconds(300), factory.toolTimeout());
-    }
-
-    @Test
-    void maxItersReturnsConfiguredValue() {
-        LlmProviderModelFactory factory = new LlmProviderModelFactory(
-                llmProviderService, Collections.emptyList(), Collections.emptyList(),
-                240L, 300L, 12, 100, 8, 8, 2, 1, true, 10);
+                llmProviderService, List.of(), List.of(), runtimeSettings);
         assertEquals(12, factory.maxIters());
     }
 
     @Test
-    void modelMaxAttemptsReturnsConfiguredValue() {
+    void modelMaxAttemptsReturnsValueFromRuntimeSettings() {
+        when(runtimeSettings.readInt("agent.model-max-attempts")).thenReturn(2);
         LlmProviderModelFactory factory = new LlmProviderModelFactory(
-                llmProviderService, Collections.emptyList(), Collections.emptyList(),
-                240L, 300L, 12, 100, 8, 8, 2, 1, true, 10);
+                llmProviderService, List.of(), List.of(), runtimeSettings);
         assertEquals(2, factory.modelMaxAttempts());
     }
 
     @Test
-    void toolMaxAttemptsReturnsConfiguredValue() {
+    void toolMaxAttemptsReturnsValueFromRuntimeSettings() {
+        when(runtimeSettings.readInt("agent.tool-max-attempts")).thenReturn(1);
         LlmProviderModelFactory factory = new LlmProviderModelFactory(
-                llmProviderService, Collections.emptyList(), Collections.emptyList(),
-                240L, 300L, 12, 100, 8, 8, 2, 1, true, 10);
+                llmProviderService, List.of(), List.of(), runtimeSettings);
         assertEquals(1, factory.toolMaxAttempts());
+    }
+
+    @Test
+    void planningEnabledReturnsValueFromRuntimeSettings() {
+        when(runtimeSettings.readBoolean("agent.planning-enabled")).thenReturn(true);
+        LlmProviderModelFactory factory = new LlmProviderModelFactory(
+                llmProviderService, List.of(), List.of(), runtimeSettings);
+        assertTrue(factory.planningEnabled());
     }
 }

@@ -37,16 +37,13 @@ ascoder:
   codegraph-root: ${CODEGRAPH_ROOT:./data/codegraph}
   llm-provider: ${LLM_PROVIDER:database}
   agent:
+    # 启动期默认值；运行时可通过设置页（/api/settings）热改并立即生效。
+    # 包含线程池（core/max/queue）的修改需重启进程。
     tool-timeout-seconds: ${AGENT_TOOL_TIMEOUT_SECONDS:300}
     max-iters: ${AGENT_MAX_ITERS:12}
-    stream-core-threads: ${AGENT_STREAM_CORE_THREADS:2}
-    stream-max-threads: ${AGENT_STREAM_MAX_THREADS:16}
-    stream-queue-capacity: ${AGENT_STREAM_QUEUE_CAPACITY:64}
     code-researcher-max-iters: ${AGENT_CODE_RESEARCHER_MAX_ITERS:100}
     impact-analyzer-max-iters: ${AGENT_IMPACT_ANALYZER_MAX_ITERS:8}
     role-specialist-max-iters: ${AGENT_ROLE_SPECIALIST_MAX_ITERS:8}
-    sse-timeout-seconds: ${AGENT_SSE_TIMEOUT_SECONDS:600}
-    heartbeat-interval-seconds: ${AGENT_HEARTBEAT_INTERVAL_SECONDS:30}
     model-max-attempts: ${AGENT_MODEL_MAX_ATTEMPTS:2}
     tool-max-attempts: ${AGENT_TOOL_MAX_ATTEMPTS:1}
     planning-enabled: ${AGENT_PLANNING_ENABLED:true}
@@ -55,9 +52,23 @@ ascoder:
     query-planner-confidence-threshold: ${AGENT_QUERY_PLANNER_CONFIDENCE_THRESHOLD:0.65}
     query-planner-ambiguous-threshold: ${AGENT_QUERY_PLANNER_AMBIGUOUS_THRESHOLD:0.82}
     query-planner-max-iters: ${AGENT_QUERY_PLANNER_MAX_ITERS:2}
+    # SSE 心跳 / 超时 / 线程池：心跳与超时对新建连接生效；线程池需重启。
+    sse-timeout-seconds: ${AGENT_SSE_TIMEOUT_SECONDS:600}
+    heartbeat-interval-seconds: ${AGENT_HEARTBEAT_INTERVAL_SECONDS:30}
+    stream-core-threads: ${AGENT_STREAM_CORE_THREADS:2}
+    stream-max-threads: ${AGENT_STREAM_MAX_THREADS:16}
+    stream-queue-capacity: ${AGENT_STREAM_QUEUE_CAPACITY:64}
   codegraph:
+    # executable 是启动期（决定 Bean 装配时拼出哪条 CLI 命令）；timeout / index-timeout 可热改。
     executable: ${CODEGRAPH_EXECUTABLE:codegraph}
     timeout-seconds: ${CODEGRAPH_TIMEOUT_SECONDS:300}
     index-timeout-seconds: ${CODEGRAPH_INDEX_TIMEOUT_SECONDS:3600}
   git:
     timeout-seconds: ${GIT_TIMEOUT_SECONDS:120}
+  log-analysis:
+    storage-root: ${LOG_ANALYSIS_STORAGE_ROOT:./data/log-analysis}
+    max-file-bytes: ${LOG_ANALYSIS_MAX_FILE_BYTES:104857600}
+    max-scan-bytes: ${LOG_ANALYSIS_MAX_SCAN_BYTES:52428800}
+    max-keyword-hits: ${LOG_ANALYSIS_MAX_KEYWORD_HITS:200}
+    max-trace-ids: ${LOG_ANALYSIS_MAX_TRACE_IDS:50}
+    ttl-hours: ${LOG_ANALYSIS_TTL_HOURS:72}

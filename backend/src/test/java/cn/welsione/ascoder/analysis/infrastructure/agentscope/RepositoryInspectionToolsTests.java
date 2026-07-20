@@ -27,7 +27,9 @@ import static org.mockito.Mockito.when;
 class RepositoryInspectionToolsTests {
 
     private final GitCommandRunner commandRunner = mock(GitCommandRunner.class);
-    private final GitRepositoryService gitRepositoryService = new GitRepositoryService(commandRunner);
+    private final cn.welsione.ascoder.runtime.application.RuntimeSettingsService runtimeSettings =
+            mock(cn.welsione.ascoder.runtime.application.RuntimeSettingsService.class);
+    private final GitRepositoryService gitRepositoryService = new GitRepositoryService(commandRunner, runtimeSettings);
     private final Path repositoryPath = Path.of("/tmp/repo");
     private final AtomicReference<String> codeContext = new AtomicReference<>("");
     private final CodeGraphWorkspaceContext workspaceContext = CodeGraphWorkspaceContext.single(repositoryPath);

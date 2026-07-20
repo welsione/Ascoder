@@ -3,6 +3,7 @@ package cn.welsione.ascoder.analysis.infrastructure.agentscope;
 import cn.welsione.ascoder.analysis.CodeGraphWorkspaceContext;
 import cn.welsione.ascoder.analysis.GitProvenanceTools;
 import cn.welsione.ascoder.common.CommandResult;
+import cn.welsione.ascoder.runtime.application.RuntimeSettingsService;
 import cn.welsione.ascoder.repository.git.GitCommandRunner;
 import cn.welsione.ascoder.repository.git.GitRepositoryService;
 import io.agentscope.core.message.ContentBlock;
@@ -29,7 +30,8 @@ import static org.mockito.Mockito.when;
 class GitProvenanceToolsTests {
 
     private final GitCommandRunner commandRunner = mock(GitCommandRunner.class);
-    private final GitRepositoryService gitRepositoryService = new GitRepositoryService(commandRunner);
+    private final RuntimeSettingsService runtimeSettings = mock(RuntimeSettingsService.class);
+    private final GitRepositoryService gitRepositoryService = new GitRepositoryService(commandRunner, runtimeSettings);
     private final Path repositoryPath = Path.of("/tmp/repo");
     private final AtomicReference<String> codeContext = new AtomicReference<>("");
     private final CodeGraphWorkspaceContext workspaceContext = CodeGraphWorkspaceContext.single(repositoryPath);

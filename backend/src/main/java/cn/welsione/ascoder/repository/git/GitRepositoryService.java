@@ -3,9 +3,9 @@ package cn.welsione.ascoder.repository.git;
 import cn.welsione.ascoder.common.CommandResult;
 import cn.welsione.ascoder.common.SafePathValidator;
 import cn.welsione.ascoder.repository.RepositoryBranchSourceKind;
+import cn.welsione.ascoder.runtime.application.RuntimeSettingsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.nio.file.Files;
@@ -20,6 +20,8 @@ import java.util.stream.Collectors;
 
 /**
  * 封装仓库内 Git 只读查询、同步和 worktree 管理操作。
+ *
+ * <p>{@code git.timeout-seconds} 在设置页修改后立即对下一次 git 命令生效。</p>
  */
 @Slf4j
 @Service
@@ -27,9 +29,11 @@ import java.util.stream.Collectors;
 public class GitRepositoryService {
 
     private final GitCommandRunner commandRunner;
+    private final RuntimeSettingsService runtimeSettings;
 
-    @Value("${ascoder.git.timeout-seconds:120}")
-    private long timeoutSeconds;
+    private long timeoutSeconds() {
+        return runtimeSettings.readLong("git.timeout-seconds");
+    }
 
     public List<GitBranchInfo> listBranches(Path repositoryPath) {
         CommandResult result = run(repositoryPath, "git", "-C", repositoryPath.toString(),
@@ -139,7 +143,7 @@ public class GitRepositoryService {
         command.add(remoteUrl);
         command.add(targetPath.toString());
 
-        CommandResult result = commandRunner.run(command, targetPath.getParent(), Duration.ofSeconds(timeoutSeconds));
+        CommandResult result = commandRunner.run(command, targetPath.getParent(), Duration.ofSeconds(timeoutSeconds()));
         ensureSuccess(result, "拉取 Git 仓库失败");
     }
 
@@ -433,7 +437,7 @@ public class GitRepositoryService {
     }
 
     private CommandResult run(Path workingDirectory, String... command) {
-        return commandRunner.run(Arrays.asList(command), workingDirectory, Duration.ofSeconds(timeoutSeconds));
+        return commandRunner.run(Arrays.asList(command), workingDirectory, Duration.ofSeconds(timeoutSeconds()));
     }
 
     private List<String> baseGitCommand(Path repositoryPath) {

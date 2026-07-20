@@ -14,11 +14,14 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
  * CodeGraph CLI 客户端实现，通过调用 codegraph 命令行工具执行代码分析操作。
+ *
+ * <p>{@link #configSupplier} 提供运行时配置（每次调用前重新读取），用于支持设置页热改。</p>
  */
 @Slf4j
 public class CliCodeGraphClient implements CodeGraphClient {
@@ -28,16 +31,28 @@ public class CliCodeGraphClient implements CodeGraphClient {
 
     private final CodeGraphCommandRunner commandRunner;
     private final IndexProgressTracker indexProgressTracker;
-    private final CodeGraphConfig config;
+    private final Supplier<CodeGraphConfig> configSupplier;
 
     public CliCodeGraphClient(
-            CodeGraphConfig config,
+            CodeGraphConfig initialConfig,
             CodeGraphCommandRunner commandRunner,
             IndexProgressTracker indexProgressTracker
     ) {
-        this.config = config;
+        this(() -> initialConfig, commandRunner, indexProgressTracker);
+    }
+
+    public CliCodeGraphClient(
+            Supplier<CodeGraphConfig> configSupplier,
+            CodeGraphCommandRunner commandRunner,
+            IndexProgressTracker indexProgressTracker
+    ) {
+        this.configSupplier = configSupplier;
         this.commandRunner = commandRunner;
         this.indexProgressTracker = indexProgressTracker;
+    }
+
+    private CodeGraphConfig config() {
+        return configSupplier.get();
     }
 
     @Override
@@ -55,9 +70,9 @@ public class CliCodeGraphClient implements CodeGraphClient {
         log.info("执行 CodeGraph 索引，路径={}", repositoryPath);
         assertEffectiveIndexPath(repositoryPath, codegraphIndexPath);
         CommandResult init = commandRunner.run(
-                List.of(config.getExecutable(), "init", repositoryPath.toString()),
+                List.of(config().getExecutable(), "init", repositoryPath.toString()),
                 repositoryPath,
-                config.getIndexTimeout()
+                config().getIndexTimeout()
         );
 
         if (!init.isSuccess()) {
@@ -69,9 +84,9 @@ public class CliCodeGraphClient implements CodeGraphClient {
         AbortSignal abortSignal = new AbortSignal();
         CliIndexCallbacks callbacks = new CliIndexCallbacks(output, repositoryPath, projectSpaceId, abortSignal);
         CommandResult index = commandRunner.runAsync(
-                List.of(config.getExecutable(), "index", repositoryPath.toString()),
+                List.of(config().getExecutable(), "index", repositoryPath.toString()),
                 repositoryPath,
-                config.getIndexTimeout(),
+                config().getIndexTimeout(),
                 callbacks,
                 abortSignal
         );
@@ -100,9 +115,9 @@ public class CliCodeGraphClient implements CodeGraphClient {
         log.info("执行 CodeGraph 增量同步，路径={}", repositoryPath);
         StringBuilder output = new StringBuilder();
         CommandResult result = commandRunner.runAsync(
-                List.of(config.getExecutable(), "sync", repositoryPath.toString()),
+                List.of(config().getExecutable(), "sync", repositoryPath.toString()),
                 repositoryPath,
-                config.getIndexTimeout(),
+                config().getIndexTimeout(),
                 line -> {
                     if (!output.isEmpty()) {
                         output.append("\n");
@@ -207,7 +222,7 @@ public class CliCodeGraphClient implements CodeGraphClient {
     public CodeGraphToolResult context(Path repositoryPath, String question) {
         log.debug("查询 CodeGraph context，路径={}，问题={}", repositoryPath, question);
         SafePathValidator.sanitizeArg(question);
-        List<String> cmd = command(config.getExecutable(), "explore", question, "--path", repositoryPath.toString());
+        List<String> cmd = command(config().getExecutable(), "explore", question, "--path", repositoryPath.toString());
         addNumberOption(cmd, "--max-files", DEFAULT_MAX_FILES);
         return runTool(cmd, repositoryPath);
     }
@@ -215,7 +230,7 @@ public class CliCodeGraphClient implements CodeGraphClient {
     @Override
     public CodeGraphToolResult query(Path repositoryPath, String search, Integer limit, String kind) {
         SafePathValidator.sanitizeArg(search);
-        List<String> command = command(config.getExecutable(), "query", search, "--path", repositoryPath.toString());
+        List<String> command = command(config().getExecutable(), "query", search, "--path", repositoryPath.toString());
         addNumberOption(command, "--limit", limit);
         addTextOption(command, "--kind", kind);
         return runTool(command, repositoryPath);
@@ -223,7 +238,7 @@ public class CliCodeGraphClient implements CodeGraphClient {
 
     @Override
     public CodeGraphToolResult files(Path repositoryPath, String filter, String pattern, String format, Integer maxDepth) {
-        List<String> command = command(config.getExecutable(), "files", "--path", repositoryPath.toString());
+        List<String> command = command(config().getExecutable(), "files", "--path", repositoryPath.toString());
         addTextOption(command, "--filter", filter);
         addTextOption(command, "--pattern", pattern);
         addTextOption(command, "--format", format);
@@ -234,7 +249,7 @@ public class CliCodeGraphClient implements CodeGraphClient {
     @Override
     public CodeGraphToolResult callers(Path repositoryPath, String symbol, Integer limit) {
         SafePathValidator.sanitizeArg(symbol);
-        List<String> command = command(config.getExecutable(), "callers", symbol, "--path", repositoryPath.toString());
+        List<String> command = command(config().getExecutable(), "callers", symbol, "--path", repositoryPath.toString());
         addNumberOption(command, "--limit", limit);
         return runTool(command, repositoryPath);
     }
@@ -242,7 +257,7 @@ public class CliCodeGraphClient implements CodeGraphClient {
     @Override
     public CodeGraphToolResult callees(Path repositoryPath, String symbol, Integer limit) {
         SafePathValidator.sanitizeArg(symbol);
-        List<String> command = command(config.getExecutable(), "callees", symbol, "--path", repositoryPath.toString());
+        List<String> command = command(config().getExecutable(), "callees", symbol, "--path", repositoryPath.toString());
         addNumberOption(command, "--limit", limit);
         return runTool(command, repositoryPath);
     }
@@ -250,14 +265,14 @@ public class CliCodeGraphClient implements CodeGraphClient {
     @Override
     public CodeGraphToolResult impact(Path repositoryPath, String symbol, Integer depth) {
         SafePathValidator.sanitizeArg(symbol);
-        List<String> command = command(config.getExecutable(), "impact", symbol, "--path", repositoryPath.toString());
+        List<String> command = command(config().getExecutable(), "impact", symbol, "--path", repositoryPath.toString());
         addNumberOption(command, "--depth", depth);
         return runTool(command, repositoryPath);
     }
 
     @Override
     public CodeGraphToolResult affected(Path repositoryPath, String files, Integer depth, String filter) {
-        List<String> command = command(config.getExecutable(), "affected", "--path", repositoryPath.toString());
+        List<String> command = command(config().getExecutable(), "affected", "--path", repositoryPath.toString());
         if (files != null && !files.isBlank()) {
             Arrays.stream(files.split("[\\n,]"))
                     .map(String::trim)
@@ -274,7 +289,7 @@ public class CliCodeGraphClient implements CodeGraphClient {
     public CodeGraphToolResult explore(Path repositoryPath, String query, Integer maxFiles) {
         log.debug("查询 CodeGraph explore，路径={}，查询={}", repositoryPath, query);
         SafePathValidator.sanitizeArg(query);
-        List<String> cmd = command(config.getExecutable(), "explore", query, "--path", repositoryPath.toString());
+        List<String> cmd = command(config().getExecutable(), "explore", query, "--path", repositoryPath.toString());
         addNumberOption(cmd, "--max-files", maxFiles);
         return runTool(cmd, repositoryPath);
     }
@@ -283,7 +298,7 @@ public class CliCodeGraphClient implements CodeGraphClient {
     public CodeGraphToolResult node(Path repositoryPath, String name, String file, Integer offset, Integer limit) {
         log.debug("查询 CodeGraph node，路径={}，符号={}", repositoryPath, name);
         SafePathValidator.sanitizeArg(name);
-        List<String> cmd = command(config.getExecutable(), "node", name, "--path", repositoryPath.toString());
+        List<String> cmd = command(config().getExecutable(), "node", name, "--path", repositoryPath.toString());
         addTextOption(cmd, "--file", file);
         addNumberOption(cmd, "--offset", offset);
         addNumberOption(cmd, "--limit", limit);
@@ -292,7 +307,7 @@ public class CliCodeGraphClient implements CodeGraphClient {
 
     private CodeGraphToolResult runTool(List<String> command, Path repositoryPath) {
         log.debug("执行 CodeGraph 命令：{}", String.join(" ", command));
-        CommandResult result = commandRunner.run(command, repositoryPath, config.getTimeout());
+        CommandResult result = commandRunner.run(command, repositoryPath, config().getTimeout());
         return new CodeGraphToolResult(result.isSuccess(), result.getOutput());
     }
 

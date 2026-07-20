@@ -4,7 +4,7 @@ import cn.welsione.ascoder.codegraph.infrastructure.cli.CliCodeGraphClient;
 import cn.welsione.ascoder.codegraph.infrastructure.cli.CodeGraphCommandRunner;
 import cn.welsione.ascoder.codegraph.infrastructure.cli.IndexProgressTracker;
 import cn.welsione.ascoder.codegraph.port.CodeGraphClient;
-import org.springframework.beans.factory.annotation.Value;
+import cn.welsione.ascoder.runtime.application.RuntimeSettingsService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -15,6 +15,9 @@ import java.util.Map;
  * CodeGraph 子模块的 Spring Bean 注册。
  *
  * <p>ascoder-codegraph 是纯 Java 库（零 Spring 依赖），需要 Spring 管理的 Bean 在此集中注册。</p>
+ *
+ * <p>executable 走启动期注入（重启生效）；timeout / indexTimeout 走
+ * {@link RuntimeSettingsService}（设置页可热改）。</p>
  */
 @Configuration
 public class CodeGraphConfiguration {
@@ -36,17 +39,20 @@ public class CodeGraphConfiguration {
 
     @Bean
     public CodeGraphClient codeGraphClient(
-            @Value("${ascoder.codegraph.executable:codegraph}") String executable,
-            @Value("${ascoder.codegraph.timeout-seconds:300}") long timeoutSeconds,
-            @Value("${ascoder.codegraph.index-timeout-seconds:3600}") long indexTimeoutSeconds,
+            RuntimeSettingsService runtimeSettings,
             CodeGraphCommandRunner codeGraphCommandRunner,
             IndexProgressTracker indexProgressTracker
     ) {
-        CodeGraphConfig config = new CodeGraphConfig(
-                executable,
-                Duration.ofSeconds(timeoutSeconds),
-                Duration.ofSeconds(indexTimeoutSeconds)
+        // executable 启动期锁定；timeout / indexTimeout 每次调用前重读
+        String executable = runtimeSettings.readString("codegraph.executable");
+        return new CliCodeGraphClient(
+                () -> new CodeGraphConfig(
+                        executable,
+                        Duration.ofSeconds(runtimeSettings.readLong("codegraph.timeout-seconds")),
+                        Duration.ofSeconds(runtimeSettings.readLong("codegraph.index-timeout-seconds"))
+                ),
+                codeGraphCommandRunner,
+                indexProgressTracker
         );
-        return new CliCodeGraphClient(config, codeGraphCommandRunner, indexProgressTracker);
     }
 }

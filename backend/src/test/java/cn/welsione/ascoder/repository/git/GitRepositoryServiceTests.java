@@ -1,6 +1,7 @@
 package cn.welsione.ascoder.repository.git;
 
 import cn.welsione.ascoder.common.CommandResult;
+import cn.welsione.ascoder.runtime.application.RuntimeSettingsService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -21,7 +22,8 @@ import static org.mockito.Mockito.when;
 class GitRepositoryServiceTests {
 
     private final GitCommandRunner commandRunner = mock(GitCommandRunner.class);
-    private final GitRepositoryService service = new GitRepositoryService(commandRunner);
+    private final RuntimeSettingsService runtimeSettings = mock(RuntimeSettingsService.class);
+    private final GitRepositoryService service = new GitRepositoryService(commandRunner, runtimeSettings);
     private final Path repositoryPath = Path.of("/tmp/repo");
 
     @Test
