@@ -25,8 +25,11 @@ jobs:
           node-version: '20'
 
       - name: Install Anthropic SDK
-        if: env.HAS_KEY == 'true'
-        run: npm install --no-save @anthropic-ai/sdk
+        run: |
+          mkdir -p .github/scripts/.review-runner
+          cd .github/scripts/.review-runner
+          npm init -y >/dev/null
+          npm install --no-audit --no-fund @anthropic-ai/sdk
 
       - name: Run AI reviewer
         id: reviewer
@@ -40,6 +43,7 @@ jobs:
           PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_PATH: ${{ github.workspace }}/.github/scripts/.review-runner/node_modules
         run: node .github/scripts/ai-review.mjs
 
       - name: Post skip notice when secret missing
