@@ -16,6 +16,11 @@ dist/
 .vite/
 *.tsbuildinfo
 
+# GitHub Actions runner scratch (ai-review SDK install)
+.github/scripts/node_modules/
+.github/scripts/package.json
+.github/scripts/package-lock.json
+
 # Environment
 .env
 .env.local

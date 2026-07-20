@@ -26,13 +26,13 @@ jobs:
 
       - name: Install Anthropic SDK
         run: |
-          mkdir -p .github/scripts/_review_runner
-          cd .github/scripts/_review_runner
+          cd .github/scripts
           npm init -y >/dev/null
           npm install --no-audit --no-fund @anthropic-ai/sdk
 
       - name: Run AI reviewer
         id: reviewer
+        working-directory: .github/scripts
         env:
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           BASE_URL: ${{ vars.LLM_BASE_URL }}
@@ -43,8 +43,7 @@ jobs:
           PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NODE_PATH: ${{ github.workspace }}/.github/scripts/_review_runner/node_modules
-        run: node .github/scripts/ai-review.mjs
+        run: node ai-review.mjs
 
       - name: Post skip notice when secret missing
         if: env.HAS_KEY != 'true'
