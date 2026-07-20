@@ -26,6 +26,9 @@ start-local.sh
 .codegraph/
 data/
 
+# Project docs (local-only, not tracked)
+docs/
+
 # Claude Code
 CLAUDE_ZH.md
 .claude/settings.local.json

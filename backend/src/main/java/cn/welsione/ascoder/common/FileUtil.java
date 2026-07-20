@@ -58,4 +58,46 @@ public final class FileUtil {
             throw new ValidationException(label + " 不在托管目录下");
         }
     }
+
+    /**
+     * 将存储的路径解析为运行时绝对路径，兼容旧版本存为绝对路径的数据。
+     *
+     * <p>存储约定为相对路径（如 {@code repoName/branchName}），运行时结合 root 拼接。
+     * 旧版本可能存为绝对路径；若该绝对路径不在当前 root 下（如从本地开发迁移到 Docker，
+     * root 由 {@code <project>/data/...} 变为 {@code /app/data/...}），取末两段重拼到当前 root，
+     * 实现自动重定位，避免跨环境后路径不可达。</p>
+     *
+     * @param storedPath 存储的路径（相对或绝对），null/blank 返回 null
+     * @param root       当前运行时根目录
+     * @return 解析后的绝对路径字符串，storedPath 为空时返回 null
+     */
+    public static String resolveUnderRoot(String storedPath, Path root) {
+        if (storedPath == null || storedPath.isBlank()) {
+            return null;
+        }
+        Path normalizedRoot = root.toAbsolutePath().normalize();
+        if (isAbsolutePath(storedPath)) {
+            Path abs = Path.of(storedPath).toAbsolutePath().normalize();
+            if (abs.startsWith(normalizedRoot)) {
+                return abs.toString();
+            }
+            return normalizedRoot.resolve(tailTwo(abs)).normalize().toString();
+        }
+        return normalizedRoot.resolve(storedPath).normalize().toString();
+    }
+
+    /**
+     * 取路径末两段（与 worktree/link 的 {@code repoName/branchName} 存储结构一致）。
+     */
+    private static Path tailTwo(Path path) {
+        int count = path.getNameCount();
+        if (count <= 2) {
+            return path;
+        }
+        return path.subpath(count - 2, count);
+    }
+
+    private static boolean isAbsolutePath(String path) {
+        return path.startsWith("/") || path.matches("[A-Za-z]:[\\\\/].*");
+    }
 }

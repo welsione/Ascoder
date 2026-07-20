@@ -10,7 +10,7 @@ Ascoder 是一个代码智能分析平台，帮助开发者对代码仓库进行
 
 ## 模块边界
 
-后端模块划分详见 `docs/architecture/modules.md`，核心依赖方向：
+后端逻辑模块按依赖方向组织：
 
 ```
 app → chat → agent → analysis → repository → common

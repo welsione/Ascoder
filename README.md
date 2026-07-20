@@ -29,7 +29,7 @@ docker compose up -d
 ## 文档
 
 - [部署指南](DEPLOY.md) — Docker Compose 配置、私有仓库访问、Windows + WSL2 部署
-- [架构模块](docs/architecture/modules.md) — 后端模块划分与依赖方向
+- [CLAUDE.md](CLAUDE.md) — 模块边界、代码规范、目录约定
 
 ## 技术栈
 

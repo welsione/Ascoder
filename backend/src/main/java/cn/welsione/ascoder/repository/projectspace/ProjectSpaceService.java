@@ -63,6 +63,9 @@ public class ProjectSpaceService {
     @Value("${ascoder.repo-root:./data/repos}")
     private String repoRoot;
 
+    @Value("${ascoder.worktree-root:./data/worktrees}")
+    private String worktreeRoot;
+
     @Transactional(readOnly = true)
     public List<ProjectSpace> list() {
         return repository.findAllByOrderByCreatedAtDesc();
@@ -317,7 +320,9 @@ public class ProjectSpaceService {
         );
         Path linkPath = snapshot.getRootPath().resolve(member.getAlias()).normalize();
         FileUtil.ensureUnderRoot(linkPath, snapshot.getRootPath(), "项目空间成员路径");
-        createOrReplaceLink(linkPath, Path.of(branchWorkspace.getWorktreePath()).toAbsolutePath().normalize());
+        Path worktreePath = Path.of(branchWorkspace.resolveWorktreePath(worktreeRoot.toString()))
+                .toAbsolutePath().normalize();
+        createOrReplaceLink(linkPath, worktreePath);
 
         savePreparedMember(snapshot.getProjectSpaceId(), member.getId(), branchWorkspace, linkPath);
     }
@@ -572,9 +577,20 @@ public class ProjectSpaceService {
                 throw new IllegalStateException("创建 junction 失败：" + linkPath + " -> " + targetPath);
             }
         } else {
-            // Unix: symlink is fine, CodeGraph handles it correctly
-            Files.createSymbolicLink(linkPath, targetPath);
+            // Unix：软链接 target 用相对路径，使其在本地开发与 Docker 部署间可移植
+            // （project-spaces 与 worktrees 同在 data/ 下，相对关系在两种环境一致）。
+            Files.createSymbolicLink(linkPath, relativeLinkTarget(linkPath, targetPath));
         }
+    }
+
+    /**
+     * 计算软链接相对 target：以 linkPath 所在目录为基准指向 targetPath。
+     *
+     * <p>相对 target 使软链接可跨环境移植（本地 {@code <project>/data/...} 与 Docker {@code /app/data/...}），
+     * 避免绝对路径在环境切换后失效。Windows junction 不支持相对路径，仅 Unix 软链接使用。</p>
+     */
+    static Path relativeLinkTarget(Path linkPath, Path targetPath) {
+        return linkPath.getParent().relativize(targetPath.toAbsolutePath().normalize());
     }
 
     private static boolean isWindows() {

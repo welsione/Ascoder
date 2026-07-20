@@ -1,5 +1,6 @@
 package cn.welsione.ascoder.repository.projectspace;
 
+import cn.welsione.ascoder.common.FileUtil;
 import cn.welsione.ascoder.repository.workspace.BranchWorkspace;
 import cn.welsione.ascoder.repository.CodeRepository;
 import cn.welsione.ascoder.repository.RepositoryBranch;
@@ -137,18 +138,7 @@ public class ProjectSpaceMember {
      * projectSpaceRoot 配置拼出完整路径。若已是绝对路径，则原样返回。</p>
      */
     public String resolveLinkPath(String projectSpaceRoot) {
-        if (linkPath == null || linkPath.isBlank()) {
-            return null;
-        }
-        if (isAbsolutePath(linkPath)) {
-            return Path.of(linkPath).toAbsolutePath().normalize().toString();
-        }
-        return Path.of(projectSpaceRoot).toAbsolutePath().normalize()
-                .resolve(linkPath).normalize().toString();
-    }
-
-    private static boolean isAbsolutePath(String path) {
-        return path.startsWith("/") || path.matches("[A-Za-z]:[\\\\/].*");
+        return FileUtil.resolveUnderRoot(linkPath, Path.of(projectSpaceRoot));
     }
 
     public void touch() {

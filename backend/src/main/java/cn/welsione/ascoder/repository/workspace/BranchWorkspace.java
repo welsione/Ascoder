@@ -2,6 +2,7 @@ package cn.welsione.ascoder.repository.workspace;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import cn.welsione.ascoder.common.FileUtil;
 import cn.welsione.ascoder.repository.CodeRepository;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -137,14 +138,7 @@ public class BranchWorkspace {
      * 需结合 worktreeRoot 配置拼出完整路径。若已是绝对路径则原样返回。</p>
      */
     public String resolveWorktreePath(String worktreeRoot) {
-        if (worktreePath == null || worktreePath.isBlank()) {
-            return null;
-        }
-        if (isAbsolutePath(worktreePath)) {
-            return Path.of(worktreePath).toAbsolutePath().normalize().toString();
-        }
-        return Path.of(worktreeRoot).toAbsolutePath().normalize()
-                .resolve(worktreePath).normalize().toString();
+        return FileUtil.resolveUnderRoot(worktreePath, Path.of(worktreeRoot));
     }
 
     /**
@@ -156,9 +150,5 @@ public class BranchWorkspace {
             return null;
         }
         return Path.of(wt).resolve(".codegraph").normalize().toString();
-    }
-
-    private static boolean isAbsolutePath(String path) {
-        return path.startsWith("/") || path.matches("[A-Za-z]:[\\\\/].*");
     }
 }
