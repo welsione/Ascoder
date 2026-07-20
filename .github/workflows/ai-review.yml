@@ -13,6 +13,8 @@ jobs:
   review:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      HAS_KEY: ${{ secrets.LLM_API_KEY != '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -26,11 +28,17 @@ jobs:
 
       - name: Install Anthropic SDK
         if: env.HAS_KEY == 'true'
-        run: npm install --no-save @anthropic-ai/sdk
+        run: |
+          cd .github/scripts
+          npm init -y >/dev/null
+          npm install --no-audit --no-fund @anthropic-ai/sdk
 
       - name: Run AI reviewer
         id: reviewer
+        if: env.HAS_KEY == 'true'
+        working-directory: .github/scripts
         env:
+          HAS_KEY: 'true'
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           BASE_URL: ${{ vars.LLM_BASE_URL }}
           MODEL_ID: ${{ vars.LLM_MODEL_ID }}
@@ -40,7 +48,7 @@ jobs:
           PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node .github/scripts/ai-review.mjs
+        run: node ai-review.mjs
 
       - name: Post skip notice when secret missing
         if: env.HAS_KEY != 'true'

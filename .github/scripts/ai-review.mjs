@@ -71,7 +71,7 @@ async function main() {
   }
 
   // 3. load prompt + render
-  const promptTemplate = await readFile('.github/ai-review-prompt.md', 'utf8')
+  const promptTemplate = await readFile(new URL('../ai-review-prompt.md', import.meta.url), 'utf8')
   const userPrompt = promptTemplate
     .replace('{{DIFF}}', `\n\`\`\`diff\n${diff}\n\`\`\``) +
     `\n\n实际 PR 标题：${prTitle}\n\n实际 PR 描述：\n${prBody || '(无)'}\n\n改动文件清单：\n${fileList}\n`
@@ -103,7 +103,7 @@ async function main() {
 
   // 5. find bot's previous review comment and update or create new
   const commentHeader = '## 🤖 AI Code Review'
-  const finalBody = `${commentHeader} (${modelId})\n\n${reviewText}\n\n---\n<sub>Reviewed commit \`${process.env.GITHUB_SHA ?? 'HEAD'}\` · model \`${modelId}\` via \`${baseUrl}\`.</sub>`
+  const finalBody = `${commentHeader}\n\n${reviewText}`
 
   const listUrl = `https://api.github.com/repos/${repo}/issues/${prNumber}/comments?per_page=100`
   const headers = {
