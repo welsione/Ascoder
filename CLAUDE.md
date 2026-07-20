@@ -27,6 +27,8 @@ app → chat → agent → analysis → repository → common
 - 对外端口不得暴露 AgentScope、Anthropic 等第三方运行时类型。
 - 新代码必须放入正确的模块包，不确定时先确认再动手。
 
+> 物理 Maven 模块见根 `pom.xml` 的 `<modules>` 节点（合并后仅 `jprompt` + `backend`）。逻辑模块与 Maven 物理拆分解耦：代码包按逻辑模块组织，但不再拆为独立 jar。
+
 ## 面向对象与代码复用
 
 ### 七大原则

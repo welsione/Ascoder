@@ -25,7 +25,7 @@ MINIMAX_API_KEY=your_api_key
 macOS / Linux：
 
 ```bash
-./scripts/deploy.sh
+docker compose up -d --build
 ```
 
 Windows PowerShell：
@@ -33,7 +33,7 @@ Windows PowerShell：
 ```powershell
 Copy-Item .env.example .env
 notepad .env
-powershell -ExecutionPolicy Bypass -File .\scripts\deploy.ps1
+docker compose up -d --build
 ```
 
 如果不使用脚本，也可以直接运行：
@@ -136,11 +136,8 @@ docker compose -f docker-compose.yml -f docker-compose.host-repos.yml up -d --bu
 - 使用 Docker Desktop，并确保启用 Linux containers。
 - 项目建议放在 `C:\Users\<你的用户名>\...` 这类 Docker Desktop 默认可访问的位置。
 - 第一次构建会下载 Maven、Node、Nginx、MySQL 和 CodeGraph 依赖，需要稳定网络。
-- 如果 PowerShell 阻止脚本运行，可以使用：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\deploy.ps1
-```
+- 如果 PowerShell 阻止 `docker compose` 执行，可以用单次绕过：
+  `powershell -ExecutionPolicy Bypass -Command "docker compose up -d --build"`
 
 - 如果端口冲突，修改 `.env` 中的 `APP_PORT`，例如 `APP_PORT=8088`。
 
@@ -189,21 +186,10 @@ docker info | Select-String "OSType"
 | 场景 | 症状 | 解决 |
 | --- | --- | --- |
 | 路径含空格（如 `C:\Users\John Doe\`） | `.env` 中路径被 compose 截断 | 始终用引号包路径；或把项目放在无空格路径 |
-| PowerShell ExecutionPolicy | `install.ps1` 运行报"running scripts is disabled" | `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` 或 `powershell -ExecutionPolicy Bypass -File .\install.ps1` |
+| PowerShell 阻止 `docker compose` | `running scripts is disabled on this system` | `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` |
 | 家庭版 Windows 10/11 | 没有 Hyper-V 默认无法跑 Docker Desktop | 安装 WSL2 内核更新后用 WSL2 后端；或升级到 Pro |
-| 企业域账户 | `Set-ExecutionPolicy` 被 Group Policy 锁 | 只能用 `powershell -ExecutionPolicy Bypass -File` 单次覆盖 |
+| 企业域账户 | `Set-ExecutionPolicy` 被 Group Policy 锁 | 只能用 `powershell -ExecutionPolicy Bypass -Command` 单次覆盖 |
 | 内网代理 | Docker Desktop 拉不到 Docker Hub 镜像 | Settings → Resources → Proxies 配置 HTTP/HTTPS 代理；或预 `docker save` 离线 tarball |
-| 旧版 install.sh 注册过 launchd / systemd | 升级后 `docker compose up` 报端口占用 | `launchctl unload` / `systemctl stop ascoder` + 删除 plist/unit |
-
-### 升级指引
-
-如果你之前使用旧版 `install.sh` + `java -jar` 部署方式，升级到 Docker Compose 模式需要：
-
-1. **停止旧服务**：
-   - macOS: `launchctl unload ~/Library/LaunchAgents/com.ascoder.service.plist && rm ~/Library/LaunchAgents/com.ascoder.service.plist`
-   - Linux: `sudo systemctl stop ascoder && sudo systemctl disable ascoder && sudo rm /etc/systemd/system/ascoder.service`
-2. **迁移数据**（如需保留）：导出 MySQL 数据 → 导入到 Docker volume 的 MySQL
-3. **重新安装**：`./installer/install.sh`（新版本会走 Docker Compose）
 
 ## Git Extra Hosts
 

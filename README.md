@@ -19,18 +19,11 @@ docker compose up -d --build
 
 启动后访问：http://localhost:5173
 
-### 使用安装脚本
-
-macOS / Linux：
+### Docker Compose 启动
 
 ```bash
-./installer/install.sh
-```
-
-Windows PowerShell：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\installer\install.ps1
+cp .env.example .env
+docker compose up -d
 ```
 
 ## 文档

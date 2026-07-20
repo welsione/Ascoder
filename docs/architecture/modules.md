@@ -1,6 +1,6 @@
 # Ascoder 模块边界
 
-本文档描述 Ascoder v1 的第一版能力模块边界。当前阶段先保持单体应用形态，通过包边界、端口接口和事件隔离约束依赖方向；边界稳定后再拆 Maven module。
+本文档描述 Ascoder 的逻辑模块边界（与 Maven 物理模块解耦，作为包内组织指引）。当前阶段保持单体应用形态，通过包边界、端口接口和事件隔离约束依赖方向。
 
 ## 包内组织原则
 
@@ -186,4 +186,3 @@ repository
 2. 将 AgentScope 工具类逐步拆成 `analysis` 能力和 `agent.tool` 装配能力。
 3. 为 repository 模块提供 ProjectSpace / Workspace Snapshot，减少跨模块传递 JPA Entity。
 4. 把 Skill 与 MCP 移入 Agent 扩展层的包结构。
-5. 在边界稳定后拆分 Maven module。

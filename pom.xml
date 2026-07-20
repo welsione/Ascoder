@@ -12,8 +12,6 @@
     <name>Ascoder</name>
 
     <modules>
-        <module>ascoder-common</module>
-        <module>ascoder-codegraph</module>
         <module>jprompt</module>
         <module>backend</module>
     </modules>
