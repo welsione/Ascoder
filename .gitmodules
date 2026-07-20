@@ -1,0 +1,4 @@
+[submodule "jprompt"]
+	path = jprompt
+	url = https://github.com/welsione/jprompt.git
+	ignore = dirty

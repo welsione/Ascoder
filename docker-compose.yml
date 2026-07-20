@@ -1,0 +1,87 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      args:
+        APT_PROXY: ${APT_PROXY:-}
+    container_name: ascoder-backend
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://host.docker.internal:3306/ascoder?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-ascoder}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-change-me}
+      LLM_PROVIDER: ${LLM_PROVIDER:-agentscope}
+      # Spring Boot env-to-property mapping: ASCODER_AGENT_MODEL_ID → ascoder.agent.model-id
+      ASCODER_AGENT_MODEL_ID: ${AGENT_MODEL_ID:-}
+      ASCODER_AGENT_API_KEY: ${MINIMAX_API_KEY:-}
+      ASCODER_AGENT_BASE_URL: ${AGENT_BASE_URL:-}
+      ASCODER_AGENT_MAX_TOKENS: ${AGENT_MAX_TOKENS:-4000}
+      ASCODER_AGENT_TIMEOUT_SECONDS: ${AGENT_TIMEOUT_SECONDS:-240}
+      ASCODER_AGENT_TOOL_TIMEOUT_SECONDS: ${AGENT_TOOL_TIMEOUT_SECONDS:-300}
+      ASCODER_AGENT_MAX_ITERS: ${AGENT_MAX_ITERS:-12}
+      ASCODER_AGENT_SSE_TIMEOUT_SECONDS: ${AGENT_SSE_TIMEOUT_SECONDS:-600}
+      ASCODER_AGENT_CODE_RESEARCHER_MAX_ITERS: ${AGENT_CODE_RESEARCHER_MAX_ITERS:-100}
+      ASCODER_AGENT_IMPACT_ANALYZER_MAX_ITERS: ${AGENT_IMPACT_ANALYZER_MAX_ITERS:-8}
+      ASCODER_AGENT_MODEL_MAX_ATTEMPTS: ${AGENT_MODEL_MAX_ATTEMPTS:-2}
+      ASCODER_AGENT_TOOL_MAX_ATTEMPTS: ${AGENT_TOOL_MAX_ATTEMPTS:-1}
+      ASCODER_AGENT_PLANNING_ENABLED: ${AGENT_PLANNING_ENABLED:-true}
+      ASCODER_AGENT_PLAN_MAX_SUBTASKS: ${AGENT_PLAN_MAX_SUBTASKS:-10}
+      MINIMAX_API_KEY: ${MINIMAX_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      REPO_ROOT: /app/data/repos
+      WORKTREE_ROOT: /app/data/worktrees
+      PROJECT_SPACE_ROOT: /app/data/project-spaces
+      CODEGRAPH_ROOT: /app/data/codegraph
+      CODEGRAPH_EXECUTABLE: codegraph
+      CODEGRAPH_TIMEOUT_SECONDS: ${CODEGRAPH_TIMEOUT_SECONDS:-300}
+      CODEGRAPH_INDEX_TIMEOUT_SECONDS: ${CODEGRAPH_INDEX_TIMEOUT_SECONDS:-3600}
+      GIT_TIMEOUT_SECONDS: ${GIT_TIMEOUT_SECONDS:-120}
+      # HTTPS token for git clone (optional, used as password in credential store)
+      GIT_TOKEN: ${GIT_TOKEN:-}
+      GIT_USERNAME: ${GIT_USERNAME:-git}
+      # Extra git hosts (comma or space separated, in addition to github.com/gitlab.com/gitee.com)
+      # Wildcards are NOT supported — git credential store does not match globs.
+      GIT_EXTRA_HOSTS: ${GIT_EXTRA_HOSTS:-}
+      # HTTP proxy for Git HTTPS operations (optional, resolves GnuTLS incompatibility)
+      # Runs a CONNECT proxy on the host; container Git uses it as TLS termination.
+      ASCODER_GIT_HTTP_PROXY: ${GIT_HTTP_PROXY:-}
+      # TLS termination proxy (optional, resolves GnuTLS handshake failures)
+      # Set to http://host.docker.internal:8443 and run: python3 git-tls-proxy.py 8443
+      GIT_TLS_PROXY: ${GIT_TLS_PROXY:-}
+      ASCODER_GIT_TLS_PROXY: ${GIT_TLS_PROXY:-}
+      JVM_OPTS: ${JVM_OPTS:--Xmx512m -Xms256m}
+    volumes:
+      - ./data/repos:/app/data/repos
+      - ./data/worktrees:/app/data/worktrees
+      - ./data/project-spaces:/app/data/project-spaces
+      - ./data/codegraph:/app/data/codegraph
+      # Mount SSH keys for Git SSH access (read-only, optional)
+      - ${HOME}/.ssh:/home/ascoder/.ssh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:18080/api/health >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  frontend:
+    build:
+      context: ./frontend/web
+      args:
+        VITE_API_BASE_URL: ""
+    container_name: ascoder-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${APP_PORT:-5173}:80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10

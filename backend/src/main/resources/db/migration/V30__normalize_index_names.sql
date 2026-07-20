@@ -1,0 +1,28 @@
+-- 规范索引命名为 camelCase，消除历史 idx_ 下划线前缀。
+-- 仅重命名索引名，不改变索引结构。
+
+ALTER TABLE agentEvent RENAME INDEX idx_agentEvent_question TO idxAgentEventQuestion;
+
+ALTER TABLE logUploads RENAME INDEX idx_logUploads_projectSpace_createdAt TO idxLogUploadsProjectSpaceCreatedAt;
+
+ALTER TABLE learningAgentRuns RENAME INDEX idx_learningAgentRuns_space_created TO idxLearningAgentRunsSpaceCreated;
+ALTER TABLE learningAgentRuns RENAME INDEX idx_learningAgentRuns_space_status TO idxLearningAgentRunsSpaceStatus;
+
+ALTER TABLE learningRawEvents RENAME INDEX idx_learningRawEvents_space_type TO idxLearningRawEventsSpaceType;
+ALTER TABLE learningRawEvents RENAME INDEX idx_learningRawEvents_space_created TO idxLearningRawEventsSpaceCreated;
+ALTER TABLE learningRawEvents RENAME INDEX idx_learningRawEvents_question TO idxLearningRawEventsQuestion;
+
+ALTER TABLE logFiles RENAME INDEX idx_logFiles_upload TO idxLogFilesUpload;
+
+ALTER TABLE learningExperiences RENAME INDEX idx_learningExperiences_space_status TO idxLearningExperiencesSpaceStatus;
+ALTER TABLE learningExperiences RENAME INDEX idx_learningExperiences_space_type TO idxLearningExperiencesSpaceType;
+
+ALTER TABLE logAnalysisTasks RENAME INDEX idx_logAnalysisTasks_question TO idxLogAnalysisTasksQuestion;
+
+ALTER TABLE learningInsights RENAME INDEX idx_learningInsights_space_status TO idxLearningInsightsSpaceStatus;
+ALTER TABLE learningInsights RENAME INDEX idx_learningInsights_space_type TO idxLearningInsightsSpaceType;
+
+ALTER TABLE learningCorrections RENAME INDEX idx_learningCorrections_space_status TO idxLearningCorrectionsSpaceStatus;
+
+ALTER TABLE learningKnowledgeItems RENAME INDEX idx_learningKnowledgeItems_space_status TO idxLearningKnowledgeItemsSpaceStatus;
+ALTER TABLE learningKnowledgeItems RENAME INDEX idx_learningKnowledgeItems_space_type TO idxLearningKnowledgeItemsSpaceType;

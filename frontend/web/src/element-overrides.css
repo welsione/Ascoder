@@ -1,0 +1,235 @@
+/* ── Element Plus 组件样式覆盖（桌面端） ── */
+
+/* ── 全局 Button ── */
+.el-button {
+  border-radius: var(--radius-full);
+  font-weight: var(--font-weight-semibold);
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast),
+    opacity var(--transition-fast),
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.el-button:not(.is-text):not(.is-link) {
+  border-color: var(--stroke);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: none;
+}
+
+.el-button:not(.is-text):not(.is-link):hover {
+  border-color: var(--stroke-strong);
+  background: var(--primary-soft);
+  color: var(--text);
+}
+
+.el-button--primary:not(.is-text):not(.is-link) {
+  border-color: var(--chat-accent);
+  background: var(--chat-accent);
+  color: #fff;
+}
+
+.el-button--primary:not(.is-text):not(.is-link):hover,
+.el-button--primary:not(.is-text):not(.is-link):focus {
+  border-color: var(--chat-accent);
+  background: var(--chat-accent);
+  color: #fff;
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.el-button--danger:not(.is-text):not(.is-link) {
+  border-color: rgba(220, 38, 38, 0.24);
+  background: #fff;
+  color: var(--danger);
+}
+
+.el-button--danger:not(.is-text):not(.is-link):hover,
+.el-button--danger:not(.is-text):not(.is-link):focus {
+  border-color: var(--danger);
+  background: #fef2f2;
+  color: var(--danger);
+}
+
+.el-button--danger.is-plain:not(.is-text):not(.is-link) {
+  border-color: rgba(220, 38, 38, 0.24);
+  background: #fff;
+  color: var(--danger);
+}
+
+.el-button--info:not(.is-text):not(.is-link) {
+  color: var(--subtle);
+}
+
+.el-button.is-disabled,
+.el-button.is-loading {
+  transform: none;
+}
+
+/* ── Tag 圆角 ── */
+.el-tag,
+.message-head .el-tag,
+.history-item-head .el-tag {
+  border-radius: var(--radius-full);
+  font-weight: var(--font-weight-medium);
+  font-size: var(--font-size-xs);
+}
+
+/* ── 输入控件 ── */
+.el-input__wrapper,
+.el-select__wrapper,
+.el-textarea__inner {
+  border-radius: var(--radius-lg);
+  background: var(--surface-soft);
+  box-shadow: 0 0 0 1px var(--stroke) inset;
+  transition:
+    box-shadow var(--transition-fast),
+    background var(--transition-fast);
+}
+
+.el-input__wrapper:hover,
+.el-select__wrapper:hover,
+.el-input__wrapper.is-focus,
+.el-select__wrapper.is-focused,
+.el-textarea__inner:focus {
+  background: var(--surface);
+  box-shadow:
+    0 0 0 1px var(--chat-composer-focus) inset,
+    0 0 0 3px rgba(79, 110, 247, 0.08);
+}
+
+.el-input__inner,
+.el-select__placeholder,
+.el-textarea__inner {
+  color: var(--text);
+  font-size: var(--font-size-md);
+}
+
+.el-input__inner::placeholder,
+.el-textarea__inner::placeholder {
+  color: var(--muted);
+}
+
+/* ── 表格 ── */
+.el-table {
+  --el-table-border-color: var(--stroke);
+  --el-table-header-bg-color: var(--surface);
+  --el-table-tr-bg-color: var(--surface);
+  --el-table-row-hover-bg-color: var(--primary-soft);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  color: var(--text);
+}
+
+.el-table th.el-table__cell {
+  color: var(--subtle);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.el-table .cell {
+  line-height: var(--line-height-normal);
+}
+
+/* ── Select 下拉 ── */
+.context-controls .el-select .el-select__wrapper {
+  min-height: 38px;
+  border-radius: var(--radius-lg);
+  background: var(--surface-soft);
+  box-shadow: 0 0 0 1px var(--stroke-strong) inset;
+  transition:
+    box-shadow var(--transition-normal),
+    background var(--transition-normal);
+}
+
+.context-controls .el-select .el-select__wrapper:hover,
+.context-controls .el-select .el-select__wrapper.is-focused {
+  background: var(--surface);
+  box-shadow:
+    0 0 0 1px var(--chat-composer-focus) inset,
+    0 0 0 3px rgba(79, 110, 247, 0.08);
+}
+
+/* ── Textarea（Composer 内） ── */
+.composer-input-shell .el-textarea__inner {
+  box-shadow: none;
+  border: 0;
+  padding: var(--spacing-2) var(--spacing-3);
+  background: transparent;
+  font-size: var(--font-size-lg);
+  line-height: var(--line-height-relaxed);
+  color: var(--text);
+}
+
+.composer-input-shell .el-textarea__inner::placeholder {
+  color: var(--muted);
+}
+
+.composer-input-shell .el-textarea.is-disabled .el-textarea__inner {
+  color: var(--muted);
+  -webkit-text-fill-color: var(--muted);
+}
+
+.composer-input-shell .el-input.is-disabled .el-input__count {
+  color: var(--stroke-strong);
+}
+
+.composer-input-shell .el-input__count {
+  padding: 0 var(--spacing-2) var(--spacing-1) 0;
+  color: var(--muted);
+  background: transparent;
+  font-size: var(--font-size-xs);
+}
+
+/* ── Button（Composer 操作） ── */
+.composer-actions .el-button {
+  min-width: 104px;
+  height: 40px;
+  padding: 0 var(--spacing-5);
+  border: 0;
+  border-radius: var(--radius-full);
+  box-shadow: none;
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-md);
+  transition:
+    background var(--transition-fast),
+    opacity var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.composer-actions .el-button--primary {
+  background: var(--chat-accent);
+  color: #fff;
+}
+
+.composer-actions .el-button--primary:hover {
+  background: var(--chat-accent);
+  opacity: 0.88;
+  transform: translateY(-1px);
+}
+
+.composer-actions .el-button--danger {
+  border-radius: var(--radius-full);
+}
+
+.composer-actions .el-button.is-disabled,
+.composer-actions .el-button.is-loading {
+  box-shadow: none;
+  transform: none;
+}
+
+/* ── Alert ── */
+.message-assistant .el-alert {
+  border-radius: var(--radius-md);
+  margin-top: var(--spacing-2);
+}
+
+/* ── 平板端 ── */
+@media (max-width: 900px) {
+  .composer-actions .el-button {
+    min-width: 96px;
+  }
+}

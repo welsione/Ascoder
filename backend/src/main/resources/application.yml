@@ -1,0 +1,63 @@
+server:
+  port: 18080
+
+spring:
+  application:
+    name: ascoder-backend
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/ascoder?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai}
+    username: ${SPRING_DATASOURCE_USERNAME:ascoder}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+    open-in-view: false
+  flyway:
+    enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+ascoder:
+  prompt:
+    source: ${ASCODER_PROMPT_SOURCE:file}  # file=开发环境（文件优先）, db=生产环境（数据库优先）
+  encryption-key: ${ASCODER_ENCRYPTION_KEY:}
+  repo-root: ${REPO_ROOT:./data/repos}
+  worktree-root: ${WORKTREE_ROOT:./data/worktrees}
+  project-space-root: ${PROJECT_SPACE_ROOT:./data/project-spaces}
+  codegraph-root: ${CODEGRAPH_ROOT:./data/codegraph}
+  llm-provider: ${LLM_PROVIDER:database}
+  agent:
+    tool-timeout-seconds: ${AGENT_TOOL_TIMEOUT_SECONDS:300}
+    max-iters: ${AGENT_MAX_ITERS:12}
+    stream-core-threads: ${AGENT_STREAM_CORE_THREADS:2}
+    stream-max-threads: ${AGENT_STREAM_MAX_THREADS:16}
+    stream-queue-capacity: ${AGENT_STREAM_QUEUE_CAPACITY:64}
+    code-researcher-max-iters: ${AGENT_CODE_RESEARCHER_MAX_ITERS:100}
+    impact-analyzer-max-iters: ${AGENT_IMPACT_ANALYZER_MAX_ITERS:8}
+    role-specialist-max-iters: ${AGENT_ROLE_SPECIALIST_MAX_ITERS:8}
+    sse-timeout-seconds: ${AGENT_SSE_TIMEOUT_SECONDS:600}
+    heartbeat-interval-seconds: ${AGENT_HEARTBEAT_INTERVAL_SECONDS:30}
+    model-max-attempts: ${AGENT_MODEL_MAX_ATTEMPTS:2}
+    tool-max-attempts: ${AGENT_TOOL_MAX_ATTEMPTS:1}
+    planning-enabled: ${AGENT_PLANNING_ENABLED:true}
+    plan-max-subtasks: ${AGENT_PLAN_MAX_SUBTASKS:10}
+    query-planner-enabled: ${AGENT_QUERY_PLANNER_ENABLED:false}
+    query-planner-confidence-threshold: ${AGENT_QUERY_PLANNER_CONFIDENCE_THRESHOLD:0.65}
+    query-planner-ambiguous-threshold: ${AGENT_QUERY_PLANNER_AMBIGUOUS_THRESHOLD:0.82}
+    query-planner-max-iters: ${AGENT_QUERY_PLANNER_MAX_ITERS:2}
+  codegraph:
+    executable: ${CODEGRAPH_EXECUTABLE:codegraph}
+    timeout-seconds: ${CODEGRAPH_TIMEOUT_SECONDS:300}
+    index-timeout-seconds: ${CODEGRAPH_INDEX_TIMEOUT_SECONDS:3600}
+  git:
+    timeout-seconds: ${GIT_TIMEOUT_SECONDS:120}

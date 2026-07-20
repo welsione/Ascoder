@@ -1,0 +1,40 @@
+# IDE
+.idea/
+*.iml
+
+# OS
+.DS_Store
+
+# Frontend (not needed for backend build)
+frontend/
+
+# Runtime data
+data/
+.codegraph/
+
+# Environment
+.env
+.env.local
+
+# Git
+.git/
+.gitignore
+
+# Docker (avoid recursive context)
+docker-compose*.yml
+.dockerignore
+
+# Dev tools
+.record/.dev/
+.record/.prod/
+.superpowers/
+.agentscope/
+.claude/
+.zread/
+
+# Docs
+*.md
+!README.md
+
+# Test artifacts
+test-screenshots/

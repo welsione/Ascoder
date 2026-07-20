@@ -1,0 +1,56 @@
+# IDE
+.idea/
+.idea/workspace.xml
+*.iml
+
+# OS
+.DS_Store
+
+# Java
+target/
+*.class
+
+# Node
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
+docker-compose.override.yml
+start-local.sh
+
+# Runtime data
+.codegraph/
+data/
+
+# Claude Code
+CLAUDE_ZH.md
+.claude/settings.local.json
+
+# AgentScope
+.agentscope/
+
+# Dev tools & local config
+.record/
+.report/
+.superpowers/
+AGENTS.md
+jprompt
+backend/.mvn/
+backend/src/main/resources/application-local.yml
+
+# Test artifacts
+test-screenshots/
+
+# Auto-generated type declarations
+auto-imports.d.ts
+components.d.ts
+
+# Logs
+*.log
+
+# Build output
+build/
