@@ -1,0 +1,54 @@
+name: AI Code Review
+
+on:
+  pull_request:
+    types: [opened, ready_for_review, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Anthropic SDK
+        if: env.HAS_KEY == 'true'
+        run: npm install --no-save @anthropic-ai/sdk
+
+      - name: Run AI reviewer
+        id: reviewer
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          BASE_URL: ${{ vars.MINIMAX_BASE_URL }}
+          MODEL_ID: ${{ vars.MINIMAX_MODEL_ID }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node .github/scripts/ai-review.mjs
+
+      - name: Post skip notice when secret missing
+        if: env.HAS_KEY != 'true'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: ai-review-skipped
+          message: |
+            ⚠️ AI 代码评审已跳过：仓库未配置 `ANTHROPIC_API_KEY` secret。
+            请仓库管理员在 Settings → Secrets and variables → Actions → New repository secret
+            添加 `ANTHROPIC_API_KEY`（值取自 https://api.minimaxi.com）。
+            可同时添加变量 `MINIMAX_MODEL_ID`（默认 `MiniMax-M3`）与 `MINIMAX_BASE_URL`（默认 `https://api.minimaxi.com/anthropic`）。
