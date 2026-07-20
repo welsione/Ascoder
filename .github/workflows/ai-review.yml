@@ -31,9 +31,9 @@ jobs:
       - name: Run AI reviewer
         id: reviewer
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          BASE_URL: ${{ vars.MINIMAX_BASE_URL }}
-          MODEL_ID: ${{ vars.MINIMAX_MODEL_ID }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          BASE_URL: ${{ vars.LLM_BASE_URL }}
+          MODEL_ID: ${{ vars.LLM_MODEL_ID }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}
@@ -48,7 +48,10 @@ jobs:
         with:
           header: ai-review-skipped
           message: |
-            ⚠️ AI 代码评审已跳过：仓库未配置 `ANTHROPIC_API_KEY` secret。
+            ⚠️ AI 代码评审已跳过：仓库未配置 `LLM_API_KEY` secret。
             请仓库管理员在 Settings → Secrets and variables → Actions → New repository secret
-            添加 `ANTHROPIC_API_KEY`（值取自 https://api.minimaxi.com）。
-            可同时添加变量 `MINIMAX_MODEL_ID`（默认 `MiniMax-M3`）与 `MINIMAX_BASE_URL`（默认 `https://api.minimaxi.com/anthropic`）。
+            添加 `LLM_API_KEY`（取值自你接入的 Anthropic 兼容 LLM 服务，例如
+            https://api.minimaxi.com/anthropic）。
+            可同时添加变量 `LLM_BASE_URL`（默认 `https://api.minimaxi.com/anthropic`）
+            与 `LLM_MODEL_ID`（默认 `MiniMax-M3`）。
+            本工作流可对接任意 Anthropic 兼容 provider。

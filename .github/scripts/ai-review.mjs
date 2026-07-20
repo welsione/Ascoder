@@ -1,17 +1,18 @@
 #!/usr/bin/env node
 /**
- * AI Code Review via MiniMax (Anthropic-compatible endpoint).
+ * AI Code Review via any Anthropic-compatible LLM endpoint.
  *
  * Required env:
- *   ANTHROPIC_API_KEY  MiniMax / Anthropic API key
- *   BASE_URL           default https://api.minimaxi.com/anthropic
- *   MODEL_ID           default MiniMax-M3
- *   PR_NUMBER          PR number to comment on
- *   PR_TITLE           PR title
- *   PR_BODY            PR body (may be null)
- *   PR_BASE_REF        e.g. master
+ *   LLM_API_KEY    API key for the chosen provider
+ *   BASE_URL       default https://api.minimaxi.com/anthropic (MiniMax) /
+ *                  https://api.anthropic.com (Anthropic) / etc.
+ *   MODEL_ID       default MiniMax-M3
+ *   PR_NUMBER      PR number to comment on
+ *   PR_TITLE       PR title
+ *   PR_BODY        PR body (may be null)
+ *   PR_BASE_REF    e.g. master
  *   GITHUB_REPOSITORY  e.g. welsione/Ascoder
- *   GITHUB_TOKEN       GitHub Actions token (pull-requests: write)
+ *   GITHUB_TOKEN   GitHub Actions token (pull-requests: write)
  */
 import Anthropic from '@anthropic-ai/sdk'
 import { readFile, writeFile } from 'node:fs/promises'
@@ -33,7 +34,7 @@ function getOptional(name, def) {
 }
 
 async function main() {
-  const apiKey = mustGet('ANTHROPIC_API_KEY')
+  const apiKey = mustGet('LLM_API_KEY')
   const baseUrl = getOptional('BASE_URL', 'https://api.minimaxi.com/anthropic')
   const modelId = getOptional('MODEL_ID', 'MiniMax-M3')
 
@@ -101,8 +102,8 @@ async function main() {
   }
 
   // 5. find bot's previous review comment and update or create new
-  const commentHeader = '## 🤖 AI Code Review (MiniMax-M3)'
-  const finalBody = `${commentHeader}\n\n${reviewText}\n\n---\n<sub>Reviewed commit \`${process.env.GITHUB_SHA ?? 'HEAD'}\` · model \`${modelId}\` via \`${baseUrl}\`.</sub>`
+  const commentHeader = '## 🤖 AI Code Review'
+  const finalBody = `${commentHeader} (${modelId})\n\n${reviewText}\n\n---\n<sub>Reviewed commit \`${process.env.GITHUB_SHA ?? 'HEAD'}\` · model \`${modelId}\` via \`${baseUrl}\`.</sub>`
 
   const listUrl = `https://api.github.com/repos/${repo}/issues/${prNumber}/comments?per_page=100`
   const headers = {
