@@ -2,7 +2,7 @@
 """简单的 HTTPS CONNECT 代理，用于让 Docker 容器内的 Git 通过宿主机访问 TLS 不兼容的服务器。
 
 用法：
-  python3 git-https-proxy.py [port]
+  python3 scripts/git-https-proxy.py [port]   # 在仓库根目录运行
 
 然后在 docker-compose.yml 中设置：
   GIT_HTTP_PROXY: http://host.docker.internal:<port>

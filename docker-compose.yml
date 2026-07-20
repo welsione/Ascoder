@@ -50,7 +50,7 @@ services:
       # Runs a CONNECT proxy on the host; container Git uses it as TLS termination.
       ASCODER_GIT_HTTP_PROXY: ${GIT_HTTP_PROXY:-}
       # TLS termination proxy (optional, resolves GnuTLS handshake failures)
-      # Set to http://host.docker.internal:8443 and run: python3 git-tls-proxy.py 8443
+      # Set to http://host.docker.internal:8443 and run: python3 scripts/git-tls-proxy.py 8443
       GIT_TLS_PROXY: ${GIT_TLS_PROXY:-}
       ASCODER_GIT_TLS_PROXY: ${GIT_TLS_PROXY:-}
       JVM_OPTS: ${JVM_OPTS:--Xmx512m -Xms256m}

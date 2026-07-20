@@ -5,7 +5,7 @@
 容器内的 Git 使用 http:// 代替 https:// 访问此代理。
 
 用法：
-  1. 启动代理：python3 git-tls-proxy.py 8443
+  1. 启动代理（仓库根目录）：python3 scripts/git-tls-proxy.py 8443
   2. 在容器内设置 Git insteadOf：
      git config --system url."http://host.docker.internal:8443/https://".insteadOf "https://"
   3. 或在 Java 代码中通过 GIT_CONFIG_COUNT 等环境变量设置
