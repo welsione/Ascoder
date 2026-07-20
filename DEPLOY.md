@@ -192,7 +192,7 @@ docker info | Select-String "OSType"
 | PowerShell ExecutionPolicy | `install.ps1` 运行报"running scripts is disabled" | `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` 或 `powershell -ExecutionPolicy Bypass -File .\install.ps1` |
 | 家庭版 Windows 10/11 | 没有 Hyper-V 默认无法跑 Docker Desktop | 安装 WSL2 内核更新后用 WSL2 后端；或升级到 Pro |
 | 企业域账户 | `Set-ExecutionPolicy` 被 Group Policy 锁 | 只能用 `powershell -ExecutionPolicy Bypass -File` 单次覆盖 |
-| 公司内网代理 | Docker Desktop 拉不到 Docker Hub 镜像 | Settings → Resources → Proxies 配置 HTTP/HTTPS 代理；或预 `docker save` 离线 tarball |
+| 内网代理 | Docker Desktop 拉不到 Docker Hub 镜像 | Settings → Resources → Proxies 配置 HTTP/HTTPS 代理；或预 `docker save` 离线 tarball |
 | 旧版 install.sh 注册过 launchd / systemd | 升级后 `docker compose up` 报端口占用 | `launchctl unload` / `systemctl stop ascoder` + 删除 plist/unit |
 
 ### 升级指引
