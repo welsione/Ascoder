@@ -25,9 +25,9 @@ log() {
 # 容错：服务器到 GitHub 的网络可能不稳定（尤其老版 git），fetch 超时或失败时跳过文件更新，
 # 继续走 GHCR 拉镜像--compose 结构低频变化，旧版本通常也能跑；镜像更新走 GHCR CDN，不受 git 网络影响。
 log "fetching latest deployment files from origin/master..."
-if timeout 60 git fetch origin master --depth=1 --quiet 2>>"$LOG_FILE"; then
+if timeout 15 git fetch origin master --depth=1 --quiet >>"$LOG_FILE" 2>&1; then
     # 只 checkout 部署相关文件，不触碰 .env / data/（它们未跟踪，见 .gitignore）
-    git checkout origin/master -- "$COMPOSE_FILE" .env.example scripts/ 2>/dev/null || true
+    git checkout origin/master -- "$COMPOSE_FILE" .env.example scripts/ >>"$LOG_FILE" 2>&1 || true
     log "deployment files synced."
 else
     log "WARN: git fetch timed out or failed (network unstable); continuing with current compose."
