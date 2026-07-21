@@ -12,7 +12,6 @@ import io.agentscope.core.model.StructuredOutputReminder;
 import io.agentscope.harness.agent.HarnessAgent;
 import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Path;
@@ -24,7 +23,6 @@ import java.util.Optional;
  */
 @Slf4j
 @Component
-@ConditionalOnProperty(name = "ascoder.llm-provider", havingValue = "agentscope", matchIfMissing = true)
 public class AgentScopeQuestionPlanningAgent implements QuestionPlanningAgent {
 
     private static final String PLANNER_TEMPLATE_PATH = "prompts/query-planner-agent.md";
