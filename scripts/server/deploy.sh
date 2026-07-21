@@ -33,6 +33,21 @@ else
     log "WARN: git fetch timed out or failed (network unstable); continuing with current compose."
 fi
 
+# 1.5 自动生成 ASCODER_ENCRYPTION_KEY（首次部署）
+# 非开发环境必须配置加密密钥（ApiKeyEncryptor 在非 dev profile 下不允许默认密钥），
+# 未配置会导致配置 LLM provider 时 encrypt() 抛异常 -> 409。
+# 首次部署自动生成并持久化到 .env；后续保留已生成的密钥（变更后已加密数据无法解密）。
+# 如需自定义密钥，在 .env 手动设置 ASCODER_ENCRYPTION_KEY 即可，脚本不会覆盖。
+if [ -f .env ] && ! grep -q "^ASCODER_ENCRYPTION_KEY=." .env 2>/dev/null; then
+    KEY=$(openssl rand -base64 32)
+    if grep -q "^ASCODER_ENCRYPTION_KEY=" .env 2>/dev/null; then
+        awk -v k="$KEY" '/^ASCODER_ENCRYPTION_KEY=/{print "ASCODER_ENCRYPTION_KEY=" k; next} 1' .env > .env.tmp && mv .env.tmp .env
+    else
+        echo "ASCODER_ENCRYPTION_KEY=$KEY" >> .env
+    fi
+    log "generated ASCODER_ENCRYPTION_KEY into .env (auto)"
+fi
+
 # 2. 拉取最新镜像
 log "pulling images..."
 if ! docker compose -f "$COMPOSE_FILE" pull 2>&1 | tee -a "$LOG_FILE"; then

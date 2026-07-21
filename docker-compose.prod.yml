@@ -14,6 +14,10 @@ services:
       SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-ascoder}
       SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-change-me}
       LLM_PROVIDER: ${LLM_PROVIDER:-agentscope}
+      # AES-256 API Key 加密密钥（Base64 编码的 32 字节）。
+      # 未配置时在「设置 -> 模型供应商」页面添加 provider 会因 encrypt() 抛异常返回 409。
+      # 生成：openssl rand -base64 32
+      ASCODER_ENCRYPTION_KEY: ${ASCODER_ENCRYPTION_KEY:-}
       # Spring Boot env-to-property mapping: ASCODER_AGENT_MODEL_ID -> ascoder.agent.model-id
       ASCODER_AGENT_MODEL_ID: ${AGENT_MODEL_ID:-}
       ASCODER_AGENT_API_KEY: ${MINIMAX_API_KEY:-}
