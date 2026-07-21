@@ -1,7 +1,18 @@
 #!/bin/sh
 # Entrypoint script for Ascoder backend container.
-# Sets up git credentials before starting the application.
+# Runs as root to chown mounted volumes, then drops to ascoder via gosu.
 set -eu
+
+# --- Privilege drop: chown mounted volumes, then re-exec as ascoder ---
+# 挂载卷（./data/*）由 docker daemon 以 root 创建，ascoder 无写权限会导致 git clone 报
+# Permission denied（如 "could not create work tree dir '/app/data/repos/...'"）。
+# 启动时以 root 修正属主，再用 gosu 降权运行 java，兼顾安全与可用。
+if [ "$(id -u)" = "0" ]; then
+    chown -R ascoder:ascoder /app/data 2>/dev/null || true
+    exec gosu ascoder "$0" "$@"
+fi
+
+export HOME=/home/ascoder
 
 # --- Git HTTPS credential setup ---
 

@@ -84,6 +84,15 @@ if ! grep -q "^ASCODER_ENCRYPTION_KEY=." .env 2>/dev/null; then
     echo "generated ASCODER_ENCRYPTION_KEY into .env (auto)"
 fi
 
+# 3.6 预创建数据目录并修正属主
+# 容器内 backend 以 uid 1000 (ascoder) 运行；docker compose 挂载的 ./data/* 默认 root 拥有，
+# 会导致 git clone 报 Permission denied。容器 entrypoint 启动时也会 chown，这里预创建可
+# 避免首次启动的额外开销，并兜底边缘情况。
+mkdir -p data/repos data/worktrees data/project-spaces data/codegraph
+if [ "$(id -u)" = "0" ]; then
+    chown -R 1000:1000 data/ 2>/dev/null || true
+fi
+
 # 4. 安装 / 更新 cron
 SCRIPT="$INSTALL_DIR/scripts/server/deploy.sh"
 chmod +x "$SCRIPT"
