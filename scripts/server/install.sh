@@ -33,6 +33,7 @@ echo ""
 command -v git >/dev/null || { echo "ERROR: git not found, install it first"; exit 1; }
 command -v docker >/dev/null || { echo "ERROR: docker not found, install Docker Engine first"; exit 1; }
 docker compose version >/dev/null 2>&1 || { echo "ERROR: docker compose plugin not found"; exit 1; }
+command -v openssl >/dev/null || { echo "ERROR: openssl not found, install it first (used to generate ASCODER_ENCRYPTION_KEY)"; exit 1; }
 
 # 2. 克隆或更新仓库（带超时与重试，应对到 GitHub 网络不稳定）
 clone_or_sync() {
@@ -68,6 +69,19 @@ if [ ! -f .env ]; then
     echo "created .env from template."
 else
     echo ".env already exists, keep it."
+fi
+
+# 3.5 自动生成 ASCODER_ENCRYPTION_KEY（未配置时）
+# 非开发环境必须配置加密密钥（ApiKeyEncryptor 在非 dev profile 下不允许默认密钥）。
+# 首次安装自动生成并持久化到 .env；如需自定义，在 .env 手动设置即可，脚本不会覆盖。
+if ! grep -q "^ASCODER_ENCRYPTION_KEY=." .env 2>/dev/null; then
+    KEY=$(openssl rand -base64 32)
+    if grep -q "^ASCODER_ENCRYPTION_KEY=" .env 2>/dev/null; then
+        awk -v k="$KEY" '/^ASCODER_ENCRYPTION_KEY=/{print "ASCODER_ENCRYPTION_KEY=" k; next} 1' .env > .env.tmp && mv .env.tmp .env
+    else
+        echo "ASCODER_ENCRYPTION_KEY=$KEY" >> .env
+    fi
+    echo "generated ASCODER_ENCRYPTION_KEY into .env (auto)"
 fi
 
 # 4. 安装 / 更新 cron
