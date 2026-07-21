@@ -39,8 +39,8 @@ command -v openssl >/dev/null || { echo "ERROR: openssl not found, install it fi
 clone_or_sync() {
     if [ -d "$INSTALL_DIR/.git" ]; then
         echo "existing repo found at $INSTALL_DIR, syncing..."
-        if timeout 60 git -C "$INSTALL_DIR" fetch origin "$BRANCH" --depth=1 --quiet 2>/dev/null; then
-            git -C "$INSTALL_DIR" checkout -B "$BRANCH" "origin/$BRANCH" --quiet
+        if ( cd "$INSTALL_DIR" && timeout 60 git fetch origin "$BRANCH" --depth=1 --quiet 2>/dev/null ); then
+            ( cd "$INSTALL_DIR" && git checkout -B "$BRANCH" "origin/$BRANCH" --quiet )
             return 0
         fi
         echo "WARN: fetch failed (network unstable), keeping existing checkout."
