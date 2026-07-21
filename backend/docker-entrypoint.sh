@@ -8,7 +8,11 @@ set -eu
 # Permission denied（如 "could not create work tree dir '/app/data/repos/...'"）。
 # 启动时以 root 修正属主，再用 gosu 降权运行 java，兼顾安全与可用。
 if [ "$(id -u)" = "0" ]; then
-    chown -R ascoder:ascoder /app/data 2>/dev/null || true
+    # 仅在挂载卷属主非 ascoder 时才全量 chown，避免每次启动递归大目录的开销。
+    # chown 失败不吞错（不加 2>/dev/null || true），让权限问题在启动时暴露而非运行时报错。
+    if [ "$(stat -c %U /app/data/repos 2>/dev/null || echo root)" != "ascoder" ]; then
+        chown -R ascoder:ascoder /app/data
+    fi
     exec gosu ascoder "$0" "$@"
 fi
 
