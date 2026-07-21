@@ -84,6 +84,12 @@ if ! grep -q "^ASCODER_ENCRYPTION_KEY=." .env 2>/dev/null; then
     echo "generated ASCODER_ENCRYPTION_KEY into .env (auto)"
 fi
 
+# 3.6 预创建数据目录
+# docker compose 挂载的 ./data/* 默认 root 拥有，容器内 ascoder 用户无写权限。
+# 这里仅预创建目录；属主由容器 entrypoint 启动时 chown 修正（见 backend/docker-entrypoint.sh）。
+# 不在宿主机 chown：ascoder 是 -r 系统用户，uid 镜像内自动分配，宿主机无法预知。
+mkdir -p data/repos data/worktrees data/project-spaces data/codegraph
+
 # 4. 安装 / 更新 cron
 SCRIPT="$INSTALL_DIR/scripts/server/deploy.sh"
 chmod +x "$SCRIPT"
