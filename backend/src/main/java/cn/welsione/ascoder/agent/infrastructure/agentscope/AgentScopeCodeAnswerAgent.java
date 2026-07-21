@@ -31,7 +31,6 @@ import io.agentscope.harness.agent.HarnessAgent;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 
@@ -46,7 +45,6 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 @Slf4j
 @Component
-@ConditionalOnProperty(name = "ascoder.llm-provider", havingValue = "agentscope", matchIfMissing = true)
 @RequiredArgsConstructor
 public class AgentScopeCodeAnswerAgent implements CodeAnswerAgent {
 

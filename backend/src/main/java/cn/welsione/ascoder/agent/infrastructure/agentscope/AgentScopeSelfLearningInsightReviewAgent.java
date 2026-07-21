@@ -24,7 +24,6 @@ import io.agentscope.harness.agent.HarnessAgent;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
@@ -47,7 +46,6 @@ import java.util.regex.Pattern;
 @Primary
 @Component
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = "ascoder.llm-provider", havingValue = "agentscope", matchIfMissing = true)
 public class AgentScopeSelfLearningInsightReviewAgent implements SelfLearningInsightReviewAgent {
 
     static final String REVIEW_AGENT_ID = "self-learning-insight-review";
