@@ -34,16 +34,31 @@ command -v git >/dev/null || { echo "ERROR: git not found, install it first"; ex
 command -v docker >/dev/null || { echo "ERROR: docker not found, install Docker Engine first"; exit 1; }
 docker compose version >/dev/null 2>&1 || { echo "ERROR: docker compose plugin not found"; exit 1; }
 
-# 2. 克隆或更新仓库
-if [ -d "$INSTALL_DIR/.git" ]; then
-    echo "existing repo found at $INSTALL_DIR, syncing..."
-    git -C "$INSTALL_DIR" fetch origin "$BRANCH" --depth=1 --quiet
-    git -C "$INSTALL_DIR" checkout -B "$BRANCH" "origin/$BRANCH" --quiet
-else
+# 2. 克隆或更新仓库（带超时与重试，应对到 GitHub 网络不稳定）
+clone_or_sync() {
+    if [ -d "$INSTALL_DIR/.git" ]; then
+        echo "existing repo found at $INSTALL_DIR, syncing..."
+        if timeout 60 git -C "$INSTALL_DIR" fetch origin "$BRANCH" --depth=1 --quiet 2>/dev/null; then
+            git -C "$INSTALL_DIR" checkout -B "$BRANCH" "origin/$BRANCH" --quiet
+            return 0
+        fi
+        echo "WARN: fetch failed (network unstable), keeping existing checkout."
+        return 0
+    fi
     mkdir -p "$(dirname "$INSTALL_DIR")"
-    echo "cloning repo (shallow)..."
-    git clone --depth=1 --branch "$BRANCH" "$REPO_URL" "$INSTALL_DIR"
-fi
+    echo "cloning repo (shallow, with retries)..."
+    for attempt in 1 2 3; do
+        if timeout 180 git clone --depth=1 --branch "$BRANCH" "$REPO_URL" "$INSTALL_DIR" 2>/dev/null; then
+            return 0
+        fi
+        echo "  clone attempt $attempt failed, retrying in 3s..."
+        rm -rf "$INSTALL_DIR"
+        sleep 3
+    done
+    return 1
+}
+
+clone_or_sync || { echo "ERROR: failed to clone/sync repo after retries (check network to github.com)"; exit 1; }
 
 cd "$INSTALL_DIR"
 

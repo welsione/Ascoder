@@ -174,6 +174,7 @@ echo "<your-PAT>" | docker login ghcr.io -u <github-username> --password-stdin
 | 症状 | 原因 / 解决 |
 | --- | --- |
 | `deploy.sh` 报 image pull failed | 仓库 private 且未 `docker login ghcr.io`；或服务器无法访问 `ghcr.io`（检查出网 / 代理） |
+| `deploy.sh` 日志出现 `git fetch timed out` | 服务器到 GitHub 网络不稳（老版 git / 慢网络常见）。deploy.sh 已容错：fetch 失败只跳过 compose 文件更新，仍会从 GHCR 拉镜像并重启--镜像更新不受影响。若 compose 结构有变更需手动同步：`cd /opt/ascoder && git fetch origin master && git checkout origin/master -- docker-compose.prod.yml scripts/`，或等下次 cron 自动重试 |
 | backend 容器反复重启 | 多半是 MySQL 连不上：检查宿主机 MySQL 是否监听 `0.0.0.0:3306`、`MYSQL_PASSWORD` 是否正确、用户是否允许从 `host.docker.internal` 连接 |
 | 前端能打开但接口 502 | backend 未通过 healthcheck；`docker compose logs backend` 看异常 |
 | cron 没生效 | `crontab -l` 确认有 `ascoder-auto-deploy` 行；`systemctl status cron`（或 crond）确认服务在跑 |
