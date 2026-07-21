@@ -8,9 +8,13 @@ set -eu
 # Permission denied（如 "could not create work tree dir '/app/data/repos/...'"）。
 # 启动时以 root 修正属主，再用 gosu 降权运行 java，兼顾安全与可用。
 if [ "$(id -u)" = "0" ]; then
-    # 仅在挂载卷属主非 ascoder 时才全量 chown，避免每次启动递归大目录的开销。
-    # chown 失败不吞错（不加 2>/dev/null || true），让权限问题在启动时暴露而非运行时报错。
-    if [ "$(stat -c %U /app/data/repos 2>/dev/null || echo root)" != "ascoder" ]; then
+    # 任一挂载卷属主非 ascoder 即全量 chown：只查 repos 会漏掉其他卷被外部改属主的情况。
+    # chown 单独放 if 内，失败不吞错（set -e 触发，启动时暴露），而非运行时报 Permission denied。
+    need_chown=0
+    for d in repos worktrees project-spaces codegraph; do
+        [ "$(stat -c %U "/app/data/$d" 2>/dev/null || echo root)" = "ascoder" ] || { need_chown=1; break; }
+    done
+    if [ "$need_chown" = "1" ]; then
         chown -R ascoder:ascoder /app/data
     fi
     exec gosu ascoder "$0" "$@"

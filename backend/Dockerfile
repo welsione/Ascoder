@@ -37,7 +37,8 @@ COPY backend/docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh \
     && chown ascoder:ascoder /app/docker-entrypoint.sh
 
-# No USER here - entrypoint runs as root to chown mounted volumes, then drops to ascoder via gosu
+# No USER here - entrypoint must run as root to chown mounted volumes, then drops to ascoder via gosu.
+# WARNING: 勿用 docker run --entrypoint 绕过 docker-entrypoint.sh，否则 java 会以 root 运行。
 
 EXPOSE 18080
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
