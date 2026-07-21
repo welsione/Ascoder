@@ -4,7 +4,7 @@
 # 服务器上配合 scripts/server/deploy.sh（cron 定时拉取）使用，详见 DEPLOY-LAN.md。
 services:
   backend:
-    image: ghcr.io/welsione/ascoder-backend:latest
+    image: ${ASCODER_IMAGE_PREFIX:-ghcr.io}/welsione/ascoder-backend:latest
     container_name: ascoder-backend
     restart: unless-stopped
     extra_hosts:
@@ -73,7 +73,7 @@ services:
       start_period: 30s
 
   frontend:
-    image: ghcr.io/welsione/ascoder-frontend:latest
+    image: ${ASCODER_IMAGE_PREFIX:-ghcr.io}/welsione/ascoder-frontend:latest
     container_name: ascoder-frontend
     restart: unless-stopped
     depends_on:
