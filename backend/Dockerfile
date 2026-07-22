@@ -28,8 +28,8 @@ RUN git config --system user.name "Ascoder" \
 # 注：不固定 uid。eclipse-temurin 的 ubuntu 用户已占用 uid/gid 1000，固定 1000 会冲突；
 # 用 -r 系统用户让 uid 自动分配，entrypoint 按用户名 chown 即可，宿主机无需预知 uid。
 RUN groupadd -r ascoder && useradd -r -g ascoder -m -d /home/ascoder ascoder \
-    && mkdir -p /app/data/repos /app/data/worktrees /app/data/project-spaces /app/data/codegraph \
-    && chown -R ascoder:ascoder /app/data /home/ascoder
+    && mkdir -p /app/data/repos /app/data/worktrees /app/data/project-spaces /app/data/codegraph /app/logs \
+    && chown -R ascoder:ascoder /app/data /app/logs /home/ascoder
 
 COPY backend/target/ascoder-backend-0.1.0-SNAPSHOT.jar /app/ascoder-backend.jar
 COPY backend/docker-entrypoint.sh /app/docker-entrypoint.sh

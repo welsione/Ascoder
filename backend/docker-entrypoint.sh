@@ -15,6 +15,8 @@ if [ "$(id -u)" = "0" ]; then
         [ "$(stat -c %U "/app/data/$d" 2>/dev/null || echo root)" = "ascoder" ] || { need_chown=1; break; }
     done
     # /app/logs 挂载卷也需要 ascoder 写权限（logback 日志落盘）
+    # 先确保目录存在（旧镜像可能未预创建），再检查属主
+    mkdir -p /app/logs
     [ "$(stat -c %U "/app/logs" 2>/dev/null || echo root)" = "ascoder" ] || need_chown=1
     if [ "$need_chown" = "1" ]; then
         chown -R ascoder:ascoder /app/data /app/logs
