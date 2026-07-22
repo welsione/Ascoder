@@ -22,16 +22,28 @@ log() {
 }
 
 # 1. 拉取最新的 compose 与脚本（源码已打进镜像，仓库在这里仅用于同步部署文件）
-# 容错：服务器到 GitHub 的网络可能不稳定（尤其老版 git），fetch 超时或失败时跳过文件更新，
-# 继续走 GHCR 拉镜像--compose 结构低频变化，旧版本通常也能跑；镜像更新走 GHCR CDN，不受 git 网络影响。
+# 容错策略：服务器到 GitHub 经代理（gh-proxy.com），网络易抖动，fetch 重试 3 次、每次 30s。
+# fetch 或 checkout 任一失败即中止部署：镜像走 GHCR CDN 通常能拉到新版，若此时用旧 compose
+# 启动新镜像，会造成配置不一致（如 volume 挂载缺失、env 变化），比"暂不更新"更危险。
+# 因此宁可保持旧的镜像 + 旧 compose 一致状态，也不允许半更新。
 log "fetching latest deployment files from origin/master..."
-if timeout 15 git fetch origin master --depth=1 --quiet >>"$LOG_FILE" 2>&1; then
-    # 只 checkout 部署相关文件，不触碰 .env / data/（它们未跟踪，见 .gitignore）
-    git checkout origin/master -- "$COMPOSE_FILE" .env.example scripts/ >>"$LOG_FILE" 2>&1 || true
-    log "deployment files synced."
-else
-    log "WARN: git fetch timed out or failed (network unstable); continuing with current compose."
+fetch_ok=0
+for attempt in 1 2 3; do
+    if timeout 30 git fetch origin master --depth=1 --force --quiet >>"$LOG_FILE" 2>&1; then
+        fetch_ok=1
+        break
+    fi
+    [ "$attempt" -lt 3 ] && log "WARN: git fetch attempt $attempt failed, retrying in 2s..."
+    sleep 2
+done
+if [ "$fetch_ok" != "1" ]; then
+    log "ERROR: git fetch failed after 3 attempts. Aborting to avoid config mismatch (new image with stale compose)."
+    exit 1
 fi
+# 只 checkout 部署相关文件，不触碰 .env / data/（它们未跟踪，见 .gitignore）。
+# 不吞错：checkout 失败（如索引锁定、路径冲突）时 set -e 触发退出，避免用旧 compose 跑新镜像。
+git checkout origin/master -- "$COMPOSE_FILE" .env.example scripts/ >>"$LOG_FILE" 2>&1
+log "deployment files synced."
 
 # 1.5 自动生成 ASCODER_ENCRYPTION_KEY（首次部署）
 # 非开发环境必须配置加密密钥（ApiKeyEncryptor 在非 dev profile 下不允许默认密钥），
