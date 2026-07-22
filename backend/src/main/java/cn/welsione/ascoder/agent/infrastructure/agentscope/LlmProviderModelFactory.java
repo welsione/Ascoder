@@ -127,14 +127,18 @@ public class LlmProviderModelFactory implements ChatModelFactory {
     /**
      * 将 LlmProvider 配置与 AgentConfig 覆盖合并为不可变快照。
      *
-     * <p>AgentConfig 的 modelId / maxTokens / timeoutSeconds 可覆盖供应商级默认值。</p>
+     * <p>AgentConfig 的 modelId / maxTokens / timeoutSeconds 可覆盖供应商级默认值。
+     * timeoutSeconds 和 maxTokens 在数据库中允许为 null，合并时按优先级回退：</p>
+     * <ol>
+     *   <li>AgentConfig 显式覆盖</li>
+     *   <li>LlmProvider 设置值</li>
+     *   <li>RuntimeSettings 中的 agent.tool-timeout-seconds（超时）或 null（maxTokens）</li>
+     * </ol>
      */
     private ResolvedModelConfig merge(LlmProvider provider, AgentConfig config) {
         String modelId = (config != null && config.getModelId() != null) ? config.getModelId() : provider.getModelId();
         Integer maxTokens = (config != null && config.getMaxTokens() != null) ? config.getMaxTokens() : provider.getMaxTokens();
-        Long timeoutSeconds = (config != null && config.getTimeoutSeconds() != null)
-                ? config.getTimeoutSeconds().longValue()
-                : provider.getTimeoutSeconds();
+        Long timeoutSeconds = resolveTimeoutSeconds(provider, config);
         return new ResolvedModelConfig(
                 provider.getApiKey(),
                 provider.getBaseUrl(),
@@ -143,6 +147,19 @@ public class LlmProviderModelFactory implements ChatModelFactory {
                 timeoutSeconds,
                 provider.getProviderType()
         );
+    }
+
+    /**
+     * 解析超时秒数，按优先级回退：AgentConfig → LlmProvider → RuntimeSettings 默认值。
+     */
+    private Long resolveTimeoutSeconds(LlmProvider provider, AgentConfig config) {
+        if (config != null && config.getTimeoutSeconds() != null) {
+            return config.getTimeoutSeconds().longValue();
+        }
+        if (provider.getTimeoutSeconds() != null) {
+            return provider.getTimeoutSeconds();
+        }
+        return runtimeSettings.readLong("agent.tool-timeout-seconds");
     }
 
     private ChatModelBuilderStrategy selectBuilderStrategy(String providerType) {
