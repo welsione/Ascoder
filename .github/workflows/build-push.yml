@@ -127,9 +127,12 @@ jobs:
           LATEST=$(git tag --list 'v*' --sort=-v:refname | head -1)
           if [ -z "$LATEST" ]; then
             NEW_TAG="v0.1.0"
-          else
+          elif [[ "$LATEST" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             IFS='.' read -r MAJOR MINOR PATCH <<< "${LATEST#v}"
             NEW_TAG="v${MAJOR}.${MINOR}.$((PATCH + 1))"
+          else
+            echo "Latest tag '$LATEST' has unexpected format, starting from v0.1.0"
+            NEW_TAG="v0.1.0"
           fi
           echo "new_tag=${NEW_TAG}" >> "$GITHUB_OUTPUT"
           echo "latest_tag=${LATEST:-none}" >> "$GITHUB_OUTPUT"
@@ -137,10 +140,12 @@ jobs:
 
       - name: Skip if tag already exists
         id: check_tag
+        env:
+          NEW_TAG: ${{ steps.version.outputs.new_tag }}
         run: |
-          if git rev-parse "${{ steps.version.outputs.new_tag }}" >/dev/null 2>&1; then
+          if git rev-parse "$NEW_TAG" >/dev/null 2>&1; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "Tag ${{ steps.version.outputs.new_tag }} already exists, skipping release"
+            echo "Tag $NEW_TAG already exists, skipping release"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
@@ -148,8 +153,10 @@ jobs:
       - name: Collect changes
         if: steps.check_tag.outputs.skip != 'true'
         id: changes
+        env:
+          LATEST_TAG: ${{ steps.version.outputs.latest_tag }}
         run: |
-          LATEST="${{ steps.version.outputs.latest_tag }}"
+          LATEST="$LATEST_TAG"
           if [ "$LATEST" = "none" ]; then
             COMMIT_LIST=$(git log --pretty=format:"%s" | head -50)
             git diff --no-color HEAD~50..HEAD > /tmp/release-diff.txt || true
@@ -196,7 +203,7 @@ jobs:
           else
             echo "## 变更列表" > /tmp/release-notes-fallback.md
             echo "" >> /tmp/release-notes-fallback.md
-            echo "${{ steps.changes.outputs.commit_list }}" | while IFS= read -r line; do
+            printf '%s\n' "$COMMIT_LIST" | while IFS= read -r line; do
               [ -n "$line" ] && echo "- ${line}" >> /tmp/release-notes-fallback.md
             done
             echo "notes_file=/tmp/release-notes-fallback.md" >> "$GITHUB_OUTPUT"
@@ -205,10 +212,12 @@ jobs:
       - name: Generate fallback release notes (no API key)
         if: steps.check_tag.outputs.skip != 'true' && env.HAS_KEY != 'true'
         id: fallback_notes
+        env:
+          COMMIT_LIST: ${{ steps.changes.outputs.commit_list }}
         run: |
           echo "## 变更列表" > /tmp/release-notes-fallback.md
           echo "" >> /tmp/release-notes-fallback.md
-          echo "${{ steps.changes.outputs.commit_list }}" | while IFS= read -r line; do
+          printf '%s\n' "$COMMIT_LIST" | while IFS= read -r line; do
             [ -n "$line" ] && echo "- ${line}" >> /tmp/release-notes-fallback.md
           done
           echo "notes_file=/tmp/release-notes-fallback.md" >> "$GITHUB_OUTPUT"
@@ -217,9 +226,9 @@ jobs:
         if: steps.check_tag.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEW_TAG: ${{ steps.version.outputs.new_tag }}
+          NOTES_FILE: ${{ steps.ai_notes.outputs.notes_file || steps.fallback_notes.outputs.notes_file }}
         run: |
-          NEW_TAG="${{ steps.version.outputs.new_tag }}"
-          NOTES_FILE="${{ steps.ai_notes.outputs.notes_file || steps.fallback_notes.outputs.notes_file }}"
           if [ ! -f "$NOTES_FILE" ]; then
             NOTES_FILE="/dev/null"
           fi

@@ -75,19 +75,39 @@ async function main() {
   // 4. call LLM
   const client = new Anthropic({ apiKey, baseURL: baseUrl })
   let reviewText
+  let message
   try {
-    const message = await client.messages.create({
+    message = await client.messages.create({
       model: modelId,
       max_tokens: MAX_OUTPUT_TOKENS,
       system:
         '你是 Ascoder 仓库的发布说明撰写员，严格按照 user prompt 中给出的输出格式生成中文 release notes。',
       messages: [{ role: 'user', content: userPrompt }],
     })
+
+    // Debug: log raw response structure
+    console.log('API response stop_reason:', message.stop_reason)
+    console.log('API response content blocks:', message.content.length)
+    for (const [i, block] of message.content.entries()) {
+      console.log(`  block[${i}] type=${block.type} text_length=${block.text?.length ?? 'N/A'}`)
+    }
+
+    // Extract review text - handle both standard Anthropic format and non-standard providers
     reviewText = message.content
       .filter((b) => b.type === 'text')
       .map((b) => b.text)
       .join('\n')
       .trim()
+
+    // Fallback: if no 'text' blocks found, try extracting text from any block that has it
+    if (!reviewText && message.content.length > 0) {
+      console.log('No type=text blocks found, trying fallback extraction...')
+      reviewText = message.content
+        .map((b) => (typeof b === 'string' ? b : b.text ?? ''))
+        .filter(Boolean)
+        .join('\n')
+        .trim()
+    }
   } catch (err) {
     console.error('LLM call failed, using fallback:', err.message)
     console.log(`FALLBACK_NOTES=${FALLBACK_FILE}`)
@@ -96,6 +116,8 @@ async function main() {
 
   if (!reviewText) {
     console.error('Empty LLM response, using fallback')
+    console.error('Full API response (for debugging):')
+    console.error(JSON.stringify(message, null, 2))
     console.log(`FALLBACK_NOTES=${FALLBACK_FILE}`)
     return
   }
