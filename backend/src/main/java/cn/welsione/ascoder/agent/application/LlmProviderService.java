@@ -73,6 +73,18 @@ public class LlmProviderService {
         return provider;
     }
 
+    /**
+     * 获取默认启用的 LLM 供应商并解密 apiKey，供运行时 LLM 调用使用。
+     * 与 {@link #getDefault()} 不同，本方法返回的 apiKey 是明文，可直接传给 LLM SDK。
+     */
+    @Transactional(readOnly = true)
+    public LlmProvider getDefaultDecrypted() {
+        LlmProvider provider = repository.findByIsDefaultTrueAndEnabledTrue()
+                .orElseThrow(() -> new InvalidStateException("未配置默认 LLM 供应商"));
+        provider.setApiKey(encryptor.decrypt(provider.getApiKey()));
+        return provider;
+    }
+
     @Transactional
     public LlmProvider create(CreateLlmProviderRequest request) {
         validateCreate(request);

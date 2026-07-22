@@ -64,7 +64,7 @@ public class LlmProviderModelFactory implements ChatModelFactory {
         if (config.getLlmProviderId() != null) {
             provider = llmProviderService.getDecrypted(config.getLlmProviderId());
         } else {
-            provider = llmProviderService.getDefault();
+            provider = llmProviderService.getDefaultDecrypted();
         }
         return merge(provider, config);
     }
@@ -120,7 +120,7 @@ public class LlmProviderModelFactory implements ChatModelFactory {
     }
 
     private ResolvedModelConfig resolveDefaultProvider() {
-        LlmProvider provider = llmProviderService.getDefault();
+        LlmProvider provider = llmProviderService.getDefaultDecrypted();
         return merge(provider, null);
     }
 
