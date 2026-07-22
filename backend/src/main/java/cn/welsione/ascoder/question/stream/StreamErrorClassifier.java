@@ -17,6 +17,9 @@ final class StreamErrorClassifier {
         if (message.contains("Maximum iterations")) {
             return "max_iters_exhausted";
         }
+        if (message.contains("Retries exhausted")) {
+            return "model_timeout";
+        }
         if (message.contains("Model request timeout")) {
             return "model_timeout";
         }

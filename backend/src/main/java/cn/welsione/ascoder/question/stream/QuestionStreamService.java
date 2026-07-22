@@ -289,7 +289,7 @@ public class QuestionStreamService {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("status", "FAILED");
         payload.put("questionId", questionId);
-        String message = ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage();
+        String message = buildErrorMessage(ex);
         if (isInterrupted(ex)) {
             message = "任务被中断：" + message;
         }
@@ -345,6 +345,35 @@ public class QuestionStreamService {
             current = current.getCause();
         }
         return Thread.currentThread().isInterrupted();
+    }
+
+    /**
+     * 构建错误消息：顶层消息 + cause chain 中有价值的根因。
+     * AgentScope 的 "Retries exhausted: 1/1" 本身不含失败原因，
+     * 需要从 cause chain 提取（如连接超时、API key 无效等）。
+     */
+    private static String buildErrorMessage(Throwable ex) {
+        String topMessage = ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage();
+        Throwable cause = ex.getCause();
+        if (cause == null) {
+            return topMessage;
+        }
+        // 提取 cause chain 中第一个有非空消息的异常
+        StringBuilder causeChain = new StringBuilder();
+        Throwable current = cause;
+        while (current != null) {
+            if (current.getMessage() != null && !current.getMessage().isEmpty()) {
+                if (causeChain.length() > 0) {
+                    causeChain.append(" → ");
+                }
+                causeChain.append(current.getMessage());
+            }
+            current = current.getCause();
+        }
+        if (causeChain.length() > 0) {
+            return topMessage + "（" + causeChain + "）";
+        }
+        return topMessage;
     }
 
     /** 静态方法保留以保持单元测试兼容性。 */

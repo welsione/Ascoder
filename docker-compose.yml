@@ -53,12 +53,16 @@ services:
       # Set to http://host.docker.internal:8443 and run: python3 scripts/git-tls-proxy.py 8443
       GIT_TLS_PROXY: ${GIT_TLS_PROXY:-}
       ASCODER_GIT_TLS_PROXY: ${GIT_TLS_PROXY:-}
+      # Logback 日志输出目录（对应 logback-spring.xml 中的 LOG_PATH）
+      LOG_PATH: /app/logs
       JVM_OPTS: ${JVM_OPTS:--Xmx512m -Xms256m}
     volumes:
       - ./data/repos:/app/data/repos
       - ./data/worktrees:/app/data/worktrees
       - ./data/project-spaces:/app/data/project-spaces
       - ./data/codegraph:/app/data/codegraph
+      # 持久化日志到宿主机，方便排查容器内问题
+      - ./data/logs:/app/logs
       # Mount SSH keys for Git SSH access (read-only, optional)
       - ${HOME}/.ssh:/home/ascoder/.ssh:ro
     healthcheck:

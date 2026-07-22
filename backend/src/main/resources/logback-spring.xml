@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Logback 配置：同时输出到 console（Docker logs 采集）和文件（持久化排查）。
+
+  文件日志写入 ${LOG_PATH:-./logs}/ascoder.log，按天滚动，保留 30 天，单文件最大 200MB。
+  LOG_PATH 可通过环境变量覆盖（生产环境设为 /app/logs，挂载到宿主机）。
+-->
+<configuration>
+
+  <property name="LOG_PATH" value="${LOG_PATH:-./logs}" />
+  <property name="LOG_FILE" value="ascoder" />
+  <property name="MAX_FILE_SIZE" value="200MB" />
+  <property name="MAX_HISTORY" value="30" />
+  <property name="TOTAL_SIZE_CAP" value="5GB" />
+
+  <!-- Console: 供 docker logs 采集 -->
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+    </encoder>
+  </appender>
+
+  <!-- File: 持久化到磁盘，滚动归档 -->
+  <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <file>${LOG_PATH}/${LOG_FILE}.log</file>
+    <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+      <fileNamePattern>${LOG_PATH}/${LOG_FILE}.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+      <maxFileSize>${MAX_FILE_SIZE}</maxFileSize>
+      <maxHistory>${MAX_HISTORY}</maxHistory>
+      <totalSizeCap>${TOTAL_SIZE_CAP}</totalSizeCap>
+    </rollingPolicy>
+    <encoder>
+      <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+    </encoder>
+  </appender>
+
+  <!-- AgentScope / LLM 调用单独输出到文件，方便排查 retry 失败 -->
+  <appender name="AGENT_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <file>${LOG_PATH}/agent.log</file>
+    <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+      <fileNamePattern>${LOG_PATH}/agent.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+      <maxFileSize>${MAX_FILE_SIZE}</maxFileSize>
+      <maxHistory>${MAX_HISTORY}</maxHistory>
+      <totalSizeCap>${TOTAL_SIZE_CAP}</totalSizeCap>
+    </rollingPolicy>
+    <encoder>
+      <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+    </encoder>
+  </appender>
+
+  <!-- AgentScope 相关包单独输出到 agent.log -->
+  <logger name="io.agentscope" level="INFO" additivity="true">
+    <appender-ref ref="AGENT_FILE" />
+  </logger>
+
+  <root level="INFO">
+    <appender-ref ref="CONSOLE" />
+    <appender-ref ref="FILE" />
+  </root>
+
+</configuration>

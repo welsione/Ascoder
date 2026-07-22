@@ -14,8 +14,10 @@ if [ "$(id -u)" = "0" ]; then
     for d in repos worktrees project-spaces codegraph; do
         [ "$(stat -c %U "/app/data/$d" 2>/dev/null || echo root)" = "ascoder" ] || { need_chown=1; break; }
     done
+    # /app/logs 挂载卷也需要 ascoder 写权限（logback 日志落盘）
+    [ "$(stat -c %U "/app/logs" 2>/dev/null || echo root)" = "ascoder" ] || need_chown=1
     if [ "$need_chown" = "1" ]; then
-        chown -R ascoder:ascoder /app/data
+        chown -R ascoder:ascoder /app/data /app/logs
     fi
     exec gosu ascoder "$0" "$@"
 fi
