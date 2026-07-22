@@ -19,7 +19,7 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { execSync } from 'node:child_process'
 
 const MAX_DIFF_CHARS = 120_000
-const MAX_OUTPUT_TOKENS = 4096
+const MAX_OUTPUT_TOKENS = 8192
 
 function mustGet(name) {
   const v = process.env[name]
@@ -30,7 +30,9 @@ function mustGet(name) {
 }
 
 function getOptional(name, def) {
-  return process.env[name] ?? def
+  const v = process.env[name]
+  // Use || instead of ?? so that empty string (e.g. unset GitHub vars) falls back to default
+  return v || def
 }
 
 async function main() {
@@ -76,9 +78,9 @@ async function main() {
     .replace('{{DIFF}}', `\n\`\`\`diff\n${diff}\n\`\`\``) +
     `\n\n实际 PR 标题：${prTitle}\n\n实际 PR 描述：\n${prBody || '(无)'}\n\n改动文件清单：\n${fileList}\n`
 
-  // 4. call MiniMax via Anthropic SDK
+  // 4. call LLM via Anthropic SDK
   const client = new Anthropic({ apiKey, baseURL: baseUrl })
-  const message = await client.messages.create({
+  const createParams = {
     model: modelId,
     max_tokens: MAX_OUTPUT_TOKENS,
     system:
@@ -89,7 +91,20 @@ async function main() {
         content: userPrompt,
       },
     ],
-  })
+  }
+
+  let message = await client.messages.create(createParams)
+
+  // If the model used extended thinking and consumed all output tokens,
+  // the text block will be empty. Retry with thinking explicitly disabled
+  // so the model spends all tokens on the actual review text.
+  const hasThinking = message.content.some((b) => b.type === 'thinking')
+  const hasEmptyText = message.content.some((b) => b.type === 'text' && (!b.text || b.text.trim() === ''))
+  if (hasThinking && hasEmptyText) {
+    console.log('Model used thinking and left no text, retrying with thinking disabled...')
+    createParams.thinking = { type: 'disabled' }
+    message = await client.messages.create(createParams)
+  }
 
   // Debug: log raw response structure
   console.log('API response stop_reason:', message.stop_reason)
