@@ -91,13 +91,36 @@ async function main() {
     ],
   })
 
-  const reviewText = message.content
+  // Debug: log raw response structure
+  console.log('API response stop_reason:', message.stop_reason)
+  console.log('API response content blocks:', message.content.length)
+  for (const [i, block] of message.content.entries()) {
+    console.log(`  block[${i}] type=${block.type} text_length=${block.text?.length ?? 'N/A'}`)
+  }
+
+  // Extract review text — handle both standard Anthropic format and non-standard providers
+  // Standard: content blocks with type='text'; some providers may use different type values
+  // or return plain strings instead of objects
+  let reviewText = message.content
     .filter((b) => b.type === 'text')
     .map((b) => b.text)
     .join('\n')
     .trim()
 
+  // Fallback: if no 'text' blocks found, try extracting text from any block that has it
+  if (!reviewText && message.content.length > 0) {
+    console.log('No type=text blocks found, trying fallback extraction...')
+    reviewText = message.content
+      .map((b) => (typeof b === 'string' ? b : b.text ?? ''))
+      .filter(Boolean)
+      .join('\n')
+      .trim()
+  }
+
   if (!reviewText) {
+    // Log full response for debugging when review is empty
+    console.error('Full API response (for debugging):')
+    console.error(JSON.stringify(message, null, 2))
     throw new Error('Empty reviewer response')
   }
 
