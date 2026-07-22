@@ -44,7 +44,8 @@ public class LlmProvider {
 
     private Integer maxTokens;
 
-    private Long timeoutSeconds;
+    @Column(nullable = false)
+    private Long timeoutSeconds = 240L;
 
     @Column(nullable = false)
     private boolean isDefault;
