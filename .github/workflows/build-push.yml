@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 env:
@@ -108,3 +108,125 @@ jobs:
             VITE_API_BASE_URL=
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  release:
+    needs: [build-backend, build-frontend]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master'
+    env:
+      HAS_KEY: ${{ secrets.LLM_API_KEY != '' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Calculate next version
+        id: version
+        run: |
+          LATEST=$(git tag --list 'v*' --sort=-v:refname | head -1)
+          if [ -z "$LATEST" ]; then
+            NEW_TAG="v0.1.0"
+          else
+            IFS='.' read -r MAJOR MINOR PATCH <<< "${LATEST#v}"
+            NEW_TAG="v${MAJOR}.${MINOR}.$((PATCH + 1))"
+          fi
+          echo "new_tag=${NEW_TAG}" >> "$GITHUB_OUTPUT"
+          echo "latest_tag=${LATEST:-none}" >> "$GITHUB_OUTPUT"
+          echo "Next version: ${NEW_TAG} (previous: ${LATEST:-none})"
+
+      - name: Skip if tag already exists
+        id: check_tag
+        run: |
+          if git rev-parse "${{ steps.version.outputs.new_tag }}" >/dev/null 2>&1; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Tag ${{ steps.version.outputs.new_tag }} already exists, skipping release"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Collect changes
+        if: steps.check_tag.outputs.skip != 'true'
+        id: changes
+        run: |
+          LATEST="${{ steps.version.outputs.latest_tag }}"
+          if [ "$LATEST" = "none" ]; then
+            COMMIT_LIST=$(git log --pretty=format:"%s" | head -50)
+            git diff --no-color HEAD~50..HEAD > /tmp/release-diff.txt || true
+          else
+            COMMIT_LIST=$(git log --pretty=format:"%s" "${LATEST}..HEAD")
+            git diff --no-color "${LATEST}..HEAD" > /tmp/release-diff.txt || true
+          fi
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "commit_list<<${EOF}" >> "$GITHUB_OUTPUT"
+          echo "${COMMIT_LIST}" >> "$GITHUB_OUTPUT"
+          echo "${EOF}" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Node.js
+        if: steps.check_tag.outputs.skip != 'true' && env.HAS_KEY == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Anthropic SDK
+        if: steps.check_tag.outputs.skip != 'true' && env.HAS_KEY == 'true'
+        run: |
+          cd .github/scripts
+          npm init -y >/dev/null
+          npm install --no-audit --no-fund @anthropic-ai/sdk
+
+      - name: Generate AI release notes
+        if: steps.check_tag.outputs.skip != 'true' && env.HAS_KEY == 'true'
+        id: ai_notes
+        working-directory: .github/scripts
+        env:
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          BASE_URL: ${{ vars.LLM_BASE_URL }}
+          MODEL_ID: ${{ vars.LLM_MODEL_ID }}
+          NEW_TAG: ${{ steps.version.outputs.new_tag }}
+          COMMIT_LIST: ${{ steps.changes.outputs.commit_list }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          OUTPUT=$(node release-notes.mjs 2>&1) || true
+          echo "$OUTPUT"
+          NOTES_PATH=$(echo "$OUTPUT" | grep -E '^(NOTES_FILE|FALLBACK_NOTES)=' | head -1 | cut -d= -f2-)
+          if [ -n "$NOTES_PATH" ] && [ -f "$NOTES_PATH" ]; then
+            echo "notes_file=${NOTES_PATH}" >> "$GITHUB_OUTPUT"
+          else
+            echo "## 变更列表" > /tmp/release-notes-fallback.md
+            echo "" >> /tmp/release-notes-fallback.md
+            echo "${{ steps.changes.outputs.commit_list }}" | while IFS= read -r line; do
+              [ -n "$line" ] && echo "- ${line}" >> /tmp/release-notes-fallback.md
+            done
+            echo "notes_file=/tmp/release-notes-fallback.md" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Generate fallback release notes (no API key)
+        if: steps.check_tag.outputs.skip != 'true' && env.HAS_KEY != 'true'
+        id: fallback_notes
+        run: |
+          echo "## 变更列表" > /tmp/release-notes-fallback.md
+          echo "" >> /tmp/release-notes-fallback.md
+          echo "${{ steps.changes.outputs.commit_list }}" | while IFS= read -r line; do
+            [ -n "$line" ] && echo "- ${line}" >> /tmp/release-notes-fallback.md
+          done
+          echo "notes_file=/tmp/release-notes-fallback.md" >> "$GITHUB_OUTPUT"
+
+      - name: Create tag and release
+        if: steps.check_tag.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          NEW_TAG="${{ steps.version.outputs.new_tag }}"
+          NOTES_FILE="${{ steps.ai_notes.outputs.notes_file || steps.fallback_notes.outputs.notes_file }}"
+          if [ ! -f "$NOTES_FILE" ]; then
+            NOTES_FILE="/dev/null"
+          fi
+          git tag "$NEW_TAG"
+          git push origin "$NEW_TAG"
+          gh release create "$NEW_TAG" \
+            --title "$NEW_TAG" \
+            --notes-file "$NOTES_FILE" \
+            --repo "${{ github.repository }}"
+          echo "Created release $NEW_TAG"
