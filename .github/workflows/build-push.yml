@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
   packages: write
 
 env:
@@ -113,6 +113,13 @@ jobs:
     needs: [build-backend, build-frontend]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/master'
+    # 防止并发 release 算出相同版本号导致 tag 冲突；不取消进行中的运行，避免 tag 已推但 release 未建
+    concurrency:
+      group: release-${{ github.ref }}
+      cancel-in-progress: false
+    # release job 需要打 tag + 创建 release，单独授予 contents: write（最小权限，build job 仍为顶层 read）
+    permissions:
+      contents: write
     env:
       HAS_KEY: ${{ secrets.LLM_API_KEY != '' }}
     steps:
@@ -124,15 +131,13 @@ jobs:
       - name: Calculate next version
         id: version
         run: |
-          LATEST=$(git tag --list 'v*' --sort=-v:refname | head -1)
+          # 过滤掉 pre-release tag（如 v1.0.0-rc1），只取标准语义化版本，避免版本号倒退
+          LATEST=$(git tag --list 'v*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
           if [ -z "$LATEST" ]; then
             NEW_TAG="v0.1.0"
-          elif [[ "$LATEST" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          else
             IFS='.' read -r MAJOR MINOR PATCH <<< "${LATEST#v}"
             NEW_TAG="v${MAJOR}.${MINOR}.$((PATCH + 1))"
-          else
-            echo "Latest tag '$LATEST' has unexpected format, starting from v0.1.0"
-            NEW_TAG="v0.1.0"
           fi
           echo "new_tag=${NEW_TAG}" >> "$GITHUB_OUTPUT"
           echo "latest_tag=${LATEST:-none}" >> "$GITHUB_OUTPUT"
@@ -158,8 +163,10 @@ jobs:
         run: |
           LATEST="$LATEST_TAG"
           if [ "$LATEST" = "none" ]; then
+            # 首次发布：用首个 commit 作为 diff 起点，避免 HEAD~50 在 commit 不足时报错
+            FIRST_COMMIT=$(git rev-list --max-parents=0 HEAD | tail -1)
             COMMIT_LIST=$(git log --pretty=format:"%s" | head -50)
-            git diff --no-color HEAD~50..HEAD > /tmp/release-diff.txt || true
+            git diff --no-color "${FIRST_COMMIT}" HEAD > /tmp/release-diff.txt || true
           else
             COMMIT_LIST=$(git log --pretty=format:"%s" "${LATEST}..HEAD")
             git diff --no-color "${LATEST}..HEAD" > /tmp/release-diff.txt || true
