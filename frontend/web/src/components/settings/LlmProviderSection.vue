@@ -18,7 +18,7 @@ const form = ref<CreateLlmProviderRequest & { enabled?: boolean }>({
   baseUrl: '',
   modelId: '',
   maxTokens: undefined,
-  timeoutSeconds: undefined,
+  timeoutSeconds: 240,
   isDefault: false,
   enabled: true,
 })
@@ -46,7 +46,7 @@ function openCreate() {
     baseUrl: '',
     modelId: '',
     maxTokens: undefined,
-    timeoutSeconds: undefined,
+    timeoutSeconds: 240,
     isDefault: false,
     enabled: true,
   }
@@ -62,7 +62,7 @@ function openEdit(provider: LlmProvider) {
     baseUrl: provider.baseUrl,
     modelId: provider.modelId,
     maxTokens: provider.maxTokens ?? undefined,
-    timeoutSeconds: provider.timeoutSeconds ?? undefined,
+    timeoutSeconds: provider.timeoutSeconds ?? 240,
     isDefault: provider.isDefault,
     enabled: provider.enabled,
   }

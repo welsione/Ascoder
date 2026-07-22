@@ -14,6 +14,7 @@ import cn.welsione.ascoder.common.exception.InvalidStateException;
 import cn.welsione.ascoder.common.exception.ResourceNotFoundException;
 import cn.welsione.ascoder.common.exception.ValidationException;
 import cn.welsione.ascoder.common.security.ApiKeyEncryptor;
+import cn.welsione.ascoder.runtime.application.RuntimeSettingsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -37,6 +38,7 @@ public class LlmProviderService {
     private final ApiKeyEncryptor encryptor;
     private final AgentConfigPort agentConfigPort;
     private final List<ConnectionTestStrategy> connectionTestStrategies;
+    private final RuntimeSettingsService runtimeSettings;
 
     @Transactional(readOnly = true)
     public List<LlmProvider> list() {
@@ -146,9 +148,12 @@ public class LlmProviderService {
      */
     public ConnectionTestResult testConnection(Long id) {
         LlmProvider provider = getDecrypted(id);
+        Long timeoutSeconds = provider.getTimeoutSeconds() != null
+                ? provider.getTimeoutSeconds()
+                : runtimeSettings.readLong("agent.tool-timeout-seconds");
         ResolvedModelConfig config = new ResolvedModelConfig(
                 provider.getApiKey(), provider.getBaseUrl(), provider.getModelId(),
-                provider.getMaxTokens(), provider.getTimeoutSeconds(), provider.getProviderType());
+                provider.getMaxTokens(), timeoutSeconds, provider.getProviderType());
         for (ConnectionTestStrategy strategy : connectionTestStrategies) {
             if (strategy.supports(provider.getProviderType().name())) {
                 return strategy.test(config);
