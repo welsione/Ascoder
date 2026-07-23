@@ -1,12 +1,13 @@
 package cn.welsione.ascoder.repository;
 
-import cn.welsione.ascoder.codegraph.port.CodeGraphClient;
-import cn.welsione.ascoder.codegraph.port.CodeGraphToolResult;
 import cn.welsione.ascoder.common.FileUtil;
 import cn.welsione.ascoder.common.exception.DuplicateException;
 import cn.welsione.ascoder.common.exception.InvalidStateException;
 import cn.welsione.ascoder.common.exception.ResourceNotFoundException;
 import cn.welsione.ascoder.common.exception.ValidationException;
+import cn.welsione.ascoder.common.task.TaskEngine;
+import cn.welsione.ascoder.common.task.TaskKind;
+import cn.welsione.ascoder.common.task.TaskSubmitRequest;
 import cn.welsione.ascoder.repository.git.GitCredentialStore;
 import cn.welsione.ascoder.repository.git.GitRepositoryService;
 import lombok.extern.slf4j.Slf4j;
@@ -16,8 +17,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.file.Path;
-import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 仓库服务，处理代码仓库的 CRUD 和 CodeGraph 索引操作。
@@ -28,28 +30,25 @@ public class RepositoryService {
 
     private final CodeRepositoryJpaRepository repository;
     private final RepositoryPathValidator pathValidator;
-    private final CodeGraphClient codeGraphClient;
     private final GitRepositoryService gitRepositoryService;
     private final GitCredentialStore gitCredentialStore;
-    private final RepositoryBranchService repositoryBranchService;
+    private final TaskEngine taskEngine;
 
     private final Path repoRoot;
 
     public RepositoryService(
             CodeRepositoryJpaRepository repository,
             RepositoryPathValidator pathValidator,
-            CodeGraphClient codeGraphClient,
             GitRepositoryService gitRepositoryService,
             GitCredentialStore gitCredentialStore,
-            RepositoryBranchService repositoryBranchService,
+            TaskEngine taskEngine,
             @Value("${ascoder.repo-root}") String repoRoot
     ) {
         this.repository = repository;
         this.pathValidator = pathValidator;
-        this.codeGraphClient = codeGraphClient;
         this.gitRepositoryService = gitRepositoryService;
         this.gitCredentialStore = gitCredentialStore;
-        this.repositoryBranchService = repositoryBranchService;
+        this.taskEngine = taskEngine;
         this.repoRoot = pathValidator.normalizeRepoRoot(repoRoot);
     }
 
@@ -82,17 +81,32 @@ public class RepositoryService {
         entity.setDefaultBranch(trimToNull(request.getDefaultBranch()));
         entity.setAuthUsername(trimToNull(request.getAuthUsername()));
         entity.setAuthPassword(trimToNull(request.getAuthPassword()));
-        entity.setStatus(RepositoryStatus.CREATED);
 
         try {
             if (remoteRepository) {
                 upsertCredentials(request.getRemoteUrl(), request.getAuthUsername(), request.getAuthPassword());
-                gitRepositoryService.cloneRepository(request.getRemoteUrl().trim(), normalizedPath, request.getDefaultBranch());
-                entity.setDefaultBranch(defaultBranch(entity.getDefaultBranch(), normalizedPath));
-                entity.pulled(new Date());
+                entity.cloning();
+            } else {
+                entity.setStatus(RepositoryStatus.CREATED);
             }
             CodeRepository saved = repository.saveAndFlush(entity);
-            refreshBranchesQuietly(saved.getId());
+
+            if (remoteRepository) {
+                Map<String, String> context = new LinkedHashMap<>();
+                context.put("remoteUrl", request.getRemoteUrl().trim());
+                context.put("targetPath", normalizedPath.toString());
+                context.put("branchName", trimToNull(request.getDefaultBranch()));
+                context.put("repositoryId", saved.getId().toString());
+                context.put("authUsername", trimToNull(request.getAuthUsername()));
+                context.put("authPassword", trimToNull(request.getAuthPassword()));
+                TaskSubmitRequest<Map<String, String>> taskRequest = new TaskSubmitRequest<>();
+                taskRequest.setKind(TaskKind.GIT_CLONE);
+                taskRequest.setContext(context);
+                taskRequest.setBusinessId(saved.getId());
+                taskEngine.submit(taskRequest);
+                log.info("已提交 Git clone 异步任务，repositoryId={}", saved.getId());
+            }
+
             return saved;
         } catch (IllegalStateException ex) {
             throw new ValidationException(ex.getMessage(), ex);
@@ -112,16 +126,17 @@ public class RepositoryService {
         entity.indexing();
         repository.saveAndFlush(entity);
 
-        CodeGraphToolResult result = codeGraphClient.index(Path.of(entity.resolveLocalPath(repoRoot.toString())));
-        if (result.isSuccess()) {
-            entity.ready(new Date());
-            log.info("仓库索引完成，id={}", id);
-        } else {
-            entity.fail(result.getOutput());
-            log.warn("仓库索引失败，id={}，错误={}", id, result.getOutput());
-        }
+        Map<String, String> context = new LinkedHashMap<>();
+        context.put("repositoryPath", entity.resolveLocalPath(repoRoot.toString()));
+        context.put("repositoryId", id.toString());
+        TaskSubmitRequest<Map<String, String>> request = new TaskSubmitRequest<>();
+        request.setKind(TaskKind.CODEGRAPH_INDEX);
+        request.setContext(context);
+        request.setBusinessId(id);
+        taskEngine.submit(request);
+        log.info("已提交 CodeGraph 索引异步任务，repositoryId={}", id);
 
-        return repository.save(entity);
+        return entity;
     }
 
     @Transactional(readOnly = true)
@@ -132,30 +147,49 @@ public class RepositoryService {
     @Transactional
     public CodeRepository fetch(Long id) {
         CodeRepository entity = getEntity(id);
-        try {
-            upsertCredentials(entity);
-            gitRepositoryService.fetch(Path.of(entity.resolveLocalPath(repoRoot.toString())));
-            entity.pulled(new Date());
-            repositoryBranchService.refresh(id);
-        } catch (RuntimeException ex) {
-            entity.pullFailed(ex.getMessage());
-        }
-        return repository.save(entity);
+        upsertCredentials(entity);
+        entity.syncing();
+        repository.saveAndFlush(entity);
+
+        Map<String, String> context = new LinkedHashMap<>();
+        context.put("repositoryPath", entity.resolveLocalPath(repoRoot.toString()));
+        context.put("repositoryId", id.toString());
+        context.put("operation", "fetch");
+        context.put("authUsername", entity.getAuthUsername());
+        context.put("authPassword", entity.getAuthPassword());
+        context.put("remoteUrl", entity.getRemoteUrl());
+        TaskSubmitRequest<Map<String, String>> fetchRequest = new TaskSubmitRequest<>();
+        fetchRequest.setKind(TaskKind.GIT_FETCH);
+        fetchRequest.setContext(context);
+        fetchRequest.setBusinessId(id);
+        taskEngine.submit(fetchRequest);
+        log.info("已提交 Git fetch 异步任务，repositoryId={}", id);
+
+        return entity;
     }
 
     @Transactional
     public CodeRepository pull(Long id) {
         CodeRepository entity = getEntity(id);
-        try {
-            upsertCredentials(entity);
-            gitRepositoryService.pull(Path.of(entity.resolveLocalPath(repoRoot.toString())));
-            entity.setDefaultBranch(defaultBranch(entity.getDefaultBranch(), Path.of(entity.resolveLocalPath(repoRoot.toString()))));
-            entity.pulled(new Date());
-            repositoryBranchService.refresh(id);
-        } catch (RuntimeException ex) {
-            entity.pullFailed(ex.getMessage());
-        }
-        return repository.save(entity);
+        upsertCredentials(entity);
+        entity.syncing();
+        repository.saveAndFlush(entity);
+
+        Map<String, String> context = new LinkedHashMap<>();
+        context.put("repositoryPath", entity.resolveLocalPath(repoRoot.toString()));
+        context.put("repositoryId", id.toString());
+        context.put("operation", "pull");
+        context.put("authUsername", entity.getAuthUsername());
+        context.put("authPassword", entity.getAuthPassword());
+        context.put("remoteUrl", entity.getRemoteUrl());
+        TaskSubmitRequest<Map<String, String>> pullRequest = new TaskSubmitRequest<>();
+        pullRequest.setKind(TaskKind.GIT_FETCH);
+        pullRequest.setContext(context);
+        pullRequest.setBusinessId(id);
+        taskEngine.submit(pullRequest);
+        log.info("已提交 Git pull 异步任务，repositoryId={}", id);
+
+        return entity;
     }
 
     @Transactional(readOnly = true)
@@ -191,31 +225,12 @@ public class RepositoryService {
         }
     }
 
-    private String defaultBranch(String configuredBranch, Path repositoryPath) {
-        if (hasText(configuredBranch)) {
-            return configuredBranch.trim();
-        }
-        try {
-            return gitRepositoryService.currentBranch(repositoryPath);
-        } catch (RuntimeException ex) {
-            return null;
-        }
-    }
-
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
     }
 
     private String trimToNull(String value) {
         return hasText(value) ? value.trim() : null;
-    }
-
-    private void refreshBranchesQuietly(Long repositoryId) {
-        try {
-            repositoryBranchService.refresh(repositoryId);
-        } catch (RuntimeException ex) {
-            log.warn("仓库分支发现失败，repositoryId={}，错误={}", repositoryId, ex.getMessage());
-        }
     }
 
     /**

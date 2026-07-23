@@ -2,26 +2,26 @@ package cn.welsione.ascoder.repository.projectspace;
 
 import cn.welsione.ascoder.repository.workspace.BranchWorkspace;
 import cn.welsione.ascoder.repository.workspace.BranchWorkspaceService;
-import cn.welsione.ascoder.repository.workspace.CreateBranchWorkspaceRequest;
 import cn.welsione.ascoder.codegraph.infrastructure.cli.IndexProgressTracker;
-import cn.welsione.ascoder.codegraph.port.CodeGraphClient;
-import cn.welsione.ascoder.codegraph.port.CodeGraphToolResult;
 import cn.welsione.ascoder.common.FileUtil;
 import cn.welsione.ascoder.common.exception.DuplicateException;
 import cn.welsione.ascoder.common.exception.InvalidStateException;
 import cn.welsione.ascoder.common.exception.ResourceNotFoundException;
-import cn.welsione.ascoder.common.exception.ValidationException;
+import cn.welsione.ascoder.common.task.TaskEngine;
+import cn.welsione.ascoder.common.task.TaskKind;
+import cn.welsione.ascoder.common.task.TaskSubmitRequest;
 import cn.welsione.ascoder.question.application.QuestionRunningGuard;
-import cn.welsione.ascoder.repository.git.GitCommitInfo;
 import cn.welsione.ascoder.repository.CodeRepository;
 import cn.welsione.ascoder.repository.RepositoryBranch;
 import cn.welsione.ascoder.repository.RepositoryBranchService;
 import cn.welsione.ascoder.repository.project.Project;
 import cn.welsione.ascoder.repository.project.ProjectRepository;
 import cn.welsione.ascoder.repository.project.ProjectService;
+import cn.welsione.ascoder.repository.git.GitCommitInfo;
 import cn.welsione.ascoder.repository.git.GitCredentialStore;
 import cn.welsione.ascoder.repository.git.GitRepositoryService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -33,13 +33,14 @@ import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /** 项目空间领域服务，负责空间的创建、成员准备、索引编排及状态流转。 */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ProjectSpaceService {
@@ -51,11 +52,11 @@ public class ProjectSpaceService {
     private final RepositoryBranchService repositoryBranchService;
     private final GitRepositoryService gitRepositoryService;
     private final GitCredentialStore gitCredentialStore;
-    private final CodeGraphClient codeGraphClient;
     private final IndexProgressTracker indexProgressTracker;
     private final ApplicationEventPublisher eventPublisher;
     private final TransactionTemplate transactionTemplate;
     private final QuestionRunningGuard questionRunningGuard;
+    private final TaskEngine taskEngine;
 
     @Value("${ascoder.project-space-root:./data/project-spaces}")
     private String projectSpaceRoot;
@@ -121,41 +122,38 @@ public class ProjectSpaceService {
     public ProjectSpace prepare(Long id) {
         ProjectSpacePrepareSnapshot snapshot = beginPrepare(id);
 
-        try {
-            Files.createDirectories(snapshot.getRootPath());
-            for (ProjectSpaceMemberSnapshot member : snapshot.getMembers()) {
-                prepareMember(snapshot, member);
-            }
-            return completePrepare(id);
-        } catch (Exception ex) {
-            failSpace(id, ex.getMessage());
-            throw new ValidationException(ex.getMessage(), ex);
-        }
+        Map<String, String> context = new LinkedHashMap<>();
+        context.put("projectSpaceId", id.toString());
+        TaskSubmitRequest<Map<String, String>> request = new TaskSubmitRequest<>();
+        request.setKind(TaskKind.PROJECT_SPACE_PREPARE);
+        request.setContext(context);
+        request.setBusinessId(id);
+        taskEngine.submit(request);
+        log.info("已提交项目空间准备异步任务，projectSpaceId={}", id);
+
+        return transactionTemplate.execute(status -> getEntity(id));
     }
 
     public ProjectSpace index(Long id) {
         ProjectSpaceIndexSnapshot snapshot = beginIndex(id, false);
         boolean previouslyIndexed = snapshot.isPreviouslyIndexed();
 
-        try {
-            CodeGraphToolResult result;
-            if (previouslyIndexed) {
-                result = codeGraphClient.sync(snapshot.getRootPath(), id);
-            } else {
-                result = codeGraphClient.index(snapshot.getRootPath(), snapshot.getCodegraphIndexPath(), id);
-            }
-            if (result.isSuccess()) {
-                indexProgressTracker.complete(id);
-                return completeIndex(id, new Date());
-            } else {
-                indexProgressTracker.fail(id, result.getOutput());
-                return failSpace(id, result.getOutput());
-            }
-        } catch (RuntimeException ex) {
-            indexProgressTracker.fail(id, ex.getMessage());
-            failSpace(id, ex.getMessage());
-            throw ex;
+        TaskKind kind = previouslyIndexed ? TaskKind.CODEGRAPH_SYNC : TaskKind.CODEGRAPH_INDEX;
+        Map<String, String> context = new LinkedHashMap<>();
+        context.put("repositoryPath", snapshot.getRootPath().toString());
+        context.put("projectSpaceId", id.toString());
+        if (!previouslyIndexed) {
+            context.put("codegraphIndexPath", snapshot.getCodegraphIndexPath().toString());
         }
+        TaskSubmitRequest<Map<String, String>> request = new TaskSubmitRequest<>();
+        request.setKind(kind);
+        request.setContext(context);
+        request.setBusinessId(id);
+        taskEngine.submit(request);
+        log.info("已提交 CodeGraph {} 异步任务，projectSpaceId={}",
+                previouslyIndexed ? "增量同步" : "全量索引", id);
+
+        return transactionTemplate.execute(status -> getEntity(id));
     }
 
     /**
@@ -168,23 +166,19 @@ public class ProjectSpaceService {
     public ProjectSpace reindex(Long id) {
         ProjectSpaceIndexSnapshot snapshot = beginIndex(id, true);
 
-        try {
-            // 删除旧索引目录，强制全量重建
-            FileUtil.deleteDirectoryIfExists(snapshot.getCodegraphIndexPath());
-            CodeGraphToolResult result = codeGraphClient.index(
-                    snapshot.getRootPath(), snapshot.getCodegraphIndexPath(), id);
-            if (result.isSuccess()) {
-                indexProgressTracker.complete(id);
-                return completeIndex(id, new Date());
-            } else {
-                indexProgressTracker.fail(id, result.getOutput());
-                return failSpace(id, result.getOutput());
-            }
-        } catch (RuntimeException ex) {
-            indexProgressTracker.fail(id, ex.getMessage());
-            failSpace(id, ex.getMessage());
-            throw ex;
-        }
+        Map<String, String> context = new LinkedHashMap<>();
+        context.put("repositoryPath", snapshot.getRootPath().toString());
+        context.put("codegraphIndexPath", snapshot.getCodegraphIndexPath().toString());
+        context.put("projectSpaceId", id.toString());
+        context.put("isReindex", "true");
+        TaskSubmitRequest<Map<String, String>> request = new TaskSubmitRequest<>();
+        request.setKind(TaskKind.CODEGRAPH_INDEX);
+        request.setContext(context);
+        request.setBusinessId(id);
+        taskEngine.submit(request);
+        log.info("已提交 CodeGraph 重新索引异步任务，projectSpaceId={}", id);
+
+        return transactionTemplate.execute(status -> getEntity(id));
     }
 
     @Transactional
@@ -222,8 +216,24 @@ public class ProjectSpaceService {
     public ProjectSpace pullRemote(Long id) {
         ensureNoRunningQuestions(id);
         upsertMemberCredentials(id);
-        List<Path> repositoryPaths = memberRepositoryPaths(id);
-        repositoryPaths.forEach(gitRepositoryService::fetch);
+
+        List<CodeRepository> memberRepos = distinctMemberRepositories(id);
+        for (CodeRepository repo : memberRepos) {
+            Map<String, String> context = new LinkedHashMap<>();
+            context.put("repositoryPath", repo.resolveLocalPath(repoRoot));
+            context.put("repositoryId", repo.getId().toString());
+            context.put("operation", "fetch");
+            context.put("authUsername", repo.getAuthUsername());
+            context.put("authPassword", repo.getAuthPassword());
+            context.put("remoteUrl", repo.getRemoteUrl());
+            TaskSubmitRequest<Map<String, String>> fetchRequest = new TaskSubmitRequest<>();
+            fetchRequest.setKind(TaskKind.GIT_FETCH);
+            fetchRequest.setContext(context);
+            fetchRequest.setBusinessId(repo.getId());
+            taskEngine.submit(fetchRequest);
+            log.info("已提交 Git fetch 异步任务（pullRemote），repositoryId={}", repo.getId());
+        }
+
         return refreshInTransaction(id);
     }
 
@@ -312,21 +322,6 @@ public class ProjectSpaceService {
         }
     }
 
-    private void prepareMember(ProjectSpacePrepareSnapshot snapshot, ProjectSpaceMemberSnapshot member) throws Exception {
-        BranchWorkspace branchWorkspace = branchWorkspaceService.prepare(
-                member.getRepositoryId(),
-                new CreateBranchWorkspaceRequest(member.getBranchName()),
-                member.getCommitSha()
-        );
-        Path linkPath = snapshot.getRootPath().resolve(member.getAlias()).normalize();
-        FileUtil.ensureUnderRoot(linkPath, snapshot.getRootPath(), "项目空间成员路径");
-        Path worktreePath = Path.of(branchWorkspace.resolveWorktreePath(worktreeRoot.toString()))
-                .toAbsolutePath().normalize();
-        createOrReplaceLink(linkPath, worktreePath);
-
-        savePreparedMember(snapshot.getProjectSpaceId(), member.getId(), branchWorkspace, linkPath);
-    }
-
     private ProjectSpacePrepareSnapshot beginPrepare(Long id) {
         return transactionTemplate.execute(status -> {
             ProjectSpace space = getEntity(id);
@@ -352,35 +347,6 @@ public class ProjectSpaceService {
                     ))
                     .toList();
             return new ProjectSpacePrepareSnapshot(space.getId(), managedRootPath(space), memberSnapshots);
-        });
-    }
-
-    private void savePreparedMember(
-            Long projectSpaceId,
-            Long memberId,
-            BranchWorkspace branchWorkspace,
-            Path linkPath
-    ) {
-        transactionTemplate.executeWithoutResult(status -> {
-            ProjectSpace space = getEntity(projectSpaceId);
-            ProjectSpaceMember member = memberRepository.findById(memberId)
-                    .orElseThrow(() -> new ResourceNotFoundException("项目空间成员", memberId));
-            member.setBranchWorkspace(branchWorkspace);
-            member.setCommitSha(branchWorkspace.getCommitSha());
-            member.setCommitMessage(branchWorkspace.getCommitMessage());
-            member.setLinkPath(linkPath.toString());
-            member.touch();
-            memberRepository.save(member);
-            space.touch();
-            repository.save(space);
-        });
-    }
-
-    private ProjectSpace completePrepare(Long id) {
-        return transactionTemplate.execute(status -> {
-            ProjectSpace space = getEntity(id);
-            space.readyToIndex(new Date());
-            return repository.save(space);
         });
     }
 
@@ -433,14 +399,16 @@ public class ProjectSpaceService {
         return allowFailed && status == ProjectSpaceStatus.FAILED;
     }
 
-    private List<Path> memberRepositoryPaths(Long id) {
+    /**
+     * 获取项目空间中去重后的成员仓库列表。
+     */
+    private List<CodeRepository> distinctMemberRepositories(Long id) {
         return transactionTemplate.execute(status -> memberRepository.findByProjectSpace_IdOrderByCreatedAtAsc(id)
                 .stream()
                 .map(ProjectSpaceMember::getRepository)
                 .collect(Collectors.toMap(CodeRepository::getId, Function.identity(), (left, right) -> left))
                 .values()
                 .stream()
-                .map(codeRepository -> Path.of(codeRepository.resolveLocalPath(repoRoot)))
                 .toList());
     }
 
@@ -489,22 +457,6 @@ public class ProjectSpaceService {
         } catch (RuntimeException ex) {
             return null;
         }
-    }
-
-    private ProjectSpace completeIndex(Long id, Date indexedAt) {
-        return transactionTemplate.execute(status -> {
-            ProjectSpace space = getEntity(id);
-            space.indexed(indexedAt);
-            return repository.save(space);
-        });
-    }
-
-    private ProjectSpace failSpace(Long id, String message) {
-        return transactionTemplate.execute(status -> {
-            ProjectSpace space = getEntity(id);
-            space.fail(message);
-            return repository.save(space);
-        });
     }
 
     @lombok.Value

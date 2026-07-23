@@ -18,6 +18,9 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import cn.welsione.ascoder.common.task.TaskQueueFullException;
+import cn.welsione.ascoder.common.task.TaskAlreadyRunningException;
+
 /**
  * 全局异常处理器，将领域异常统一转换为 HTTP 响应。
  * 消除 Service 层对 {@code ResponseStatusException} 的依赖，使 HTTP 关注点与业务逻辑解耦。
@@ -55,6 +58,16 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleToolError(ToolExecutionException ex) {
         log.error("工具执行失败", ex);
         return buildResponse(HttpStatus.BAD_GATEWAY, ex.getErrorCode(), ex.getMessage());
+    }
+
+    @ExceptionHandler(TaskQueueFullException.class)
+    public ResponseEntity<Map<String, Object>> handleTaskQueueFull(TaskQueueFullException ex) {
+        return buildResponse(HttpStatus.TOO_MANY_REQUESTS, ex.getErrorCode(), ex.getMessage());
+    }
+
+    @ExceptionHandler(TaskAlreadyRunningException.class)
+    public ResponseEntity<Map<String, Object>> handleTaskAlreadyRunning(TaskAlreadyRunningException ex) {
+        return buildResponse(HttpStatus.CONFLICT, ex.getErrorCode(), ex.getMessage());
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

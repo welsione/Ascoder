@@ -87,7 +87,7 @@ class LlmProviderModelFactoryTests {
 
         assertSame(mockModel, model);
         verify(llmProviderService).getDecrypted(2L);
-        verify(llmProviderService, never()).getDefault();
+        verify(llmProviderService, never()).getDefaultDecrypted();
         verify(anthropicStrategy).build(argThat(resolved ->
                 resolved.getModelId().equals("claude-3-5-sonnet")
         ));
@@ -96,19 +96,19 @@ class LlmProviderModelFactoryTests {
     @Test
     void createDefaultModel() {
         LlmProviderModelFactory factory = factoryWithAnthropic();
-        when(llmProviderService.getDefault()).thenReturn(defaultProvider());
+        when(llmProviderService.getDefaultDecrypted()).thenReturn(defaultProvider());
         when(anthropicStrategy.build(any(ResolvedModelConfig.class))).thenReturn(mockModel);
 
         AnthropicChatModel model = factory.createDefaultModel();
 
         assertSame(mockModel, model);
-        verify(llmProviderService).getDefault();
+        verify(llmProviderService).getDefaultDecrypted();
     }
 
     @Test
     void createDefaultModelNoProviderThrows() {
         LlmProviderModelFactory factory = factoryWithAnthropic();
-        when(llmProviderService.getDefault()).thenThrow(new InvalidStateException("未配置默认 LLM 供应商"));
+        when(llmProviderService.getDefaultDecrypted()).thenThrow(new InvalidStateException("未配置默认 LLM 供应商"));
 
         assertThrows(InvalidStateException.class, () -> factory.createDefaultModel());
     }
@@ -116,7 +116,7 @@ class LlmProviderModelFactoryTests {
     @Test
     void agentConfigOverridesProviderModelId() {
         LlmProviderModelFactory factory = factoryWithAnthropic();
-        when(llmProviderService.getDefault()).thenReturn(defaultProvider());
+        when(llmProviderService.getDefaultDecrypted()).thenReturn(defaultProvider());
         when(anthropicStrategy.build(any(ResolvedModelConfig.class))).thenReturn(mockModel);
         AgentConfig config = new AgentConfig();
         config.setModelId("override-model");
@@ -131,7 +131,7 @@ class LlmProviderModelFactoryTests {
     @Test
     void agentConfigOverridesProviderMaxTokens() {
         LlmProviderModelFactory factory = factoryWithAnthropic();
-        when(llmProviderService.getDefault()).thenReturn(defaultProvider());
+        when(llmProviderService.getDefaultDecrypted()).thenReturn(defaultProvider());
         when(anthropicStrategy.build(any(ResolvedModelConfig.class))).thenReturn(mockModel);
         AgentConfig config = new AgentConfig();
         config.setMaxTokens(8000);
@@ -146,7 +146,7 @@ class LlmProviderModelFactoryTests {
     @Test
     void agentConfigOverridesProviderTimeoutSeconds() {
         LlmProviderModelFactory factory = factoryWithAnthropic();
-        when(llmProviderService.getDefault()).thenReturn(defaultProvider());
+        when(llmProviderService.getDefaultDecrypted()).thenReturn(defaultProvider());
         when(anthropicStrategy.build(any(ResolvedModelConfig.class))).thenReturn(mockModel);
         AgentConfig config = new AgentConfig();
         config.setTimeoutSeconds(120);
@@ -161,7 +161,7 @@ class LlmProviderModelFactoryTests {
     @Test
     void agentConfigNullFieldsFallbackToProvider() {
         LlmProviderModelFactory factory = factoryWithAnthropic();
-        when(llmProviderService.getDefault()).thenReturn(defaultProvider());
+        when(llmProviderService.getDefaultDecrypted()).thenReturn(defaultProvider());
         when(anthropicStrategy.build(any(ResolvedModelConfig.class))).thenReturn(mockModel);
         AgentConfig config = new AgentConfig();
 
@@ -185,7 +185,7 @@ class LlmProviderModelFactoryTests {
         );
         LlmProvider provider = defaultProvider();
         provider.setProviderType(LlmProviderType.OPENAI_COMPATIBLE);
-        when(llmProviderService.getDefault()).thenReturn(provider);
+        when(llmProviderService.getDefaultDecrypted()).thenReturn(provider);
         AgentConfig config = new AgentConfig();
 
         assertThrows(InvalidStateException.class, () -> factory.createModel(config));
@@ -194,7 +194,7 @@ class LlmProviderModelFactoryTests {
     @Test
     void resolveProviderReturnsCorrectSnapshot() {
         LlmProviderModelFactory factory = factoryWithAnthropic();
-        when(llmProviderService.getDefault()).thenReturn(defaultProvider());
+        when(llmProviderService.getDefaultDecrypted()).thenReturn(defaultProvider());
         AgentConfig config = new AgentConfig();
         config.setModelId("custom-model");
 

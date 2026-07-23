@@ -108,6 +108,27 @@ public class CodeRepository {
         touch();
     }
 
+    /** 标记仓库克隆完成，恢复到 CREATED 状态。 */
+    public void cloned() {
+        this.status = RepositoryStatus.CREATED;
+        this.lastPullError = null;
+        touch();
+    }
+
+    /** 标记仓库正在克隆远程仓库。 */
+    public void cloning() {
+        this.status = RepositoryStatus.CLONING;
+        this.lastPullError = null;
+        touch();
+    }
+
+    /** 标记仓库正在同步（fetch / pull）。 */
+    public void syncing() {
+        this.status = RepositoryStatus.SYNCING;
+        this.lastPullError = null;
+        touch();
+    }
+
     public void touch() {
         this.updatedAt = new Date();
     }

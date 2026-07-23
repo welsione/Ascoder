@@ -4,6 +4,7 @@ import cn.welsione.ascoder.codegraph.infrastructure.cli.CliCodeGraphClient;
 import cn.welsione.ascoder.codegraph.infrastructure.cli.CodeGraphCommandRunner;
 import cn.welsione.ascoder.codegraph.infrastructure.cli.IndexProgressTracker;
 import cn.welsione.ascoder.codegraph.port.CodeGraphClient;
+import cn.welsione.ascoder.common.task.AsyncTaskJpaRepository;
 import cn.welsione.ascoder.runtime.application.RuntimeSettingsService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -33,8 +34,8 @@ public class CodeGraphConfiguration {
     }
 
     @Bean
-    public IndexProgressTracker indexProgressTracker() {
-        return new IndexProgressTracker();
+    public IndexProgressTracker indexProgressTracker(AsyncTaskJpaRepository taskRepository) {
+        return new IndexProgressTracker(taskRepository);
     }
 
     @Bean
