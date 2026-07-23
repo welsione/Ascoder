@@ -33,7 +33,7 @@ ascoder:
   project-space-root: ${PROJECT_SPACE_ROOT:./data/project-spaces}
   codegraph-root: ${CODEGRAPH_ROOT:./data/codegraph}
   llm-provider: ${LLM_PROVIDER:database}
-  encryption-key: ${ASCODER_ENCRYPTION_KEY:dGVzdC1lbmNyeXB0aW9uLWtleS1mb3ItaW50ZWdyYXRpb24tdGVzdHMtMTIzNDU2}
+  encryption-key: ${ASCODER_ENCRYPTION_KEY:YXNjb2Rlci10ZXN0LWVuY3J5cHRpb24ta2V5LTMyYiE=}
   codegraph:
     executable: ${CODEGRAPH_EXECUTABLE:codegraph}
     timeout-seconds: 300
