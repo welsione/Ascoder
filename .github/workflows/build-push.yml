@@ -229,12 +229,43 @@ jobs:
           done
           echo "notes_file=/tmp/release-notes-fallback.md" >> "$GITHUB_OUTPUT"
 
+      - name: Append container image links
+        if: steps.check_tag.outputs.skip != 'true'
+        id: append_images
+        env:
+          NEW_TAG: ${{ steps.version.outputs.new_tag }}
+          NOTES_FILE_IN: ${{ steps.ai_notes.outputs.notes_file || steps.fallback_notes.outputs.notes_file }}
+          BACKEND_IMAGE: ${{ env.BACKEND_IMAGE }}
+          FRONTEND_IMAGE: ${{ env.FRONTEND_IMAGE }}
+        run: |
+          # 镜像 tag 与 release 版本号一致：release job 创建 NEW_TAG 后，tag push 会触发
+          # build job（type=ref,event=tag）给两个镜像打上 v0.1.x tag 推到 GHCR。
+          NOTES_FILE="${NOTES_FILE_IN:-/tmp/release-notes-container.md}"
+          [ -f "$NOTES_FILE" ] || : > "$NOTES_FILE"
+          {
+            echo ""
+            echo "## 容器镜像"
+            echo ""
+            echo "镜像 tag 与本 release 版本号一致（\`${NEW_TAG}\`），tag push 触发构建后可在 GHCR 拉取："
+            echo ""
+            echo "- 后端：\`${BACKEND_IMAGE}:${NEW_TAG}\`"
+            echo "- 前端：\`${FRONTEND_IMAGE}:${NEW_TAG}\`"
+            echo ""
+            echo "拉取："
+            echo ""
+            echo '```bash'
+            echo "docker pull ${BACKEND_IMAGE}:${NEW_TAG}"
+            echo "docker pull ${FRONTEND_IMAGE}:${NEW_TAG}"
+            echo '```'
+          } >> "$NOTES_FILE"
+          echo "notes_file=${NOTES_FILE}" >> "$GITHUB_OUTPUT"
+
       - name: Create tag and release
         if: steps.check_tag.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NEW_TAG: ${{ steps.version.outputs.new_tag }}
-          NOTES_FILE: ${{ steps.ai_notes.outputs.notes_file || steps.fallback_notes.outputs.notes_file }}
+          NOTES_FILE: ${{ steps.append_images.outputs.notes_file }}
         run: |
           if [ ! -f "$NOTES_FILE" ]; then
             NOTES_FILE="/dev/null"
