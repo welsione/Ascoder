@@ -1,0 +1,51 @@
+# dev-local profile:本地 IDE / mvn spring-boot:run 启动后端,连接 docker 化测试数据库(3307)。
+# 前端用本地 npm run dev(vite proxy 已指向 localhost:18080)。
+#
+# 启动数据库:docker compose -f docker-compose.test.yml up -d mysql
+# 启动后端:  mvn spring-boot:run -pl backend -Dspring-boot.run.profiles=dev-local
+# 启动前端:  cd frontend/web && npm run dev
+#
+# 测试账号默认 ascoder/test-password,可通过 TEST_MYSQL_* 环境变量覆盖(需与 compose 一致)。
+server:
+  port: 18080
+
+spring:
+  application:
+    name: ascoder-backend
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+  datasource:
+    url: jdbc:mysql://127.0.0.1:${TEST_MYSQL_PORT:3307}/${TEST_MYSQL_DATABASE:ascoder}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+    username: ${TEST_MYSQL_USER:ascoder}
+    password: ${TEST_MYSQL_PASSWORD:test-password}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+    open-in-view: false
+  flyway:
+    enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+ascoder:
+  prompt:
+    source: file
+  repo-root: ${REPO_ROOT:./data/repos}
+  worktree-root: ${WORKTREE_ROOT:./data/worktrees}
+  project-space-root: ${PROJECT_SPACE_ROOT:./data/project-spaces}
+  codegraph-root: ${CODEGRAPH_ROOT:./data/codegraph}
+  llm-provider: ${LLM_PROVIDER:database}
+  codegraph:
+    executable: ${CODEGRAPH_EXECUTABLE:codegraph}
+    timeout-seconds: 300
+    index-timeout-seconds: 3600
+  git:
+    timeout-seconds: 120

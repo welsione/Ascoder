@@ -12,13 +12,13 @@ import java.util.Set;
 /**
  * 安全相关 Bean 配置，注册 ascoder-common 中的加密工具。
  *
- * <p>开发环境（{@code spring.profiles.active=local}）允许在密钥未配置时使用
+ * <p>开发与测试环境（local / dev / dev-local / dev-docker / default）允许在密钥未配置时使用
  * 默认开发密钥，仅用于本地启动与单元测试；生产环境必须显式配置密钥。</p>
  */
 @Configuration
 public class SecurityConfiguration {
 
-    private static final Set<String> DEV_PROFILES = new HashSet<>(Arrays.asList("local", "dev", "default"));
+    private static final Set<String> DEV_PROFILES = new HashSet<>(Arrays.asList("local", "dev", "default", "dev-local", "dev-docker"));
 
     @Bean
     public ApiKeyEncryptor apiKeyEncryptor(

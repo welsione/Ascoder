@@ -1,0 +1,46 @@
+# dev-docker profile:后端跑在容器内,通过 compose 内部网络连接 mysql service。
+# 由 docker-compose.test.yml 的 backend 服务激活(SPRING_PROFILES_ACTIVE=dev-docker)。
+# 大部分参数走 compose 环境变量,这里只给容器内默认值;datasource 默认指向同网络的 mysql:3306。
+server:
+  port: 18080
+
+spring:
+  application:
+    name: ascoder-backend
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://mysql:3306/ascoder?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false}
+    username: ${SPRING_DATASOURCE_USERNAME:ascoder}
+    password: ${SPRING_DATASOURCE_PASSWORD:test-password}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+    open-in-view: false
+  flyway:
+    enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+ascoder:
+  prompt:
+    source: ${ASCODER_PROMPT_SOURCE:file}
+  repo-root: ${REPO_ROOT:/app/data/repos}
+  worktree-root: ${WORKTREE_ROOT:/app/data/worktrees}
+  project-space-root: ${PROJECT_SPACE_ROOT:/app/data/project-spaces}
+  codegraph-root: ${CODEGRAPH_ROOT:/app/data/codegraph}
+  llm-provider: ${LLM_PROVIDER:database}
+  codegraph:
+    executable: ${CODEGRAPH_EXECUTABLE:codegraph}
+    timeout-seconds: ${CODEGRAPH_TIMEOUT_SECONDS:300}
+    index-timeout-seconds: ${CODEGRAPH_INDEX_TIMEOUT_SECONDS:3600}
+  git:
+    timeout-seconds: ${GIT_TIMEOUT_SECONDS:120}
