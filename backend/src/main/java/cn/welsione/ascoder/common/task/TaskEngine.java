@@ -1,7 +1,6 @@
 package cn.welsione.ascoder.common.task;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -27,13 +26,14 @@ import java.util.concurrent.RejectedExecutionException;
  */
 @Slf4j
 @Service
-public class TaskEngine {
+public class TaskEngine implements org.springframework.beans.factory.SmartInitializingSingleton {
 
     private final AsyncTaskJpaRepository taskRepository;
     private final TaskExecutorRegistry executorRegistry;
     private final TaskProgressPublisher progressPublisher;
     private final TransactionTemplate txTemplate;
     private final ObjectMapper objectMapper;
+    private final org.springframework.beans.factory.ObjectProvider<java.util.List<TaskDefinition<?>>> definitionsProvider;
 
     /** 按 kind 索引的 TaskDefinition。 */
     private final Map<TaskKind, TaskDefinition<?>> definitions = new ConcurrentHashMap<>();
@@ -46,17 +46,37 @@ public class TaskEngine {
                       TaskProgressPublisher progressPublisher,
                       TransactionTemplate txTemplate,
                       ObjectMapper objectMapper,
-                      List<TaskDefinition<?>> definitionList) {
+                      org.springframework.beans.factory.ObjectProvider<java.util.List<TaskDefinition<?>>> definitionsProvider) {
         this.taskRepository = taskRepository;
         this.executorRegistry = executorRegistry;
         this.progressPublisher = progressPublisher;
         this.txTemplate = txTemplate;
         this.objectMapper = objectMapper;
-        // 自动注册所有 TaskDefinition
-        for (TaskDefinition<?> def : definitionList) {
+        this.definitionsProvider = definitionsProvider;
+    }
+
+    /**
+     * 注册所有 TaskDefinition Bean 并恢复未完成任务。
+     *
+     * 注册所有 TaskDefinition Bean 并恢复未完成任务。
+     *
+     * <p>用 {@link org.springframework.beans.factory.SmartInitializingSingleton} 在所有单例
+     * Bean 创建完成后调用，避免 {@code @PostConstruct} 过早解析 TaskDefinition 列表触发循环依赖
+     *（TaskDefinition 依赖链可能回到 TaskEngine）。List 按 {@code @Order} 排序，
+     * 后注册的覆盖先注册的（测试可借此覆盖生产实现）。</p>
+     */
+    @Override
+    public void afterSingletonsInstantiated() {
+        init();
+    }
+
+    void init() {
+        java.util.List<TaskDefinition<?>> defList = definitionsProvider.getIfAvailable(java.util.Collections::emptyList);
+        for (TaskDefinition<?> def : defList) {
             definitions.put(def.kind(), def);
             log.info("注册任务定义：{}", def.kind());
         }
+        recoverTasks();
     }
 
     /**
@@ -171,7 +191,6 @@ public class TaskEngine {
     /**
      * 启动后恢复未完成的任务：RUNNING → QUEUED 重新提交。
      */
-    @PostConstruct
     void recoverTasks() {
         List<AsyncTask> unfinished = taskRepository.findByStatusIn(
                 List.of(TaskStatus.QUEUED, TaskStatus.RUNNING));

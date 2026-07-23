@@ -65,8 +65,16 @@ class TaskEngineTests {
     }
 
     private TaskEngine newEngine() {
-        return new TaskEngine(taskRepository, executorRegistry, progressPublisher,
-                txTemplate, objectMapper, List.of(definition));
+        @SuppressWarnings("unchecked")
+        org.springframework.beans.factory.ObjectProvider<java.util.List<TaskDefinition<?>>> provider =
+                mock(org.springframework.beans.factory.ObjectProvider.class);
+        java.util.List<TaskDefinition<?>> defs = List.of(definition);
+        when(provider.getIfAvailable()).thenReturn(defs);
+        when(provider.getIfAvailable(any(java.util.function.Supplier.class))).thenReturn(defs);
+        TaskEngine engine = new TaskEngine(taskRepository, executorRegistry, progressPublisher,
+                txTemplate, objectMapper, provider);
+        engine.init();
+        return engine;
     }
 
     private TaskSubmitRequest<Map<String, String>> submitRequest() {
