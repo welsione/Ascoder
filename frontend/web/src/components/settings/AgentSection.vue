@@ -34,7 +34,11 @@ onUnmounted(() => {
 
 onMounted(() => {
   nowTimer = setInterval(() => { now.value = Date.now() }, 1000)
+  agentStore.fetch()
   llmProviderStore.fetchProviders()
+  toolStore.fetch()
+  skillStore.fetch()
+  mcpStore.fetch()
   // SSE 不可用时由 store 拉一次状态快照兜底，30s 间隔
   livePollTimer = setInterval(() => {
     if (!drawerOpen.value) {
