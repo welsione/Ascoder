@@ -37,6 +37,8 @@ docs/
 # Claude Code
 CLAUDE_ZH.md
 .claude/settings.local.json
+# Claude Code 工作副本（含独立 .git 的嵌套 worktree，提交会污染主仓库）
+.claude/worktrees/
 
 # AgentScope
 .agentscope/
