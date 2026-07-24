@@ -2,7 +2,10 @@ package cn.welsione.ascoder.common.task;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.Date;
@@ -157,6 +160,23 @@ public class TaskEngine implements org.springframework.beans.factory.SmartInitia
                 .findFirst()
                 .map(TaskHandleImpl::new)
                 .orElse(null);
+    }
+
+    /**
+     * 分页查询任务列表，支持按类型和状态筛选。
+     */
+    @Transactional(readOnly = true)
+    public Page<AsyncTask> list(TaskKind kind, List<TaskStatus> statuses, Pageable pageable) {
+        if (kind != null && statuses != null && !statuses.isEmpty()) {
+            return taskRepository.findByKindAndStatusIn(kind, statuses, pageable);
+        }
+        if (kind != null) {
+            return taskRepository.findByKind(kind, pageable);
+        }
+        if (statuses != null && !statuses.isEmpty()) {
+            return taskRepository.findByStatusIn(statuses, pageable);
+        }
+        return taskRepository.findAll(pageable);
     }
 
     /**

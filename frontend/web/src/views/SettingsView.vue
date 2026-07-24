@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import SettingsSidebar from '../components/settings/SettingsSidebar.vue'
 import RepositorySection from '../components/settings/RepositorySection.vue'
+import TaskSection from '../components/settings/TaskSection.vue'
 import SkillSection from '../components/settings/SkillSection.vue'
 import ToolSection from '../components/settings/ToolSection.vue'
 import AgentSection from '../components/settings/AgentSection.vue'
@@ -14,6 +15,7 @@ const route = useRoute()
 
 function normalizeSection(value: string | undefined): Section {
   if (value === 'repository' || value === 'repositories') return 'repositories'
+  if (value === 'tasks') return 'tasks'
   if (value === 'skill' || value === 'skills') return 'skills'
   if (value === 'tool' || value === 'tools') return 'tools'
   if (value === 'agents') return 'agents'
@@ -30,6 +32,9 @@ const section = computed<Section>(() => {
 const sectionMeta = computed(() => {
   if (section.value === 'repositories') {
     return { title: '仓库管理', description: '维护代码仓库接入、同步与分支发现状态。' }
+  }
+  if (section.value === 'tasks') {
+    return { title: '任务管理', description: '查看和管理所有异步任务的执行状态与进度。' }
   }
   if (section.value === 'skills') {
     return { title: 'Skill 管理', description: '配置回答策略与规则，让 Ascoder 的回答更贴近团队协作方式。' }
@@ -62,6 +67,7 @@ const sectionMeta = computed(() => {
       </header>
 
       <RepositorySection v-if="section === 'repositories'" />
+      <TaskSection v-else-if="section === 'tasks'" />
       <SkillSection v-else-if="section === 'skills'" />
       <ToolSection v-else-if="section === 'tools'" />
       <AgentSection v-else-if="section === 'agents'" />

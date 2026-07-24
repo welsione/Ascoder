@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, Blocks, BotMessageSquare, Cpu, FolderGit2, Settings, SlidersHorizontal, WandSparkles } from 'lucide-vue-next'
+import { onMounted } from 'vue'
+import { Activity, ArrowLeft, Blocks, BotMessageSquare, Cpu, FolderGit2, Settings, SlidersHorizontal, WandSparkles } from 'lucide-vue-next'
 import { useRepositoryStore } from '../../stores/repository'
 import { useSkillStore } from '../../stores/skill'
 import { useMcpServerStore } from '../../stores/mcpServer'
 import { useAgentToolStore } from '../../stores/agentTool'
 import { useAgentStore } from '../../stores/agent'
 import { useLlmProviderStore } from '../../stores/llmProvider'
+import { useAsyncTaskStore } from '../../stores/asyncTask'
 import type { Section } from '../../types/settings'
 
 const route = useRoute()
@@ -17,11 +19,13 @@ const mcpStore = useMcpServerStore()
 const toolStore = useAgentToolStore()
 const agentStore = useAgentStore()
 const llmProviderStore = useLlmProviderStore()
+const asyncTaskStore = useAsyncTaskStore()
 const mcpConfigEnabled = true
 
 function currentSection(): Section {
   const s = route.params.section as string
   if (s === 'repository' || s === 'repositories') return 'repositories'
+  if (s === 'tasks') return 'tasks'
   if (s === 'skill' || s === 'skills') return 'skills'
   if (s === 'tool' || s === 'tools') return 'tools'
   if (s === 'agents') return 'agents'
@@ -37,6 +41,10 @@ function navigate(section: Section) {
   }
   router.push(`/settings/${section}`)
 }
+
+onMounted(() => {
+  asyncTaskStore.fetchTasks()
+})
 </script>
 
 <template>
@@ -69,6 +77,18 @@ function navigate(section: Section) {
           仓库管理
         </span>
         <small>{{ repositoryStore.repositories.length }} 个仓库</small>
+      </button>
+      <button
+        class="settings-nav-item"
+        :class="{ active: currentSection() === 'tasks' }"
+        type="button"
+        @click="navigate('tasks')"
+      >
+        <span>
+          <Activity class="inline-icon" aria-hidden="true" :size="16" :stroke-width="1.8" />
+          任务管理
+        </span>
+        <small>{{ asyncTaskStore.activeCount }} 个运行中</small>
       </button>
       <button
         class="settings-nav-item"
