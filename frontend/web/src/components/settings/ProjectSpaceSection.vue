@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Search } from '@element-plus/icons-vue'
 import {
   DatabaseZap,
   Eye,
@@ -36,6 +37,7 @@ const creatingAndIndexing = ref(false)
 const prefilledSourceId = ref<number | null>(null)
 const showExistingSpaces = ref(!!props.projectId)
 const spaceSearchQuery = ref('')
+const nameTouched = ref(false)
 
 const formRef = ref(projectSpaceStore.form)
 const { hasDraft, restore: restoreDraft, clear: clearDraft } = useDraftAutoSave(
@@ -43,7 +45,7 @@ const { hasDraft, restore: restoreDraft, clear: clearDraft } = useDraftAutoSave(
   formRef,
   3000
 )
-const { takeSnapshot, restoreSnapshot, snapshots, clearHistory } = useChangeHistory(formRef)
+const { takeSnapshot, clearHistory } = useChangeHistory(formRef)
 
 const sourceSpace = computed(() =>
   props.sourceSpaceId == null
@@ -218,7 +220,7 @@ watch(
 watch(
   () => suggestedSpaceName.value,
   (name) => {
-    if (!isDeriveMode.value && name && !projectSpaceStore.form.name.trim()) {
+    if (!isDeriveMode.value && name && !nameTouched.value) {
       projectSpaceStore.form.name = name
     }
   },
@@ -362,6 +364,7 @@ function handleReset() {
     cancelButtonText: '取消',
     type: 'warning',
   }).then(() => {
+    projectSpaceStore.form.projectId = null
     projectSpaceStore.form.name = ''
     projectSpaceStore.form.description = ''
     projectSpaceStore.form.defaultBranch = ''
@@ -406,9 +409,10 @@ function handleReset() {
       <el-tag type="info">{{ projectSpaceStore.form.memberBranches.length }} 个仓库参与分析</el-tag>
     </div>
 
-    <!-- 空间基础信息 -->
-    <div class="config-group">
-      <h3 class="config-group-title">基础信息</h3>
+    <template v-if="selectedProject">
+      <!-- 空间基础信息 -->
+      <div class="config-group">
+        <h3 class="config-group-title">基础信息</h3>
       <div class="settings-form-grid settings-form-grid-repo">
         <div class="config-field">
           <label class="field-label">
@@ -421,6 +425,7 @@ function handleReset() {
             clearable
             show-word-limit
             :class="{ 'is-error': spaceNameError }"
+            @input="nameTouched = true"
           />
           <p v-if="spaceNameError" class="field-error">{{ spaceNameError }}</p>
         </div>
@@ -444,7 +449,7 @@ function handleReset() {
     <div class="config-group">
       <h3 class="config-group-title">仓库分支</h3>
       <p class="config-group-desc">{{ selectedProjectMemberText }}</p>
-      <el-table class="workspace-table" :data="projectSpaceStore.form.memberBranches" empty-text="选择项目后自动生成仓库分支">
+      <el-table class="workspace-table" :data="projectSpaceStore.form.memberBranches" empty-text="选择项目后自动生成仓库分支" max-height="360">
         <el-table-column prop="repositoryName" label="仓库" min-width="140" />
         <el-table-column label="目录别名" min-width="140">
           <template #default="{ row }">
@@ -486,9 +491,14 @@ function handleReset() {
         </el-table-column>
       </el-table>
     </div>
+    </template>
+
+    <div v-else class="empty-box compact-empty">
+      <p>请先在上一步选择项目，再配置分析空间。</p>
+    </div>
 
     <div class="settings-actions">
-      <el-button title="重置表单" aria-label="重置表单" @click="handleReset">
+      <el-button title="重置表单" aria-label="重置表单" :disabled="creatingAndIndexing || projectSpaceStore.loading" @click="handleReset">
         <RotateCcw class="button-icon" aria-hidden="true" :size="16" :stroke-width="1.8" />
         重置
       </el-button>
@@ -524,31 +534,29 @@ function handleReset() {
   </section>
 
   <!-- 已有空间管理 -->
-  <details
-    v-if="!isDeriveMode"
-    class="surface-panel settings-block existing-space-panel config-section"
-    :open="showExistingSpaces"
-    @toggle="showExistingSpaces = ($event.currentTarget as HTMLDetailsElement).open"
-  >
-    <summary>
+  <section v-if="!isDeriveMode" class="surface-panel settings-block existing-space-panel config-section">
+    <div class="existing-space-header" @click="showExistingSpaces = !showExistingSpaces">
       <span>
         <span class="kicker">已有分析空间</span>
         <strong>查看已创建空间和维护操作</strong>
       </span>
       <span class="existing-space-count">{{ filteredSpaces.length }} 个空间</span>
-    </summary>
+    </div>
+
+    <el-collapse-transition>
+      <div v-if="showExistingSpaces">
 
     <div class="config-search-bar">
       <el-input
         v-model="spaceSearchQuery"
         :placeholder="projectId ? '搜索空间名称或状态...' : '搜索空间名称、项目或状态...'"
-        prefix-icon="Search"
+        :prefix-icon="Search"
         clearable
         size="default"
       />
     </div>
 
-    <el-table v-loading="projectSpaceStore.loading" :data="filteredSpaces" empty-text="暂无项目空间">
+    <el-table v-loading="projectSpaceStore.loading" :data="filteredSpaces" empty-text="暂无项目空间" max-height="400">
       <el-table-column prop="name" label="空间" min-width="160" />
       <el-table-column v-if="!projectId" prop="project" label="项目" min-width="140" />
       <el-table-column label="状态" width="130">
@@ -629,7 +637,9 @@ function handleReset() {
         </template>
       </el-table-column>
     </el-table>
-  </details>
+      </div>
+    </el-collapse-transition>
+  </section>
 
   <!-- 空间成员 -->
   <section v-if="!isDeriveMode && projectSpaceStore.selectedSpace && showExistingSpaces" class="surface-panel settings-block config-section">
@@ -640,7 +650,7 @@ function handleReset() {
       </div>
     </div>
 
-    <el-table :data="projectSpaceStore.members" empty-text="暂无成员">
+    <el-table :data="projectSpaceStore.members" empty-text="暂无成员" max-height="360">
       <el-table-column type="expand" width="44">
         <template #default="{ row }">
           <div class="member-commit-history">
@@ -674,11 +684,6 @@ function handleReset() {
 <style scoped>
 .config-group {
   margin: var(--spacing-4) 0;
-  padding: var(--spacing-4);
-  border: 1px solid var(--stroke);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-  box-shadow: var(--shadow-soft);
 }
 
 .config-group-title {
@@ -805,23 +810,20 @@ function handleReset() {
 .existing-space-panel {
   padding: 0;
   overflow: hidden;
+  background: var(--surface-soft, var(--surface));
+  border-color: transparent;
 }
 
-.existing-space-panel > summary {
+.existing-space-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--spacing-4);
   padding: var(--spacing-5);
   cursor: pointer;
-  list-style: none;
 }
 
-.existing-space-panel > summary::-webkit-details-marker {
-  display: none;
-}
-
-.existing-space-panel > summary strong {
+.existing-space-header strong {
   display: block;
   margin-top: 4px;
   font-size: var(--font-size-xl);

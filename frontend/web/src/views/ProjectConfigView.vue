@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onMounted } from 'vue'
+import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
 import { ArrowLeft, Code2 } from 'lucide-vue-next'
 import { useRepositoryStore } from '../stores/repository'
 import { useProjectStore } from '../stores/project'
@@ -37,17 +37,32 @@ const mode = computed(() => {
   return 'create'
 })
 
-const activeStep = computed(() =>
-  mode.value === 'analysis-create'
-    ? 2
-    : projectStore.projects.length && projectStore.members.length
-      ? 2
-      : projectStore.projects.length
-        ? 1
-        : repositoryStore.repositories.length
-          ? 0
-          : -1
+/** 用户已完成的步骤（仅 create 模式使用交互追踪） */
+const stepProjectSelected = ref(false)
+const stepMembersConfirmed = ref(false)
+
+/** 监听 projectStore.selectedProjectId 变化，标记用户已选择项目 */
+watch(
+  () => projectStore.selectedProjectId,
+  (id) => {
+    if (id != null) stepProjectSelected.value = true
+  }
 )
+
+/** 监听 projectStore.members 变化，标记用户已确认仓库 */
+watch(
+  () => projectStore.members.length,
+  (len) => {
+    if (len > 0 && stepProjectSelected.value) stepMembersConfirmed.value = true
+  }
+)
+
+const activeStep = computed(() => {
+  if (mode.value === 'analysis-create') return 2
+  if (stepMembersConfirmed.value) return 2
+  if (stepProjectSelected.value) return 1
+  return 0
+})
 
 const kicker = computed(() => {
   if (mode.value === 'derive') return '分析空间新版本'
@@ -92,9 +107,7 @@ const projectSummary = computed(() =>
 )
 
 onMounted(() => {
-  projectStore.fetch()
-  projectSpaceStore.fetch()
-  repositoryStore.fetch()
+  // Layout 已负责 fetch project/projectSpace/repository，此处不再重复请求
 })
 </script>
 
@@ -145,11 +158,7 @@ onMounted(() => {
 
 <style scoped>
 .config-flow-bar {
-  border: 1px solid var(--stroke);
-  border-radius: var(--radius-xl);
-  background: var(--surface);
-  padding: var(--spacing-5) var(--spacing-6);
-  box-shadow: var(--shadow-soft);
+  padding: 0 var(--spacing-2);
 }
 
 .current-project-card {

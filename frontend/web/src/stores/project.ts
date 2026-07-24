@@ -34,10 +34,6 @@ export const useProjectStore = defineStore('project', () => {
 
   async function fetch() {
     await crud.fetchAll(() => api.getAll(), '无法加载项目')
-    if (!selectedProjectId.value && crud.items.value.length) {
-      selectedProjectId.value = crud.items.value[0].id
-      await fetchMembers(selectedProjectId.value)
-    }
   }
 
   async function create() {

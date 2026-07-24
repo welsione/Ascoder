@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { CheckSquare, Plus, RefreshCw, RotateCcw, Save, Square, Trash2, Undo2 } from 'lucide-vue-next'
+import { Search } from '@element-plus/icons-vue'
+import { Plus, RefreshCw, RotateCcw, Save, Trash2, Undo2 } from 'lucide-vue-next'
 import { useProjectStore } from '../../stores/project'
 import { useRepositoryStore } from '../../stores/repository'
 import { useDraftAutoSave } from '../../composables/useDraftAutoSave'
@@ -10,7 +11,8 @@ import { useChangeHistory } from '../../composables/useChangeHistory'
 const projectStore = useProjectStore()
 const repositoryStore = useRepositoryStore()
 const showCreateProject = ref(false)
-const searchQuery = ref('')
+const projectQuery = ref('')
+const memberQuery = ref('')
 const selectedMemberIds = ref<number[]>([])
 
 const formRef = ref(projectStore.form)
@@ -19,14 +21,14 @@ const { hasDraft, restore: restoreDraft, clear: clearDraft } = useDraftAutoSave(
   formRef,
   3000
 )
-const { takeSnapshot, restoreSnapshot, snapshots, clearHistory } = useChangeHistory(formRef)
+const { takeSnapshot, clearHistory } = useChangeHistory(formRef)
 
 const selectedProject = computed(() =>
   projectStore.projects.find((project) => project.id === projectStore.selectedProjectId) ?? null
 )
 
 const filteredProjects = computed(() => {
-  const q = searchQuery.value.trim().toLowerCase()
+  const q = projectQuery.value.trim().toLowerCase()
   if (!q) return projectStore.projects
   return projectStore.projects.filter(
     (project) =>
@@ -36,7 +38,7 @@ const filteredProjects = computed(() => {
 })
 
 const filteredMembers = computed(() => {
-  const q = searchQuery.value.trim().toLowerCase()
+  const q = memberQuery.value.trim().toLowerCase()
   if (!q) return projectStore.members
   return projectStore.members.filter(
     (member) =>
@@ -133,20 +135,6 @@ async function batchRemove() {
   }
 }
 
-function toggleMemberSelection(id: number) {
-  const idx = selectedMemberIds.value.indexOf(id)
-  if (idx === -1) selectedMemberIds.value.push(id)
-  else selectedMemberIds.value.splice(idx, 1)
-}
-
-function toggleSelectAll() {
-  if (selectedMemberIds.value.length === projectStore.members.length) {
-    selectedMemberIds.value = []
-  } else {
-    selectedMemberIds.value = projectStore.members.map((m) => m.id)
-  }
-}
-
 async function restoreFromDraft() {
   const data = restoreDraft()
   if (data) {
@@ -163,6 +151,11 @@ function handleReset() {
   }).then(() => {
     projectStore.form.name = ''
     projectStore.form.description = ''
+    projectStore.memberForm.repositoryId = null
+    projectStore.memberForm.alias = ''
+    projectStore.memberForm.role = 'repository'
+    projectStore.memberForm.primaryRepository = false
+    projectStore.memberForm.sortOrder = 0
     clearDraft()
     clearHistory()
     ElMessage.success('已重置')
@@ -201,9 +194,9 @@ function handleReset() {
 
     <div class="config-search-bar">
       <el-input
-        v-model="searchQuery"
+        v-model="projectQuery"
         placeholder="搜索项目名称或描述..."
-        prefix-icon="Search"
+        :prefix-icon="Search"
         clearable
         size="default"
       />
@@ -214,7 +207,7 @@ function handleReset() {
         <strong>已有项目</strong>
         <span>{{ projectStore.projects.length }} 个</span>
       </div>
-      <div v-if="filteredProjects.length" class="project-card-list">
+      <div v-if="filteredProjects.length" v-loading="projectStore.loading" class="project-card-list">
         <button
           v-for="project in filteredProjects"
           :key="project.id"
@@ -228,8 +221,8 @@ function handleReset() {
           <em v-if="project.id === projectStore.selectedProjectId">当前</em>
         </button>
       </div>
-      <div v-else class="empty-box compact-empty">
-        <p>{{ searchQuery ? '没有匹配的项目' : '还没有项目。点击右上角"新建项目"开始。' }}</p>
+      <div v-else v-loading="projectStore.loading" class="empty-box compact-empty">
+        <p>{{ projectQuery ? '没有匹配的项目' : '还没有项目。点击右上角"新建项目"开始。' }}</p>
       </div>
     </div>
 
@@ -297,11 +290,11 @@ function handleReset() {
   </section>
 
   <!-- 仓库配置：权限与成员 -->
-  <section class="surface-panel settings-block config-section">
+  <section v-if="selectedProject" class="surface-panel settings-block config-section">
     <div class="section-heading">
       <div>
         <p class="kicker">2. 确认仓库</p>
-        <h2>{{ selectedProject ? `${selectedProject.name} 的仓库` : '先选择项目' }}</h2>
+        <h2>{{ selectedProject.name }} 的仓库</h2>
       </div>
       <div class="section-actions">
         <span class="maintenance-summary-meta">{{ projectStore.members.length }} 个仓库</span>
@@ -320,11 +313,11 @@ function handleReset() {
       </div>
     </div>
 
-    <div v-if="selectedProject" class="config-search-bar">
+    <div class="config-search-bar">
       <el-input
-        v-model="searchQuery"
+        v-model="memberQuery"
         placeholder="搜索仓库名称、别名..."
-        prefix-icon="Search"
+        :prefix-icon="Search"
         clearable
         size="default"
       />
@@ -340,7 +333,6 @@ function handleReset() {
           placeholder="选择仓库"
           clearable
           style="width: 100%"
-          :disabled="!selectedProject"
         >
           <el-option
             v-for="repo in repositoryStore.repositories"
@@ -374,13 +366,13 @@ function handleReset() {
         <label class="field-label">排序</label>
         <el-input-number v-model="projectStore.memberForm.sortOrder" :min="0" style="width: 100%" />
       </div>
-      <div class="config-field span-2">
+      <div class="config-field inline-field">
         <el-checkbox v-model="projectStore.memberForm.primaryRepository">核心仓库</el-checkbox>
       </div>
     </div>
 
     <div class="settings-actions">
-      <el-button type="primary" :disabled="!selectedProject" @click="addRepository">
+      <el-button type="primary" @click="addRepository">
         <Plus class="button-icon" aria-hidden="true" :size="16" :stroke-width="1.8" />
         加入项目
       </el-button>
@@ -389,6 +381,7 @@ function handleReset() {
     <el-table
       :data="filteredMembers"
       empty-text="当前项目还没有仓库"
+      max-height="360"
       @selection-change="(rows: ProjectRepositoryMember[]) => selectedMemberIds = rows.map(r => r.id)"
     >
       <el-table-column type="selection" width="45" />
@@ -418,29 +411,6 @@ function handleReset() {
         </template>
       </el-table-column>
     </el-table>
-
-    <div v-if="selectedMemberIds.length" class="batch-action-bar">
-      <span>已选择 {{ selectedMemberIds.length }} 项</span>
-      <el-button
-        size="small"
-        :title="selectedMemberIds.length === projectStore.members.length ? '取消全选' : '全选'"
-        :aria-label="selectedMemberIds.length === projectStore.members.length ? '取消全选' : '全选'"
-        @click="toggleSelectAll"
-      >
-        <component
-          :is="selectedMemberIds.length === projectStore.members.length ? Square : CheckSquare"
-          class="button-icon"
-          aria-hidden="true"
-          :size="15"
-          :stroke-width="1.8"
-        />
-        {{ selectedMemberIds.length === projectStore.members.length ? '取消全选' : '全选' }}
-      </el-button>
-      <el-button size="small" type="danger" title="批量移出" aria-label="批量移出" @click="batchRemove">
-        <Trash2 class="button-icon" aria-hidden="true" :size="15" :stroke-width="1.8" />
-        批量移出
-      </el-button>
-    </div>
   </section>
 </template>
 
@@ -476,6 +446,11 @@ import type { ProjectRepositoryMember } from '../../types/project'
 .config-field {
   display: grid;
   gap: var(--spacing-1);
+}
+
+.config-field.inline-field {
+  align-content: end;
+  padding-bottom: 2px;
 }
 
 .required-star {
@@ -561,19 +536,6 @@ import type { ProjectRepositoryMember } from '../../types/project'
   color: var(--chat-accent);
   font-size: var(--font-size-xs);
   font-style: normal;
-}
-
-.batch-action-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: var(--spacing-3);
-  padding: var(--spacing-3) var(--spacing-4);
-  border: 1px solid var(--stroke);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-  font-size: var(--font-size-sm);
-  color: var(--muted);
 }
 
 @media (max-width: 900px) {

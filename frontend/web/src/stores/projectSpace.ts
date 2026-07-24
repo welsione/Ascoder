@@ -71,10 +71,6 @@ export const useProjectSpaceStore = defineStore('projectSpace', () => {
 
   async function fetch() {
     await crud.fetchAll(() => api.getAll(), '无法加载项目空间')
-    if (!crud.selectedId.value && crud.items.value.length) {
-      crud.selectedId.value = crud.items.value[0].id
-      await fetchMembers(crud.selectedId.value)
-    }
   }
 
   function generateMembers(projectMembers: ProjectRepositoryMember[]) {
