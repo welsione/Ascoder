@@ -154,7 +154,7 @@ public class RepositoryService {
         Map<String, String> context = new LinkedHashMap<>();
         context.put("repositoryPath", entity.resolveLocalPath(repoRoot.toString()));
         context.put("repositoryId", id.toString());
-        context.put("operation", "fetch");
+        context.put("operation", GitSyncOperation.FETCH.code());
         context.put("authUsername", entity.getAuthUsername());
         context.put("authPassword", entity.getAuthPassword());
         context.put("remoteUrl", entity.getRemoteUrl());
@@ -178,7 +178,7 @@ public class RepositoryService {
         Map<String, String> context = new LinkedHashMap<>();
         context.put("repositoryPath", entity.resolveLocalPath(repoRoot.toString()));
         context.put("repositoryId", id.toString());
-        context.put("operation", "pull");
+        context.put("operation", GitSyncOperation.PULL.code());
         context.put("authUsername", entity.getAuthUsername());
         context.put("authPassword", entity.getAuthPassword());
         context.put("remoteUrl", entity.getRemoteUrl());
@@ -196,6 +196,30 @@ public class RepositoryService {
     public CodeRepository getEntity(Long id) {
         return repository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("仓库", id));
+    }
+
+    /**
+     * 提交分支刷新异步任务。
+     *
+     * <p>提交 BRANCH_REFRESH 任务后立即返回，不等待 fetch + 分支发现完成。
+     * 用户可通过 GET /{id}/branches 查询最新分支列表。</p>
+     */
+    @Transactional
+    public void refreshBranches(Long id) {
+        CodeRepository entity = getEntity(id);
+        upsertCredentials(entity);
+
+        Map<String, String> context = new LinkedHashMap<>();
+        context.put("repositoryId", id.toString());
+        context.put("authUsername", entity.getAuthUsername());
+        context.put("authPassword", entity.getAuthPassword());
+        context.put("remoteUrl", entity.getRemoteUrl());
+        TaskSubmitRequest<Map<String, String>> request = new TaskSubmitRequest<>();
+        request.setKind(TaskKind.BRANCH_REFRESH);
+        request.setContext(context);
+        request.setBusinessId(id);
+        taskEngine.submit(request);
+        log.info("已提交分支刷新异步任务，repositoryId={}", id);
     }
 
     /**

@@ -305,11 +305,8 @@ async function refreshSpace() {
 async function pullSpace() {
   if (!space.value) return
   const updated = await projectSpaceStore.pullRemote(space.value.id)
-  if (updated?.status === 'STALE' || staleMembers.value.length) {
-    questionStore.form.projectSpaceId = null
-    ElMessage.warning('已拉取远端代码，当前空间落后远端，请重新准备并索引')
-  } else if (updated) {
-    ElMessage.success('已拉取远端代码，当前空间为最新')
+  if (updated) {
+    ElMessage.info('拉取任务已提交，fetch 完成后请点击刷新按钮查看最新提交记录')
   }
 }
 

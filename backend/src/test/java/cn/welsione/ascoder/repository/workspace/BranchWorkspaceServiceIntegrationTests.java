@@ -71,7 +71,7 @@ class BranchWorkspaceServiceIntegrationTests extends AbstractIntegrationTest {
         when(gitRepositoryService.commitSha(any(), anyString())).thenReturn("abc123def456");
         when(gitRepositoryService.commitMessage(any(), anyString())).thenReturn("测试提交");
         Mockito.doNothing().when(gitRepositoryService)
-                .createOrUpdateDetachedWorktree(any(), anyString(), anyString(), any());
+                .upsertDetachedWorktree(any(), anyString(), anyString(), any());
     }
 
     @Test
@@ -129,7 +129,7 @@ class BranchWorkspaceServiceIntegrationTests extends AbstractIntegrationTest {
 
         Mockito.doThrow(new RuntimeException("git worktree add 失败"))
                 .when(gitRepositoryService)
-                .createOrUpdateDetachedWorktree(any(), anyString(), anyString(), any());
+                .upsertDetachedWorktree(any(), anyString(), anyString(), any());
 
         ValidationException ex = assertThrows(ValidationException.class, () ->
                 service.prepare(repo.getId(), new CreateBranchWorkspaceRequest("main")));

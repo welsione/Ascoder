@@ -62,7 +62,7 @@ export function getBranches(repositoryId: number) {
 }
 
 export function refreshBranches(repositoryId: number) {
-  return request<RepositoryBranch[]>(`/api/repositories/${repositoryId}/branches/refresh`, {
+  return request<void>(`/api/repositories/${repositoryId}/branches/refresh`, {
     method: 'POST',
   })
 }

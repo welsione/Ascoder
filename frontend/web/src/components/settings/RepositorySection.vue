@@ -58,11 +58,9 @@ async function createRepository() {
   }
 }
 
-async function refreshRepositoryBranches(repoId: number) {
-  const branches = await repositoryStore.refreshBranches(repoId)
-  if (branches.length > 0) {
-    ElMessage.success('分支发现已刷新')
-  }
+async function refreshBranches(repoId: number) {
+  await repositoryStore.refreshBranches(repoId)
+  ElMessage.info('分支刷新任务已提交，完成后请刷新查看最新分支')
 }
 
 function openCredentialDialog(repository: CodeRepository) {
@@ -172,7 +170,7 @@ async function saveCredentials() {
                 circle
                 :loading="repositoryStore.branchRefreshingId === row.id"
                 aria-label="刷新分支"
-                @click="refreshRepositoryBranches(row.id)"
+                @click="refreshBranches(row.id)"
               >
                 <GitBranch aria-hidden="true" :size="15" :stroke-width="1.8" />
               </el-button>

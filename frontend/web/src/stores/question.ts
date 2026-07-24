@@ -5,11 +5,11 @@ import type { LogUploadRecord, StreamEvent } from '../services/questionApi'
 import type { QuestionRecord } from '../types/question'
 import {
   notifyAnswerCompleted,
-  requestAnswerNotificationPermission,
+  requestNotificationPermission,
 } from '../utils/browserNotification'
 import {
-  applyQuestionStreamEvent,
-  createInitialQuestionStreamState,
+  applyStreamEvent,
+  createInitialState,
   resetLiveStreamState,
   sortedStreamingAgents,
 } from './questionStreamState'
@@ -175,10 +175,10 @@ export const useQuestionStore = defineStore('question', () => {
     form.value.logUploadIds = []
   }
 
-  function createQuestionLiveState(questionId: number): QuestionLiveState {
+  function createLiveState(questionId: number): QuestionLiveState {
     return {
       questionId,
-      ...createInitialQuestionStreamState(),
+      ...createInitialState(),
     }
   }
 
@@ -193,7 +193,7 @@ export const useQuestionStore = defineStore('question', () => {
   function ensureLiveState(questionId: number): QuestionLiveState {
     const resolvedQuestionId = resolveQuestionId(questionId)
     if (!streamStatesByQuestionId[resolvedQuestionId]) {
-      streamStatesByQuestionId[resolvedQuestionId] = createQuestionLiveState(resolvedQuestionId)
+      streamStatesByQuestionId[resolvedQuestionId] = createLiveState(resolvedQuestionId)
     }
     return streamStatesByQuestionId[resolvedQuestionId]
   }
@@ -202,11 +202,11 @@ export const useQuestionStore = defineStore('question', () => {
     return pendingQuestionAliases[questionId] ?? questionId
   }
 
-  function createPendingQuestionId() {
+  function createPendingId() {
     return nextPendingQuestionId--
   }
 
-  function movePendingStateToQuestion(pendingQuestionId: number, questionId: number) {
+  function movePendingState(pendingQuestionId: number, questionId: number) {
     const pendingState = streamStatesByQuestionId[pendingQuestionId]
     if (!pendingState) {
       return ensureLiveState(questionId)
@@ -362,9 +362,9 @@ export const useQuestionStore = defineStore('question', () => {
   function submitStream(): number | null {
     if (!form.value.projectSpaceId || !form.value.text.trim()) return null
 
-    requestAnswerNotificationPermission()
+    requestNotificationPermission()
 
-    const pendingQuestionId = createPendingQuestionId()
+    const pendingQuestionId = createPendingId()
     const state = ensureLiveState(pendingQuestionId)
     state.streaming = true
     error.value = ''
@@ -386,7 +386,7 @@ export const useQuestionStore = defineStore('question', () => {
         text: questionText,
         logUploadIds: currentLogUploadIds,
       },
-      (event: StreamEvent) => applyStreamEvent(event, pendingQuestionId, {
+      (event: StreamEvent) => handleStreamEvent(event, pendingQuestionId, {
         projectSpaceId: currentProjectSpaceId,
         conversationId: currentConversationId,
         role: currentRole,
@@ -409,7 +409,7 @@ export const useQuestionStore = defineStore('question', () => {
     const question = questions.value.find((q) => q.id === questionId)
     if (!question?.projectSpaceId) return null
 
-    requestAnswerNotificationPermission()
+    requestNotificationPermission()
     const state = ensureLiveState(questionId)
     state.streaming = true
     streamingQuestionId.value = questionId
@@ -426,7 +426,7 @@ export const useQuestionStore = defineStore('question', () => {
     )
 
     const streamFn = retry ? api.retryStream : api.resumeStream
-    const cancel = streamFn(questionId, (event: StreamEvent) => applyStreamEvent(event, questionId, {
+    const cancel = streamFn(questionId, (event: StreamEvent) => handleStreamEvent(event, questionId, {
       projectSpaceId: question.projectSpaceId!,
       conversationId: question.conversationId,
       role: question.role ?? form.value.role,
@@ -449,17 +449,17 @@ export const useQuestionStore = defineStore('question', () => {
     return null
   }
 
-  function applyStreamEvent(event: StreamEvent, questionId: number, context: StreamSubmissionContext) {
+  function handleStreamEvent(event: StreamEvent, questionId: number, context: StreamSubmissionContext) {
     let state: QuestionLiveState = ensureLiveState(questionId)
     if (event.type === 'created') {
       streamingQuestionId.value = event.data.id
       if (questionId < 0) {
-        state = movePendingStateToQuestion(questionId, event.data.id)
+        state = movePendingState(questionId, event.data.id)
       } else {
         state = ensureLiveState(event.data.id)
       }
     }
-    const result = applyQuestionStreamEvent(event, questions.value, state, context)
+    const result = applyStreamEvent(event, questions.value, state, context)
     if (state.lastFailedQuestion) {
       lastFailedQuestion.value = state.lastFailedQuestion
     }
@@ -562,7 +562,7 @@ export const useQuestionStore = defineStore('question', () => {
           continue
         }
         const streamEvent = { type: event.eventType, data: event.payload } as StreamEvent
-        applyQuestionStreamEvent(streamEvent, questions.value, state, context)
+        applyStreamEvent(streamEvent, questions.value, state, context)
       }
     } catch {
       // 回放失败不影响查看

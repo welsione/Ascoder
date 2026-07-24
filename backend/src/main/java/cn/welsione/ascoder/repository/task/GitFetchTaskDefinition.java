@@ -5,14 +5,17 @@ import cn.welsione.ascoder.common.task.TaskKind;
 import cn.welsione.ascoder.common.task.TaskProgress;
 import cn.welsione.ascoder.repository.CodeRepository;
 import cn.welsione.ascoder.repository.CodeRepositoryJpaRepository;
+import cn.welsione.ascoder.repository.GitSyncOperation;
 import cn.welsione.ascoder.repository.RepositoryBranchService;
 import cn.welsione.ascoder.repository.git.GitCredentialStore;
 import cn.welsione.ascoder.repository.git.GitProgressMapper;
 import cn.welsione.ascoder.repository.git.GitRepositoryService;
+import cn.welsione.ascoder.repository.projectspace.ProjectSpaceFetchCompletedEvent;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -23,8 +26,8 @@ import java.util.Map;
 /**
  * Git fetch/pull 异步任务定义，负责同步远程仓库并刷新分支信息。
  *
- * <p>上下文包含 repositoryPath、repositoryId、operation 三个字段，
- * operation 取值为 "fetch" 或 "pull"。</p>
+ * <p>上下文包含 repositoryPath、repositoryId、operation 等字段，
+ * operation 取值见 {@link GitSyncOperation}。</p>
  */
 @Slf4j
 @Component
@@ -33,10 +36,17 @@ public class GitFetchTaskDefinition implements TaskDefinition<Map<String, String
 
     private static final TypeReference<Map<String, String>> CONTEXT_TYPE = new TypeReference<>() {};
 
+    private static final long DEFAULT_TIMEOUT_MS = 30 * 60 * 1000L; // 30 分钟
+
+    /** fetch/pull 执行阶段的进度上限，后续阶段从该值继续推进。 */
+    private static final int SYNC_PROGRESS_END = 80;
+    private static final int COMPLETE_PROGRESS = 100;
+
     private final GitRepositoryService gitRepositoryService;
     private final GitCredentialStore gitCredentialStore;
     private final RepositoryBranchService repositoryBranchService;
     private final CodeRepositoryJpaRepository codeRepositoryJpaRepository;
+    private final ApplicationEventPublisher eventPublisher;
     private final TransactionTemplate transactionTemplate;
     private final ObjectMapper objectMapper;
 
@@ -47,7 +57,7 @@ public class GitFetchTaskDefinition implements TaskDefinition<Map<String, String
 
     @Override
     public long defaultTimeoutMs() {
-        return 30 * 60 * 1000L; // 30 分钟
+        return DEFAULT_TIMEOUT_MS;
     }
 
     @Override
@@ -61,7 +71,7 @@ public class GitFetchTaskDefinition implements TaskDefinition<Map<String, String
     public void execute(Map<String, String> context, TaskProgress progress) throws Exception {
         String repositoryPath = context.get("repositoryPath");
         Long repositoryId = Long.valueOf(context.get("repositoryId"));
-        String operation = context.get("operation");
+        GitSyncOperation operation = GitSyncOperation.fromCode(context.get("operation"));
 
         log.info("开始同步仓库，repositoryId={}，operation={}，path={}", repositoryId, operation, repositoryPath);
 
@@ -79,8 +89,8 @@ public class GitFetchTaskDefinition implements TaskDefinition<Map<String, String
         String errorMessage = null;
         try {
             Path path = Path.of(repositoryPath);
-            GitProgressMapper progressMapper = new GitProgressMapper(progress, 0, 80);
-            if ("pull".equals(operation)) {
+            GitProgressMapper progressMapper = new GitProgressMapper(progress, 0, SYNC_PROGRESS_END);
+            if (operation == GitSyncOperation.PULL) {
                 gitRepositoryService.pull(path, progressMapper::onLine);
             } else {
                 gitRepositoryService.fetch(path, progressMapper::onLine);
@@ -91,7 +101,7 @@ public class GitFetchTaskDefinition implements TaskDefinition<Map<String, String
             log.warn("仓库同步失败，repositoryId={}，operation={}：{}", repositoryId, operation, errorMessage);
         }
 
-        progress.update(80, "同步完成，正在刷新分支...");
+        progress.update(SYNC_PROGRESS_END, "同步完成，正在刷新分支...");
         progress.checkCancelled();
 
         repositoryBranchService.refresh(repositoryId);
@@ -108,8 +118,27 @@ public class GitFetchTaskDefinition implements TaskDefinition<Map<String, String
             codeRepositoryJpaRepository.save(entity);
         });
 
-        progress.update(100, "完成");
+        progress.update(COMPLETE_PROGRESS, "完成");
         log.info("Git fetch 任务完成，repositoryId={}", repositoryId);
+
+        publishFetchCompletedIfNeeded(context);
+    }
+
+    /**
+     * 若由项目空间拉取触发（上下文含 projectSpaceId），fetch 完成后发布事件通知项目空间刷新。
+     */
+    private void publishFetchCompletedIfNeeded(Map<String, String> context) {
+        String projectSpaceIdStr = context.get("projectSpaceId");
+        if (projectSpaceIdStr == null || projectSpaceIdStr.isBlank()) {
+            return;
+        }
+        try {
+            Long projectSpaceId = Long.valueOf(projectSpaceIdStr);
+            eventPublisher.publishEvent(new ProjectSpaceFetchCompletedEvent(projectSpaceId));
+            log.info("已发布项目空间 fetch 完成事件，projectSpaceId={}", projectSpaceId);
+        } catch (NumberFormatException ex) {
+            log.warn("projectSpaceId 格式无效：{}", projectSpaceIdStr);
+        }
     }
 
     @Override

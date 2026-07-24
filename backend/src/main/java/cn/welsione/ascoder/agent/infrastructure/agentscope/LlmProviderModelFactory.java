@@ -73,7 +73,7 @@ public class LlmProviderModelFactory implements ChatModelFactory {
      * 使用指定供应商配置执行连接测试。
      */
     public ConnectionTestResult testConnection(ResolvedModelConfig config) {
-        return selectConnectionTestStrategy(config.getProviderType().name()).test(config);
+        return selectTestStrategy(config.getProviderType().name()).test(config);
     }
 
     public Duration timeout() {
@@ -169,7 +169,7 @@ public class LlmProviderModelFactory implements ChatModelFactory {
                 .orElseThrow(() -> new InvalidStateException("不支持的供应商协议类型: " + providerType));
     }
 
-    private ConnectionTestStrategy selectConnectionTestStrategy(String providerType) {
+    private ConnectionTestStrategy selectTestStrategy(String providerType) {
         return connectionTestStrategies.stream()
                 .filter(s -> s.supports(providerType))
                 .findFirst()

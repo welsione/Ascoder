@@ -113,7 +113,7 @@ public class SelfLearningEntityLoader {
 
     // ---------- 正式知识 ----------
 
-    public List<LearningKnowledgeItem> knowledgeItemsByProjectSpace(Long projectSpaceId) {
+    public List<LearningKnowledgeItem> knowledgeItemsBySpace(Long projectSpaceId) {
         return knowledgeRepository.findByProjectSpace_IdOrderByUpdatedAtDesc(projectSpaceId);
     }
 
@@ -167,7 +167,7 @@ public class SelfLearningEntityLoader {
 
     // ---------- 经验 / 术语 / 纠正 ----------
 
-    public List<LearningExperience> experiencesByProjectSpace(Long projectSpaceId) {
+    public List<LearningExperience> experiencesBySpace(Long projectSpaceId) {
         return experienceRepository.findByProjectSpace_IdOrderByUpdatedAtDesc(projectSpaceId);
     }
 
@@ -175,7 +175,7 @@ public class SelfLearningEntityLoader {
         return termRepository.findByProjectSpace_IdOrderByUpdatedAtDesc(projectSpaceId);
     }
 
-    public List<LearningCorrection> correctionsByProjectSpace(Long projectSpaceId) {
+    public List<LearningCorrection> correctionsBySpace(Long projectSpaceId) {
         return correctionRepository.findByProjectSpace_IdOrderByUpdatedAtDesc(projectSpaceId);
     }
 

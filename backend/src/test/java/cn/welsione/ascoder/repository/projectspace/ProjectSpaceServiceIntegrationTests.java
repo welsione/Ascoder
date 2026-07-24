@@ -612,7 +612,7 @@ class ProjectSpaceServiceIntegrationTests extends AbstractIntegrationTest {
         when(gitRepositoryService.commitSha(any(), anyString())).thenReturn("abc123def456");
         when(gitRepositoryService.commitMessage(any(), anyString())).thenReturn("测试提交");
         Mockito.doNothing().when(gitRepositoryService)
-                .createOrUpdateDetachedWorktree(any(), anyString(), anyString(), any());
+                .upsertDetachedWorktree(any(), anyString(), anyString(), any());
     }
 
     /**

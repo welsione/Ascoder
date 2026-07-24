@@ -74,7 +74,7 @@ class AgentRequestBuilder {
                 member.getBranchWorkspaceId(),
                 member.getBranchName(),
                 member.getCommitSha(),
-                resolveMemberWorkspacePath(member),
+                resolveWorkspacePath(member),
                 null,
                 member.getRole(),
                 primary
@@ -84,7 +84,7 @@ class AgentRequestBuilder {
     /**
      * 解析成员工作区路径。优先用 linkPath（相对路径），其次回退到 worktreePath。
      */
-    private String resolveMemberWorkspacePath(ProjectSpaceMember member) {
+    private String resolveWorkspacePath(ProjectSpaceMember member) {
         String linkPath = member.resolveLinkPath(projectSpaceRoot);
         if (linkPath != null && !linkPath.isBlank()) {
             return linkPath;

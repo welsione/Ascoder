@@ -242,7 +242,7 @@ public class GitRepositoryService {
         return result.getOutput().lines().findFirst().orElse("").trim();
     }
 
-    public void createOrUpdateDetachedWorktree(Path repositoryPath, String branchName, String commitSha, Path worktreePath) {
+    public void upsertDetachedWorktree(Path repositoryPath, String branchName, String commitSha, Path worktreePath) {
         SafePathValidator.sanitizeArg(branchName);
         SafePathValidator.sanitizeArg(commitSha);
         if (Files.exists(worktreePath.resolve(".git"))) {

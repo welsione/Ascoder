@@ -230,7 +230,7 @@ public class QuestionStreamService {
                 payload.put("uncertainty", response.getUncertainty());
                 payload.put("nextStep", response.getNextStep());
             }
-            createSelfLearningCandidate(questionId, response, fullAnswer);
+            createLearningCandidate(questionId, response, fullAnswer);
             if (analysisProcess != null) {
                 payload.put("analysisProcess", analysisProcess);
             }
@@ -273,7 +273,7 @@ public class QuestionStreamService {
         handleError(questionId, ex, null, null, null);
     }
 
-    private void createSelfLearningCandidate(Long questionId, QuestionResponse response, String fullAnswer) {
+    private void createLearningCandidate(Long questionId, QuestionResponse response, String fullAnswer) {
         try {
             eventPublisher.publishEvent(new QuestionAnsweredEvent(questionId, response, fullAnswer));
         } catch (Exception ex) {

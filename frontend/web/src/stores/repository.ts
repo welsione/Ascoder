@@ -186,14 +186,11 @@ export const useRepositoryStore = defineStore('repository', () => {
     branchRefreshingId.value = repositoryId
     crud.error.value = ''
     try {
-      branchesByRepository.value = {
-        ...branchesByRepository.value,
-        [repositoryId]: await api.refreshBranches(repositoryId),
-      }
-      return branchesByRepository.value[repositoryId]
+      await api.refreshBranches(repositoryId)
+      // 异步任务已提交，刷新当前分支列表作为基线
+      await fetchBranches(repositoryId)
     } catch (err) {
       crud.error.value = err instanceof Error ? err.message : '刷新仓库分支失败'
-      return []
     } finally {
       branchRefreshingId.value = null
     }

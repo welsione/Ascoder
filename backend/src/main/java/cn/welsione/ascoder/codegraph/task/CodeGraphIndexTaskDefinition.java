@@ -135,12 +135,12 @@ public class CodeGraphIndexTaskDefinition implements TaskDefinition<Map<String, 
 
                 log.info("CodeGraph 索引任务完成，projectSpaceId={}", projectSpaceId);
             } else {
-                handleProjectSpaceIndexFailure(projectSpaceId, result.getOutput(), progress);
+                handleIndexFailure(projectSpaceId, result.getOutput(), progress);
                 throw new RuntimeException("CodeGraph 索引失败：" + result.getOutput());
             }
         } catch (RuntimeException ex) {
             if (!ex.getMessage().startsWith("CodeGraph 索引失败")) {
-                handleProjectSpaceIndexFailure(projectSpaceId, ex.getMessage(), progress);
+                handleIndexFailure(projectSpaceId, ex.getMessage(), progress);
                 log.error("CodeGraph 索引任务异常，projectSpaceId={}", projectSpaceId, ex);
             }
             throw ex;
@@ -215,7 +215,7 @@ public class CodeGraphIndexTaskDefinition implements TaskDefinition<Map<String, 
         }
     }
 
-    private void handleProjectSpaceIndexFailure(Long projectSpaceId, String errorMessage, TaskProgress progress) {
+    private void handleIndexFailure(Long projectSpaceId, String errorMessage, TaskProgress progress) {
         indexProgressTracker.fail(projectSpaceId, errorMessage);
         progress.update(0, "索引失败");
 

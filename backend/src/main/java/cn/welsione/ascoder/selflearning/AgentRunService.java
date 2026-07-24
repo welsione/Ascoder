@@ -169,12 +169,12 @@ public class AgentRunService {
                         questions.stream().map(Question::getId).toList()
                 ).stream()
                 .collect(Collectors.toMap(item -> item.getQuestion().getId(), item -> item));
-        Set<String> existingKeys = conversationRecordHelper.existingConversationRecordKeys(projectSpaceId);
+        Set<String> existingKeys = conversationRecordHelper.existingRecordKeys(projectSpaceId);
         int importedConversations = 0;
         int importedEvents = 0;
         int skippedEvents = 0;
 
-        for (List<Question> conversationQuestions : conversationRecordHelper.groupQuestionsByConversation(questions)) {
+        for (List<Question> conversationQuestions : conversationRecordHelper.groupByConversation(questions)) {
             ConversationRecordHelper.ImportResult result = conversationRecordHelper.importConversationRecord(space, conversationQuestions, queryPlans, existingKeys, false);
             importedEvents += result.importedCount();
             skippedEvents += result.skippedCount();
@@ -213,7 +213,7 @@ public class AgentRunService {
                         || item.getStatus() == LearningInsightStatus.REJECTED)
                 .filter(item -> referencesAnyRawEvent(item.getSourceRawEventIdsJson(), legacyIds))
                 .toList();
-        List<LearningKnowledgeItem> staleKnowledge = entityLoader.knowledgeItemsByProjectSpace(projectSpaceId).stream()
+        List<LearningKnowledgeItem> staleKnowledge = entityLoader.knowledgeItemsBySpace(projectSpaceId).stream()
                 .filter(item -> referencesAnyRawEvent(item.getSourceRawEventIdsJson(), legacyIds))
                 .filter(item -> item.getStatus() == LearningKnowledgeStatus.ACTIVE
                         || item.getStatus() == LearningKnowledgeStatus.VERIFIED)

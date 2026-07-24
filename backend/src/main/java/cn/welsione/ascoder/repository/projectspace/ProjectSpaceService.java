@@ -12,6 +12,7 @@ import cn.welsione.ascoder.common.task.TaskKind;
 import cn.welsione.ascoder.common.task.TaskSubmitRequest;
 import cn.welsione.ascoder.question.application.QuestionRunningGuard;
 import cn.welsione.ascoder.repository.CodeRepository;
+import cn.welsione.ascoder.repository.GitSyncOperation;
 import cn.welsione.ascoder.repository.RepositoryBranch;
 import cn.welsione.ascoder.repository.RepositoryBranchService;
 import cn.welsione.ascoder.repository.project.Project;
@@ -24,6 +25,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.event.EventListener;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -211,30 +213,35 @@ public class ProjectSpaceService {
     }
 
     /**
-     * 拉取项目空间所有成员仓库的远端引用，并重新计算空间是否落后。
+     * 拉取项目空间所有成员仓库的远端引用。
+     *
+     * <p>提交异步 fetch 任务后立即返回，不等待 fetch 完成。
+     * fetch 完成后由 {@link cn.welsione.ascoder.repository.task.GitFetchTaskDefinition}
+     * 自动刷新关联的项目空间状态。用户可通过刷新按钮获取最新提交记录。</p>
      */
     public ProjectSpace pullRemote(Long id) {
         ensureNoRunningQuestions(id);
         upsertMemberCredentials(id);
 
-        List<CodeRepository> memberRepos = distinctMemberRepositories(id);
+        List<CodeRepository> memberRepos = distinctRepositories(id);
         for (CodeRepository repo : memberRepos) {
             Map<String, String> context = new LinkedHashMap<>();
             context.put("repositoryPath", repo.resolveLocalPath(repoRoot));
             context.put("repositoryId", repo.getId().toString());
-            context.put("operation", "fetch");
+            context.put("operation", GitSyncOperation.FETCH.code());
             context.put("authUsername", repo.getAuthUsername());
             context.put("authPassword", repo.getAuthPassword());
             context.put("remoteUrl", repo.getRemoteUrl());
+            context.put("projectSpaceId", id.toString());
             TaskSubmitRequest<Map<String, String>> fetchRequest = new TaskSubmitRequest<>();
             fetchRequest.setKind(TaskKind.GIT_FETCH);
             fetchRequest.setContext(context);
             fetchRequest.setBusinessId(repo.getId());
             taskEngine.submit(fetchRequest);
-            log.info("已提交 Git fetch 异步任务（pullRemote），repositoryId={}", repo.getId());
+            log.info("已提交 Git fetch 异步任务（pullRemote），repositoryId={}，projectSpaceId={}", repo.getId(), id);
         }
 
-        return refreshInTransaction(id);
+        return getEntity(id);
     }
 
     /**
@@ -402,7 +409,7 @@ public class ProjectSpaceService {
     /**
      * 获取项目空间中去重后的成员仓库列表。
      */
-    private List<CodeRepository> distinctMemberRepositories(Long id) {
+    private List<CodeRepository> distinctRepositories(Long id) {
         return transactionTemplate.execute(status -> memberRepository.findByProjectSpace_IdOrderByCreatedAtAsc(id)
                 .stream()
                 .map(ProjectSpaceMember::getRepository)
@@ -414,6 +421,21 @@ public class ProjectSpaceService {
 
     private ProjectSpace refreshInTransaction(Long id) {
         return transactionTemplate.execute(status -> refresh(id));
+    }
+
+    /**
+     * 监听项目空间关联仓库 fetch 完成事件，刷新项目空间状态。
+     *
+     * <p>fetch 完成后本地 git 数据已更新，此时刷新可正确读取最新的 commitSha 和提交记录。</p>
+     */
+    @EventListener
+    public void onFetchCompleted(ProjectSpaceFetchCompletedEvent event) {
+        try {
+            refreshInTransaction(event.getProjectSpaceId());
+            log.info("fetch 完成后刷新项目空间，projectSpaceId={}", event.getProjectSpaceId());
+        } catch (Exception ex) {
+            log.warn("fetch 完成后刷新项目空间失败，projectSpaceId={}：{}", event.getProjectSpaceId(), ex.getMessage());
+        }
     }
 
     private void ensureNoRunningQuestions(Long projectSpaceId) {

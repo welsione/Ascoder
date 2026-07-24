@@ -272,7 +272,8 @@ export const useProjectSpaceStore = defineStore('projectSpace', () => {
         crud.items.value[idx] = updated
       }
       crud.selectedId.value = projectSpaceId
-      await fetchMembers(projectSpaceId)
+      // 不在此处 fetchMembers：异步 fetch 任务尚未完成，提交记录仍是旧数据
+      // 用户点击刷新按钮时 fetchMembers 会获取最新数据
       return updated
     } catch (err) {
       crud.error.value = err instanceof Error ? err.message : '拉取项目空间代码失败'
