@@ -1376,9 +1376,9 @@ onMounted(loadAll)
 
 <style scoped>
 .learning-page {
-  width: min(1180px, calc(100vw - 48px));
+  width: min(var(--page-max-width), calc(100vw - 48px));
   margin: 0 auto;
-  padding: var(--spacing-6) 0 var(--spacing-10);
+  padding: var(--page-padding-y) 0 var(--spacing-10);
 }
 
 .learning-nav {

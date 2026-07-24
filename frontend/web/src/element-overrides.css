@@ -1,15 +1,17 @@
 /* ── Element Plus 组件样式覆盖（桌面端） ── */
+/* Apple 设计语言：按压反馈、弹簧缓动、焦点环 */
 
 /* ── 全局 Button ── */
 .el-button {
   border-radius: var(--radius-full);
   font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-wide);
   transition:
     background var(--transition-fast),
     border-color var(--transition-fast),
     color var(--transition-fast),
     opacity var(--transition-fast),
-    transform var(--transition-fast),
+    transform var(--press-duration) var(--ease-snappy),
     box-shadow var(--transition-fast);
 }
 
@@ -26,6 +28,11 @@
   color: var(--text);
 }
 
+/* ── Button 按压反馈（Apple pointer-down 响应） ── */
+.el-button:not(.is-text):not(.is-link):not(.is-disabled):not(.is-loading):active {
+  transform: scale(var(--press-scale));
+}
+
 .el-button--primary:not(.is-text):not(.is-link) {
   border-color: var(--chat-accent);
   background: var(--chat-accent);
@@ -39,6 +46,10 @@
   color: #fff;
   opacity: 0.9;
   transform: translateY(-1px);
+}
+
+.el-button--primary:not(.is-text):not(.is-link):not(.is-disabled):not(.is-loading):active {
+  transform: scale(var(--press-scale));
 }
 
 .el-button--danger:not(.is-text):not(.is-link) {
@@ -76,6 +87,7 @@
   border-radius: var(--radius-full);
   font-weight: var(--font-weight-medium);
   font-size: var(--font-size-xs);
+  letter-spacing: var(--tracking-wide);
 }
 
 /* ── 输入控件 ── */
@@ -86,8 +98,8 @@
   background: var(--surface-soft);
   box-shadow: 0 0 0 1px var(--stroke) inset;
   transition:
-    box-shadow var(--transition-fast),
-    background var(--transition-fast);
+    box-shadow 180ms var(--ease-snappy),
+    background 180ms var(--ease-snappy);
 }
 
 .el-input__wrapper:hover,
@@ -141,8 +153,8 @@
   background: var(--surface-soft);
   box-shadow: 0 0 0 1px var(--stroke-strong) inset;
   transition:
-    box-shadow var(--transition-normal),
-    background var(--transition-normal);
+    box-shadow 180ms var(--ease-snappy),
+    background 180ms var(--ease-snappy);
 }
 
 .context-controls .el-select .el-select__wrapper:hover,
@@ -197,7 +209,7 @@
   transition:
     background var(--transition-fast),
     opacity var(--transition-fast),
-    transform var(--transition-fast);
+    transform var(--press-duration) var(--ease-snappy);
 }
 
 .composer-actions .el-button--primary {
@@ -209,6 +221,10 @@
   background: var(--chat-accent);
   opacity: 0.88;
   transform: translateY(-1px);
+}
+
+.composer-actions .el-button--primary:not(.is-disabled):not(.is-loading):active {
+  transform: scale(var(--press-scale));
 }
 
 .composer-actions .el-button--danger {

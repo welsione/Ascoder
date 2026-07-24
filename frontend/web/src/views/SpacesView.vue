@@ -1,12 +1,20 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { ArrowRight, FolderGit2, Plus, Settings } from 'lucide-vue-next'
 import { useProjectStore } from '../stores/project'
+import { useAppleSpring } from '../composables/useAppleMotion'
 import logoUrl from '../images/logo.svg'
 
 const projectStore = useProjectStore()
-
 const projectCards = computed(() => projectStore.projects)
+
+/** 项目卡片 stagger 入场 */
+const gridRef = ref<HTMLElement | null>(null)
+useAppleSpring(
+  gridRef,
+  { opacity: [0, 1], y: [16, 0] },
+  { bounce: 0, duration: 0.4 },
+)
 </script>
 
 <template>
@@ -20,7 +28,7 @@ const projectCards = computed(() => projectStore.projects)
       <p class="project-home-subtitle">选择项目进入项目空间</p>
     </div>
 
-    <section class="project-card-grid project-home-grid">
+    <section ref="gridRef" class="project-card-grid project-home-grid">
       <router-link class="project-card add-project-card" to="/projects/config">
         <span class="icon-badge" aria-hidden="true">
           <Plus :size="18" :stroke-width="1.8" />

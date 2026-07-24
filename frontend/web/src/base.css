@@ -1,6 +1,7 @@
 /* ═══════════════════════════════════════════════════
    Ascoder — 桌面端聊天页样式
    适配 1920×1080 及以上，8px 栅格规范
+   Apple 设计语言：按压反馈、弹簧缓动、材质层级、排版 tracking
    ═══════════════════════════════════════════════════ */
 
 * {
@@ -15,7 +16,9 @@ body {
     radial-gradient(ellipse 80% 50% at 50% 0%, rgba(79, 110, 247, 0.03), transparent),
     var(--bg);
   color: var(--text);
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  font-optical-sizing: auto;
+  font-feature-settings: "ss01", "cv11";
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -60,6 +63,56 @@ select {
 }
 
 /* ──────────────────────────────────
+   按压反馈（Apple pointer-down 响应）
+   ────────────────────────────────── */
+
+:where(.primary-action,
+       .suggestion-card,
+       .project-entry-card,
+       .add-project-card,
+       .space-card,
+       .settings-nav-item,
+       .ghost-button,
+       .back-space-button,
+       .sidebar-export-button,
+       .new-message-hint,
+       .load-more-button,
+       .project-card-enter,
+       .space-console-row,
+       .card-delete,
+       .card-caret,
+       .conversation-card,
+       .project-home-settings)
+  :where(:not([disabled]):not(.is-disabled):not(.disabled):not(.is-loading)) {
+  transition:
+    transform var(--press-duration) var(--ease-snappy),
+    box-shadow var(--press-duration) var(--ease-snappy),
+    border-color var(--press-duration) var(--ease-snappy),
+    background-color var(--press-duration) var(--ease-snappy);
+}
+
+:where(.primary-action,
+       .suggestion-card,
+       .project-entry-card,
+       .add-project-card,
+       .space-card,
+       .settings-nav-item,
+       .ghost-button,
+       .back-space-button,
+       .sidebar-export-button,
+       .new-message-hint,
+       .load-more-button,
+       .project-card-enter,
+       .space-console-row,
+       .card-delete,
+       .card-caret,
+       .conversation-card,
+       .project-home-settings)
+  :where(:not([disabled]):not(.is-disabled):not(.disabled):not(.is-loading)):active {
+  transform: scale(var(--press-scale));
+}
+
+/* ──────────────────────────────────
    聊天页面布局
    ────────────────────────────────── */
 
@@ -99,8 +152,9 @@ select {
   border-width: 0 1px 0 0;
   border-radius: 0;
   border-color: var(--chat-sidebar-stroke);
-  background: var(--chat-sidebar-bg);
-  backdrop-filter: blur(12px);
+  background: var(--material-sidebar);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
   z-index: 10;
 }
 
@@ -140,7 +194,7 @@ select {
   color: var(--chat-timestamp);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.06em;
+  letter-spacing: var(--tracking-wider);
   text-transform: uppercase;
 }
 
@@ -178,6 +232,7 @@ select {
   min-height: 100vh;
   height: 100vh;
   overflow: hidden;
+  background: var(--content-bg);
 }
 
 .chat-main-inner {
@@ -196,6 +251,8 @@ select {
   grid-template-rows: minmax(0, 1fr) auto;
   min-height: 0;
   align-content: stretch;
+  /* Apple 呼吸感：composer 与内容之间有间距 */
+  gap: var(--composer-lift);
 }
 
 .chat-content {
@@ -213,8 +270,8 @@ select {
   justify-items: center;
   align-content: center;
   gap: var(--spacing-8);
-  min-height: calc(100vh - 240px);
-  padding: var(--spacing-5);
+  min-height: 100%;
+  padding: var(--spacing-8) var(--spacing-5);
   text-align: center;
 }
 
@@ -228,9 +285,9 @@ select {
   margin: 0;
   max-width: 18ch;
   font-size: 32px;
-  line-height: var(--line-height-tight);
+  line-height: var(--line-height-display);
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: var(--tracking-tighter);
 }
 
 .welcome-copy {
@@ -276,6 +333,7 @@ select {
 .stat-value {
   font-size: var(--font-size-3xl);
   font-weight: var(--font-weight-bold);
+  letter-spacing: var(--tracking-tighter);
 }
 
 .suggestion-card,
@@ -299,7 +357,7 @@ select {
     border-color var(--transition-normal),
     box-shadow var(--transition-normal),
     background var(--transition-normal),
-    transform var(--transition-normal);
+    transform var(--press-duration) var(--ease-snappy);
 }
 
 .suggestion-card:hover {
@@ -375,7 +433,7 @@ select {
   transition:
     background var(--transition-normal),
     box-shadow var(--transition-normal);
-  animation: messageFadeIn 0.3s ease-out;
+  /* 入场动画由 motion-v 弹簧驱动（见 Thread.vue），保证可中断 */
 }
 
 @keyframes messageFadeIn {
@@ -479,20 +537,23 @@ select {
 .markdown-body h4 {
   margin: 1em 0 0.4em;
   color: var(--text);
-  line-height: var(--line-height-tight);
+  line-height: var(--line-height-heading);
   font-weight: var(--font-weight-semibold);
 }
 
 .markdown-body h1 {
   font-size: var(--font-size-2xl);
+  letter-spacing: var(--tracking-tighter);
 }
 
 .markdown-body h2 {
   font-size: var(--font-size-xl);
+  letter-spacing: var(--tracking-tight);
 }
 
 .markdown-body h3 {
   font-size: var(--font-size-lg);
+  letter-spacing: var(--tracking-tight);
 }
 
 .markdown-body p,
@@ -647,7 +708,7 @@ select {
   align-items: center;
   padding: 0 var(--spacing-1);
   font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.02em;
+  letter-spacing: var(--tracking-wide);
 }
 
 /* ── 分析卡片 ── */
@@ -707,12 +768,12 @@ select {
   display: grid;
   align-content: start;
   gap: var(--spacing-3);
-  margin: 0 0 var(--spacing-3);
+  margin: 0 0 var(--composer-lift);
   padding: var(--spacing-4) var(--spacing-4) var(--spacing-4);
   border: 1px solid var(--chat-composer-border);
   border-radius: var(--radius-2xl);
   background: var(--chat-composer-bg);
-  box-shadow: var(--shadow-soft);
+  box-shadow: var(--shadow-panel);
   transition:
     border-color var(--transition-normal),
     box-shadow var(--transition-normal);
@@ -722,7 +783,7 @@ select {
   border-color: var(--chat-composer-focus);
   box-shadow:
     0 0 0 3px rgba(79, 110, 247, 0.12),
-    var(--shadow-soft);
+    var(--shadow-panel);
 }
 
 .composer-status-text {
@@ -783,7 +844,7 @@ select {
 .composer-context-text {
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.02em;
+  letter-spacing: var(--tracking-wide);
 }
 
 .composer-form,
@@ -815,7 +876,7 @@ select {
     background var(--transition-fast),
     border-color var(--transition-fast),
     box-shadow var(--transition-fast),
-    transform var(--transition-fast);
+    transform var(--press-duration) var(--ease-snappy);
 }
 
 .settings-nav-item:hover,
@@ -848,10 +909,10 @@ select {
 .settings-layout {
   display: grid;
   grid-template-columns: 1fr;
-  width: min(1280px, 100%);
+  width: min(var(--page-max-width-wide), 100%);
   min-height: 100vh;
   margin: 0 auto;
-  padding: var(--spacing-6) var(--spacing-6) var(--spacing-10);
+  padding: var(--page-padding-y) var(--page-padding-x) var(--spacing-10);
 }
 
 /* ──────────────────────────────────
@@ -869,9 +930,9 @@ select {
 
 .project-page,
 .project-detail-page {
-  width: min(1280px, 100%);
+  width: min(var(--page-max-width-wide), 100%);
   margin: 0 auto;
-  padding: var(--spacing-6);
+  padding: var(--page-padding-y) var(--page-padding-x);
 }
 
 .project-page {
@@ -883,10 +944,10 @@ select {
   display: grid;
   align-content: start;
   gap: var(--spacing-6);
-  width: min(1180px, 100%);
+  width: min(var(--page-max-width), 100%);
   min-height: 100vh;
   margin: 0 auto;
-  padding: var(--spacing-8) var(--spacing-6) var(--spacing-10);
+  padding: var(--page-padding-y) var(--page-padding-x) var(--spacing-10);
 }
 
 .project-home-center {
@@ -937,7 +998,9 @@ select {
   border-radius: var(--radius-xl);
   background:
     linear-gradient(135deg, rgba(79, 110, 247, 0.06), rgba(255, 255, 255, 0) 44%),
-    var(--surface);
+    var(--material-header);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
   box-shadow: var(--shadow-soft);
 }
 
@@ -945,7 +1008,7 @@ select {
   flex: 1 1 560px;
 }
 
-.project-page-icon {
+.project-page-header .project-page-icon {
   width: 46px;
   height: 46px;
   flex: 0 0 auto;
@@ -960,9 +1023,10 @@ select {
 
 .project-page-header h1,
 .project-home-hero h1 {
-  max-width: 760px;
+  max-width: 920px;
   font-size: 30px;
-  line-height: var(--line-height-tight);
+  line-height: var(--line-height-display);
+  letter-spacing: var(--tracking-tighter);
 }
 
 .project-home-logo {
@@ -974,7 +1038,7 @@ select {
 
 .project-page-copy {
   margin: var(--spacing-2) 0 0;
-  max-width: 760px;
+  max-width: 920px;
   color: var(--muted);
   line-height: var(--line-height-relaxed);
 }
@@ -1024,7 +1088,7 @@ select {
   transition:
     border-color var(--transition-normal),
     box-shadow var(--transition-normal),
-    transform var(--transition-normal);
+    transform var(--press-duration) var(--ease-snappy);
 }
 
 .add-project-card {
@@ -1072,7 +1136,8 @@ select {
 
 .add-project-copy h2 {
   font-size: 22px;
-  line-height: var(--line-height-tight);
+  line-height: var(--line-height-heading);
+  letter-spacing: var(--tracking-tight);
 }
 
 .add-project-copy p {
@@ -1120,7 +1185,7 @@ select {
   color: var(--chat-accent);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
-  letter-spacing: 0.04em;
+  letter-spacing: var(--tracking-wide);
 }
 
 .add-project-hint::after {
@@ -1149,6 +1214,7 @@ select {
   margin: var(--spacing-1) 0 0;
   font-size: var(--font-size-2xl);
   line-height: 1.35;
+  letter-spacing: var(--tracking-tight);
 }
 
 .project-card-description {
@@ -1179,7 +1245,7 @@ select {
   transition:
     background var(--transition-normal),
     border-color var(--transition-normal),
-    transform var(--transition-normal);
+    transform var(--press-duration) var(--ease-snappy);
 }
 
 .project-space-card:hover,
@@ -1260,6 +1326,7 @@ select {
   gap: var(--spacing-1);
   color: var(--muted);
   text-decoration: none;
+  transition: color var(--transition-fast);
 }
 
 .project-card-enter:hover {
@@ -1285,7 +1352,7 @@ select {
     background var(--transition-normal),
     border-color var(--transition-normal),
     box-shadow var(--transition-normal),
-    transform var(--transition-normal);
+    transform var(--press-duration) var(--ease-snappy);
 }
 
 .project-home-settings:hover {
@@ -1297,7 +1364,7 @@ select {
 }
 
 .project-home-settings:active {
-  transform: translateY(0);
+  transform: scale(var(--press-scale));
 }
 
 .icon-badge {
@@ -1415,7 +1482,7 @@ select {
   transition:
     border-color var(--transition-normal),
     box-shadow var(--transition-normal),
-    transform var(--transition-normal);
+    transform var(--press-duration) var(--ease-snappy);
 }
 
 .space-card:hover {
@@ -1435,6 +1502,7 @@ select {
   margin: var(--spacing-1) 0 0;
   font-size: 18px;
   line-height: 1.35;
+  letter-spacing: var(--tracking-tight);
 }
 
 .space-project {
@@ -1543,7 +1611,8 @@ select {
 .project-command-title h1 {
   margin: 0;
   font-size: 30px;
-  line-height: var(--line-height-tight);
+  line-height: var(--line-height-display);
+  letter-spacing: var(--tracking-tighter);
 }
 
 .project-overview-grid {
@@ -1566,6 +1635,7 @@ select {
   color: var(--text);
   font-size: 28px;
   line-height: 1.1;
+  letter-spacing: var(--tracking-tighter);
 }
 
 .project-metric span:last-child {
@@ -1621,7 +1691,8 @@ select {
 .settings-drawer-brand h2 {
   margin: var(--spacing-1) 0 0;
   font-size: var(--font-size-2xl);
-  line-height: var(--line-height-tight);
+  line-height: var(--line-height-heading);
+  letter-spacing: var(--tracking-tight);
 }
 
 .settings-drawer-main {
@@ -1636,7 +1707,9 @@ select {
   border-radius: var(--radius-xl);
   background:
     linear-gradient(135deg, rgba(79, 110, 247, 0.06), rgba(255, 255, 255, 0) 44%),
-    var(--surface);
+    var(--material-header);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
   box-shadow: var(--shadow-soft);
 }
 
@@ -1645,6 +1718,7 @@ select {
   max-width: 760px;
   font-size: var(--font-size-2xl);
   line-height: var(--line-height-normal);
+  letter-spacing: var(--tracking-tight);
 }
 
 .settings-form-grid {
@@ -1817,7 +1891,7 @@ select {
   font-size: var(--font-size-xs);
   color: var(--muted);
   font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.05em;
+  letter-spacing: var(--tracking-wider);
   text-transform: uppercase;
 }
 
@@ -1839,7 +1913,7 @@ select {
     background var(--transition-fast),
     border-color var(--transition-fast),
     box-shadow var(--transition-fast),
-    transform var(--transition-fast);
+    transform var(--press-duration) var(--ease-snappy);
 }
 
 .primary-action:hover {
@@ -1977,7 +2051,7 @@ select {
     width: 280px;
     height: 100vh;
     transform: translateX(-100%);
-    transition: transform 0.25s ease;
+    transition: transform 0.35s var(--ease-spring);
     border-right: 1px solid var(--stroke);
   }
 
@@ -2050,4 +2124,68 @@ body {
 :focus-visible {
   outline: 2px solid var(--chat-accent);
   outline-offset: 2px;
+}
+
+/* ──────────────────────────────────
+   无障碍媒体查询（Apple 设计规范）
+   ────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  :where(.primary-action,
+         .suggestion-card,
+         .project-entry-card,
+         .add-project-card,
+         .space-card,
+         .settings-nav-item,
+         .ghost-button,
+         .back-space-button,
+         .sidebar-export-button,
+         .new-message-hint,
+         .load-more-button,
+         .project-card-enter,
+         .space-console-row,
+         .card-delete,
+         .card-caret,
+         .conversation-card,
+         .project-home-settings):active {
+    transform: none !important;
+  }
+
+  .message-bubble {
+    animation: none !important;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .sidebar,
+  .composer-shell,
+  .composer-panel,
+  .project-page-header,
+  .settings-drawer-header,
+  .project-home-center {
+    background: var(--surface) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --stroke: #999;
+    --stroke-strong: #555;
+  }
+
+  [data-theme="dark"] {
+    --stroke: #555;
+    --stroke-strong: #888;
+  }
 }

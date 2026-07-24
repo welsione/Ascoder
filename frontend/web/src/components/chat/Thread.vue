@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
+import { animate } from 'motion-v'
+import { usePreferredReducedMotion } from '@vueuse/core'
 import { ArrowDown } from 'lucide-vue-next'
 import { useQuestionStore } from '../../stores/question'
 import type { QuestionRecord } from '../../types/question'
@@ -11,6 +13,7 @@ import QueryPlanCard from './QueryPlanCard.vue'
 import AnalysisTimeline from './AnalysisTimeline.vue'
 
 const questionStore = useQuestionStore()
+const prefersReducedMotion = usePreferredReducedMotion()
 const scrollContainer = ref<HTMLElement | null>(null)
 const streamingTextRef = ref<HTMLElement | null>(null)
 const isUserScrolling = ref(false)
@@ -101,6 +104,37 @@ function onNewMessageClick() {
   isUserScrolling.value = false
   scrollToBottom(true)
 }
+
+/** Apple 风格弹簧入场：对新消息气泡应用可中断弹簧动画 */
+const animatedCount = ref(0)
+watch(
+  () => virtualItems.value.length,
+  (newLen) => {
+    if (newLen <= animatedCount.value) {
+      animatedCount.value = newLen
+      return
+    }
+    const prevLen = animatedCount.value
+    animatedCount.value = newLen
+    nextTick(() => {
+      const bubbles = scrollContainer.value?.querySelectorAll('.message-bubble')
+      if (!bubbles) return
+      // 仅对新增的气泡做入场动画
+      for (let i = prevLen; i < bubbles.length; i++) {
+        const el = bubbles[i] as HTMLElement
+        if (prefersReducedMotion.value === 'reduce') {
+          animate(el, { opacity: [0, 1] }, { duration: 0.2 })
+        } else {
+          animate(el, { opacity: [0, 1], y: [10, 0] }, {
+            type: 'spring',
+            bounce: 0,
+            duration: 0.3,
+          })
+        }
+      }
+    })
+  },
+)
 
 defineExpose({ scrollToBottom })
 </script>
@@ -259,7 +293,7 @@ export default { components: { Loading } }
     linear-gradient(180deg, var(--surface), rgba(255, 255, 255, 0.82));
   border: 1px solid rgba(79, 110, 247, 0.14);
   box-shadow: var(--shadow-panel);
-  animation: messageFadeIn 0.3s ease-out;
+  /* 入场由 motion-v 弹簧驱动，此处不再设置 animation */
 }
 
 .streaming-message::before {
@@ -661,7 +695,7 @@ export default { components: { Loading } }
   z-index: 5;
   transition:
     background var(--transition-fast),
-    transform var(--transition-fast),
+    transform var(--press-duration) var(--ease-snappy),
     box-shadow var(--transition-fast);
 }
 
@@ -669,6 +703,10 @@ export default { components: { Loading } }
   background: var(--chat-accent-soft);
   transform: translateX(-50%) translateY(-1px);
   box-shadow: var(--shadow-panel);
+}
+
+.new-message-hint:active {
+  transform: translateX(-50%) scale(var(--press-scale));
 }
 
 .hint-arrow {
@@ -685,14 +723,4 @@ export default { components: { Loading } }
   opacity: 0;
 }
 
-@keyframes messageFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
 </style>

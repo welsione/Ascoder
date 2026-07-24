@@ -402,7 +402,8 @@ function exportChat() {
   transition:
     box-shadow var(--transition-normal),
     border-color var(--transition-normal),
-    background var(--transition-normal);
+    background var(--transition-normal),
+    transform var(--press-duration) var(--ease-snappy);
 }
 
 .conversation-card:hover {
@@ -582,9 +583,9 @@ function exportChat() {
   font-size: var(--font-size-sm);
   outline: none;
   transition:
-    border-color var(--transition-normal),
-    box-shadow var(--transition-normal),
-    background var(--transition-normal);
+    border-color 180ms var(--ease-snappy),
+    box-shadow 180ms var(--ease-snappy),
+    background 180ms var(--ease-snappy);
 }
 
 .sidebar-search-input:focus {
@@ -750,7 +751,7 @@ function exportChat() {
 .space-info-chevron {
   flex-shrink: 0;
   color: var(--chat-timestamp);
-  transition: transform var(--transition-fast);
+  transition: transform var(--transition-normal);
 }
 
 .space-info-expanded .space-info-chevron {

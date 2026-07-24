@@ -443,21 +443,18 @@ export default { components: { Loading } }
   background:
     radial-gradient(circle at 8% 0%, rgba(79, 110, 247, 0.08), transparent 34%),
     var(--chat-composer-bg);
-  box-shadow:
-    0 18px 46px rgba(15, 23, 42, 0.08),
-    0 1px 2px rgba(15, 23, 42, 0.04);
+  box-shadow: var(--shadow-panel);
   transition:
-    border-color var(--transition-normal),
-    box-shadow var(--transition-normal),
-    transform var(--transition-normal);
+    border-color 180ms var(--ease-snappy),
+    box-shadow 180ms var(--ease-snappy),
+    transform 180ms var(--ease-snappy);
 }
 
 .composer-panel:focus-within {
   border-color: rgba(79, 110, 247, 0.34);
   box-shadow:
     0 0 0 3px rgba(79, 110, 247, 0.1),
-    0 22px 56px rgba(15, 23, 42, 0.1),
-    0 1px 2px rgba(15, 23, 42, 0.05);
+    var(--shadow-panel);
 }
 
 .composer-toolbar {
@@ -522,9 +519,9 @@ export default { components: { Loading } }
   background: var(--surface-soft);
   box-shadow: var(--shadow-inset);
   transition:
-    border-color var(--transition-normal),
-    box-shadow var(--transition-normal),
-    background var(--transition-normal);
+    border-color 180ms var(--ease-snappy),
+    box-shadow 180ms var(--ease-snappy),
+    background 180ms var(--ease-snappy);
 }
 
 .composer-input-wrap:focus-within {
@@ -610,7 +607,7 @@ export default { components: { Loading } }
 
 .composer-send-btn {
   min-width: 96px !important;
-  box-shadow: 0 10px 24px rgba(79, 110, 247, 0.22) !important;
+  box-shadow: 0 6px 16px rgba(79, 110, 247, 0.22) !important;
 }
 
 .composer-send-btn.is-disabled,

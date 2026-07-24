@@ -72,12 +72,17 @@ onUnmounted(() => {
   color: var(--text);
   transition:
     background var(--transition-fast),
-    border-color var(--transition-fast);
+    border-color var(--transition-fast),
+    transform var(--press-duration) var(--ease-snappy);
 }
 
 .mobile-menu-btn:hover {
   background: var(--primary-soft);
   border-color: var(--stroke-strong);
+}
+
+.mobile-menu-btn:active {
+  transform: scale(var(--press-scale));
 }
 
 .mobile-overlay {
@@ -86,7 +91,8 @@ onUnmounted(() => {
   inset: 0;
   z-index: 90;
   background: rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(2px);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
 }
 
 @media (max-width: 600px) {
