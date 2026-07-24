@@ -57,6 +57,18 @@ public class ProjectSpacePrepareTaskDefinition implements TaskDefinition<Map<Str
     }
 
     @Override
+    public long defaultTimeoutMs() {
+        return 120 * 60 * 1000L; // 2 小时（多成员仓库逐个准备）
+    }
+
+    @Override
+    public String resolveBusinessLabel(Long businessId) {
+        return projectSpaceJpaRepository.findById(businessId)
+                .map(space -> space.getName() + " (项目空间)")
+                .orElse(null);
+    }
+
+    @Override
     public void execute(Map<String, String> context, TaskProgress progress) throws Exception {
         Long projectSpaceId = Long.valueOf(context.get("projectSpaceId"));
 

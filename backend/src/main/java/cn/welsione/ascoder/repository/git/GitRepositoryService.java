@@ -125,6 +125,14 @@ public class GitRepositoryService {
     }
 
     public void cloneRepository(String remoteUrl, Path targetPath, String branchName) {
+        cloneRepository(remoteUrl, targetPath, branchName, null);
+    }
+
+    /**
+     * 克隆远程仓库，支持通过 onLine 回调实时接收 git 输出行（用于进度追踪）。
+     */
+    public void cloneRepository(String remoteUrl, Path targetPath, String branchName,
+                                java.util.function.Consumer<String> onLine) {
         SafePathValidator.sanitizeArg(remoteUrl);
         SafePathValidator.sanitizeArg(branchName);
         try {
@@ -136,6 +144,7 @@ public class GitRepositoryService {
         List<String> command = new ArrayList<>();
         command.add("git");
         command.add("clone");
+        command.add("--progress");
         if (branchName != null && !branchName.isBlank()) {
             command.add("--branch");
             command.add(branchName.trim());
@@ -143,16 +152,22 @@ public class GitRepositoryService {
         command.add(remoteUrl);
         command.add(targetPath.toString());
 
-        CommandResult result = commandRunner.run(command, targetPath.getParent(), Duration.ofSeconds(timeoutSeconds()));
+        CommandResult result = commandRunner.runAsync(command, targetPath.getParent(),
+                Duration.ofSeconds(timeoutSeconds()), onLine);
         ensureSuccess(result, "拉取 Git 仓库失败");
     }
 
     public void fetch(Path repositoryPath) {
-        CommandResult result = run(repositoryPath, "git", "-C", repositoryPath.toString(),
-                "fetch", "--all", "--prune");
+        fetch(repositoryPath, null);
+    }
+
+    /**
+     * 同步远程分支，支持通过 onLine 回调实时接收 git 输出行。
+     */
+    public void fetch(Path repositoryPath, java.util.function.Consumer<String> onLine) {
+        CommandResult result = runAsync(repositoryPath, onLine,
+                "git", "-C", repositoryPath.toString(), "fetch", "--all", "--prune", "--progress");
         if (!result.isSuccess()) {
-            // 大小写不敏感文件系统上，部分分支 fetch 可能因名称冲突失败（exit code 1），
-            // 但大部分分支已成功获取，仅记录警告而非抛异常。
             if (result.getOutput().contains("case-insensitive filesystem")) {
                 log.warn("部分分支因大小写冲突跳过：{}", result.getOutput().lines()
                         .filter(l -> l.contains("case-insensitive"))
@@ -177,9 +192,14 @@ public class GitRepositoryService {
     }
 
     public void pull(Path repositoryPath) {
-        // 先 fetch 更新远程引用
-        fetch(repositoryPath);
-        // 如果有本地分支追踪远程，尝试 ff-only merge
+        pull(repositoryPath, null);
+    }
+
+    /**
+     * 拉取并合并，支持通过 onLine 回调实时接收 git 输出行。
+     */
+    public void pull(Path repositoryPath, java.util.function.Consumer<String> onLine) {
+        fetch(repositoryPath, onLine);
         String branch = tryGetCurrentBranch(repositoryPath);
         if (branch != null) {
             CommandResult result = run(repositoryPath, "git", "-C", repositoryPath.toString(),
@@ -438,6 +458,12 @@ public class GitRepositoryService {
 
     private CommandResult run(Path workingDirectory, String... command) {
         return commandRunner.run(Arrays.asList(command), workingDirectory, Duration.ofSeconds(timeoutSeconds()));
+    }
+
+    /** 带行回调的命令执行，用于实时追踪 git 进度。 */
+    private CommandResult runAsync(Path workingDirectory, java.util.function.Consumer<String> onLine, String... command) {
+        return commandRunner.runAsync(Arrays.asList(command), workingDirectory,
+                Duration.ofSeconds(timeoutSeconds()), onLine);
     }
 
     private List<String> baseGitCommand(Path repositoryPath) {

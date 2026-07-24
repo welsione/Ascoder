@@ -84,9 +84,9 @@ class GitCloneTaskDefinitionTests {
         definition.execute(context, progress);
 
         verify(gitRepositoryService).cloneRepository(eq("https://github.com/foo/bar.git"),
-                eq(Path.of("/tmp/repos/bar")), eq("main"));
+                eq(Path.of("/tmp/repos/bar")), eq("main"), any());
         verify(repositoryBranchService).refresh(1L);
-        verify(progress).update(50, "克隆完成，正在刷新分支...");
+        verify(progress).update(80, "克隆完成，正在刷新分支...");
         verify(progress).update(100, "完成");
         verify(codeRepositoryJpaRepository).save(entity);
         assertEquals(RepositoryStatus.CREATED, entity.getStatus());
@@ -136,7 +136,7 @@ class GitCloneTaskDefinitionTests {
     @Test
     void executeCloneThrowsExceptionPropagates() {
         doThrow(new IllegalStateException("clone failed"))
-                .when(gitRepositoryService).cloneRepository(anyString(), any(), any());
+                .when(gitRepositoryService).cloneRepository(anyString(), any(), any(), any());
 
         Map<String, String> context = Map.of(
                 "remoteUrl", "https://github.com/foo/bar.git",

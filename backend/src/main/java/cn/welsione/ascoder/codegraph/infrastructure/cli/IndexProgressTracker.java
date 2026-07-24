@@ -36,10 +36,17 @@ public class IndexProgressTracker {
 
     /**
      * 更新指定项目空间的索引进度。
+     *
+     * <p>当 percent < 0 时保留上一次的百分比，只更新消息文本。
+     * 这确保了无法提取百分比的输出行不会导致进度倒退。</p>
      */
     public void update(Long projectSpaceId, int percent, String message) {
-        progressMap.put(projectSpaceId, new IndexProgress(percent, message, false));
-        log.debug("项目空间 {} 索引进度: {}% - {}", projectSpaceId, percent, message);
+        progressMap.compute(projectSpaceId, (id, existing) -> {
+            int effectivePercent = percent >= 0 ? percent : (existing != null ? existing.getPercent() : 0);
+            return new IndexProgress(effectivePercent, message, existing != null && existing.isCompleted());
+        });
+        log.debug("项目空间 {} 索引进度: {}% - {}", projectSpaceId,
+                percent >= 0 ? percent : "保留", message);
     }
 
     /**

@@ -55,6 +55,25 @@ public class CodeGraphIndexTaskDefinition implements TaskDefinition<Map<String, 
         return TaskKind.CODEGRAPH_INDEX;
     }
 
+    /**
+     * 全量索引时长不可预估（大型代码库可能数小时），不设引擎层超时。
+     * 依赖 codegraph.index-timeout-seconds（CLI 进程级超时）+ ensureTerminal 兜底。
+     */
+    @Override
+    public long defaultTimeoutMs() {
+        return 0;
+    }
+
+    @Override
+    public String resolveBusinessLabel(Long businessId) {
+        // CODEGRAPH_INDEX 的 businessId 可能是 projectSpaceId 或 repositoryId
+        return projectSpaceJpaRepository.findById(businessId)
+                .map(space -> space.getName() + " (项目空间)")
+                .orElseGet(() -> codeRepositoryJpaRepository.findById(businessId)
+                        .map(repo -> repo.getName() + " (仓库)")
+                        .orElse(null));
+    }
+
     @Override
     public void execute(Map<String, String> context, TaskProgress progress) throws Exception {
         String repositoryPath = context.get("repositoryPath");
@@ -145,8 +164,12 @@ public class CodeGraphIndexTaskDefinition implements TaskDefinition<Map<String, 
             FileUtil.deleteDirectoryIfExists(indexPath);
         }
 
+        // 启动进度同步线程，使用 repositoryId 作为 tracker 标识
+        indexProgressTracker.start(repositoryId);
+        Thread progressSync = startProgressSyncThread(repositoryId, "index-repo-progress-sync-", progress);
+
         try {
-            CodeGraphToolResult result = codeGraphClient.index(Path.of(repositoryPath));
+            CodeGraphToolResult result = codeGraphClient.index(Path.of(repositoryPath), repositoryId);
 
             if (result.isSuccess()) {
                 progress.update(100, "索引完成");
@@ -187,6 +210,8 @@ public class CodeGraphIndexTaskDefinition implements TaskDefinition<Map<String, 
                 log.error("CodeGraph 仓库索引任务异常，repositoryId={}", repositoryId, ex);
             }
             throw ex;
+        } finally {
+            progressSync.interrupt();
         }
     }
 

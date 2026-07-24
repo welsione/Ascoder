@@ -78,10 +78,10 @@ class GitFetchTaskDefinitionTests {
 
         definition.execute(context, progress);
 
-        verify(gitRepositoryService).fetch(Path.of("/tmp/repos/bar"));
-        verify(gitRepositoryService, never()).pull(any());
+        verify(gitRepositoryService).fetch(eq(Path.of("/tmp/repos/bar")), any());
+        verify(gitRepositoryService, never()).pull(any(), any());
         verify(repositoryBranchService).refresh(1L);
-        verify(progress).update(50, "同步完成，正在刷新分支...");
+        verify(progress).update(80, "同步完成，正在刷新分支...");
         verify(progress).update(100, "完成");
         assertNotNull(entity.getLastPulledAt());
         assertNull(entity.getLastPullError());
@@ -103,8 +103,8 @@ class GitFetchTaskDefinitionTests {
 
         definition.execute(context, progress);
 
-        verify(gitRepositoryService).pull(Path.of("/tmp/repos/bar"));
-        verify(gitRepositoryService, never()).fetch(any());
+        verify(gitRepositoryService).pull(eq(Path.of("/tmp/repos/bar")), any());
+        verify(gitRepositoryService, never()).fetch(any(), any());
         verify(repositoryBranchService).refresh(1L);
     }
 
@@ -135,7 +135,7 @@ class GitFetchTaskDefinitionTests {
         when(codeRepositoryJpaRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         doThrow(new RuntimeException("network error"))
-                .when(gitRepositoryService).fetch(any());
+                .when(gitRepositoryService).fetch(any(), any());
 
         Map<String, String> context = Map.of(
                 "repositoryPath", "/tmp/repos/bar",

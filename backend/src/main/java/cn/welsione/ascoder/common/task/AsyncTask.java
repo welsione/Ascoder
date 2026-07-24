@@ -83,9 +83,10 @@ public class AsyncTask {
         this.updatedAt = new Date();
     }
 
-    /** 标记任务成功完成。 */
+    /** 标记任务成功完成，进度设为 100。 */
     public void succeed(String result) {
         this.status = TaskStatus.SUCCEEDED;
+        this.progress = 100;
         this.resultJson = result;
         this.finishedAt = new Date();
         this.updatedAt = new Date();

@@ -8,6 +8,7 @@ import cn.welsione.ascoder.repository.CodeRepository;
 import cn.welsione.ascoder.repository.CodeRepositoryJpaRepository;
 import cn.welsione.ascoder.repository.RepositoryBranchService;
 import cn.welsione.ascoder.repository.git.GitCredentialStore;
+import cn.welsione.ascoder.repository.git.GitProgressMapper;
 import cn.welsione.ascoder.repository.git.GitRepositoryService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -46,6 +47,18 @@ public class GitCloneTaskDefinition implements TaskDefinition<Map<String, String
     }
 
     @Override
+    public long defaultTimeoutMs() {
+        return 60 * 60 * 1000L; // 1 小时（大仓库 clone 可能较慢）
+    }
+
+    @Override
+    public String resolveBusinessLabel(Long businessId) {
+        return codeRepositoryJpaRepository.findById(businessId)
+                .map(repo -> repo.getName() + " (仓库)")
+                .orElse(null);
+    }
+
+    @Override
     public void execute(Map<String, String> context, TaskProgress progress) throws Exception {
         String remoteUrl = context.get("remoteUrl");
         String targetPath = context.get("targetPath");
@@ -63,10 +76,11 @@ public class GitCloneTaskDefinition implements TaskDefinition<Map<String, String
             gitCredentialStore.upsert(remoteUrl, authUsername, authPassword);
         }
 
-        gitRepositoryService.cloneRepository(remoteUrl, Path.of(targetPath), branchName);
+        gitRepositoryService.cloneRepository(remoteUrl, Path.of(targetPath), branchName,
+                new GitProgressMapper(progress, 0, 80)::onLine);
         log.info("仓库克隆完成，repositoryId={}", repositoryId);
 
-        progress.update(50, "克隆完成，正在刷新分支...");
+        progress.update(80, "克隆完成，正在刷新分支...");
         progress.checkCancelled();
 
         repositoryBranchService.refresh(repositoryId);

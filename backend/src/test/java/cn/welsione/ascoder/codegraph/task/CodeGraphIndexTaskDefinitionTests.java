@@ -220,7 +220,7 @@ class CodeGraphIndexTaskDefinitionTests {
         when(codeRepositoryJpaRepository.findById(2L)).thenReturn(Optional.of(entity));
         when(codeRepositoryJpaRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        when(codeGraphClient.index(any(Path.class)))
+        when(codeGraphClient.index(any(Path.class), anyLong()))
                 .thenReturn(CodeGraphToolResult.success("索引完成"));
 
         Map<String, String> context = Map.of(
@@ -230,7 +230,8 @@ class CodeGraphIndexTaskDefinitionTests {
 
         definition.execute(context, progress);
 
-        verify(codeGraphClient).index(Path.of("/tmp/repos/baz"));
+        verify(indexProgressTracker).start(2L);
+        verify(codeGraphClient).index(Path.of("/tmp/repos/baz"), 2L);
         verify(progress).update(100, "索引完成");
         verify(codeRepositoryJpaRepository).save(entity);
         assertEquals(RepositoryStatus.READY, entity.getStatus());
@@ -244,7 +245,7 @@ class CodeGraphIndexTaskDefinitionTests {
         when(codeRepositoryJpaRepository.findById(2L)).thenReturn(Optional.of(entity));
         when(codeRepositoryJpaRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        when(codeGraphClient.index(any(Path.class)))
+        when(codeGraphClient.index(any(Path.class), anyLong()))
                 .thenReturn(CodeGraphToolResult.error("仓库格式不支持"));
 
         Map<String, String> context = Map.of(
@@ -256,6 +257,7 @@ class CodeGraphIndexTaskDefinitionTests {
                 () -> definition.execute(context, progress));
         assertTrue(ex.getMessage().startsWith("CodeGraph 索引失败"));
 
+        verify(indexProgressTracker).start(2L);
         verify(progress).update(0, "索引失败");
         verify(codeRepositoryJpaRepository).save(entity);
         assertEquals(RepositoryStatus.FAILED, entity.getStatus());
@@ -269,7 +271,7 @@ class CodeGraphIndexTaskDefinitionTests {
         when(codeRepositoryJpaRepository.findById(2L)).thenReturn(Optional.of(entity));
         when(codeRepositoryJpaRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        when(codeGraphClient.index(any(Path.class)))
+        when(codeGraphClient.index(any(Path.class), anyLong()))
                 .thenThrow(new RuntimeException("OOM"));
 
         Map<String, String> context = Map.of(
@@ -281,6 +283,7 @@ class CodeGraphIndexTaskDefinitionTests {
                 () -> definition.execute(context, progress));
         assertEquals("OOM", ex.getMessage());
 
+        verify(indexProgressTracker).start(2L);
         verify(codeRepositoryJpaRepository).save(entity);
         assertEquals(RepositoryStatus.FAILED, entity.getStatus());
     }

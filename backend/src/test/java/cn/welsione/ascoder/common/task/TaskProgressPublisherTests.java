@@ -70,6 +70,22 @@ class TaskProgressPublisherTests {
     }
 
     @Test
+    void persistProgressHundredNotThrottled() {
+        AsyncTask task = new AsyncTask();
+        task.setId(1L);
+        when(taskRepository.findById(1L)).thenReturn(Optional.of(task));
+        when(taskRepository.save(any(AsyncTask.class))).thenAnswer(inv -> inv.getArgument(0));
+        simulateTransaction();
+
+        publisher.persistProgress(1L, 50, "halfway");
+        publisher.persistProgress(1L, 100, "完成");
+
+        // 100% 是终态进度，不受节流限制，必须写入
+        verify(taskRepository, times(2)).save(any(AsyncTask.class));
+        assertEquals(100, task.getProgress());
+    }
+
+    @Test
     void clearThrottleAllowsImmediateWrite() {
         AsyncTask task = new AsyncTask();
         task.setId(1L);

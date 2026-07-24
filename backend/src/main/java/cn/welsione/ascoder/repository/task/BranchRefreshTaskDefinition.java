@@ -3,7 +3,9 @@ package cn.welsione.ascoder.repository.task;
 import cn.welsione.ascoder.common.task.TaskDefinition;
 import cn.welsione.ascoder.common.task.TaskKind;
 import cn.welsione.ascoder.common.task.TaskProgress;
+import cn.welsione.ascoder.repository.CodeRepositoryJpaRepository;
 import cn.welsione.ascoder.repository.RepositoryBranchService;
+import cn.welsione.ascoder.repository.git.GitProgressMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +27,7 @@ public class BranchRefreshTaskDefinition implements TaskDefinition<Map<String, S
     private static final TypeReference<Map<String, String>> CONTEXT_TYPE = new TypeReference<>() {};
 
     private final RepositoryBranchService repositoryBranchService;
+    private final CodeRepositoryJpaRepository codeRepositoryJpaRepository;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -33,12 +36,25 @@ public class BranchRefreshTaskDefinition implements TaskDefinition<Map<String, S
     }
 
     @Override
+    public long defaultTimeoutMs() {
+        return 10 * 60 * 1000L; // 10 分钟
+    }
+
+    @Override
+    public String resolveBusinessLabel(Long businessId) {
+        return codeRepositoryJpaRepository.findById(businessId)
+                .map(repo -> repo.getName() + " (仓库)")
+                .orElse(null);
+    }
+
+    @Override
     public void execute(Map<String, String> context, TaskProgress progress) throws Exception {
         Long repositoryId = Long.valueOf(context.get("repositoryId"));
 
         log.info("开始刷新分支，repositoryId={}", repositoryId);
 
-        repositoryBranchService.refresh(repositoryId);
+        progress.update(0, "正在 fetch 远程引用...");
+        repositoryBranchService.refresh(repositoryId, new GitProgressMapper(progress, 0, 90)::onLine);
 
         progress.update(100, "分支刷新完成");
         log.info("分支刷新完成，repositoryId={}", repositoryId);

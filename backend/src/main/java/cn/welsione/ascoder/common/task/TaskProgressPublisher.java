@@ -37,8 +37,11 @@ public class TaskProgressPublisher {
     void persistProgress(Long taskId, int percent, String message) {
         long now = System.currentTimeMillis();
         Long lastTime = lastPersistTime.get(taskId);
-        if (lastTime != null && now - lastTime < MIN_PERSIST_INTERVAL_MS) {
-            return; // 节流：距上次写入不足 2s，跳过
+        // 节流：距上次写入不足 2s 且非关键进度时跳过
+        // 100% 是终态进度，必须写入，避免任务完成后进度仍显示中间值
+        boolean isCritical = percent >= 100;
+        if (lastTime != null && now - lastTime < MIN_PERSIST_INTERVAL_MS && !isCritical) {
+            return;
         }
         lastPersistTime.put(taskId, now);
 

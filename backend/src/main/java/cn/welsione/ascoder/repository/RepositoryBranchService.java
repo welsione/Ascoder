@@ -42,12 +42,20 @@ public class RepositoryBranchService {
 
     @Transactional
     public List<RepositoryBranch> refresh(Long repositoryId) {
+        return refresh(repositoryId, null);
+    }
+
+    /**
+     * 刷新仓库分支，支持通过 onLine 回调实时接收 fetch 阶段的 git 输出。
+     */
+    @Transactional
+    public List<RepositoryBranch> refresh(Long repositoryId, java.util.function.Consumer<String> onLine) {
         CodeRepository codeRepository = lockRepository(repositoryId);
         log.info("刷新仓库分支，repositoryId={}，name={}", repositoryId, codeRepository.getName());
 
         Path repositoryPath = Path.of(codeRepository.resolveLocalPath(repoRoot));
         if (codeRepository.getRemoteUrl() != null && !codeRepository.getRemoteUrl().isBlank()) {
-            gitRepositoryService.fetch(repositoryPath);
+            gitRepositoryService.fetch(repositoryPath, onLine);
             codeRepository.pulled(new Date());
             codeRepositoryJpaRepository.save(codeRepository);
         }

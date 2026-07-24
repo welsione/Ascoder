@@ -46,6 +46,16 @@ class AsyncTaskTests {
     }
 
     @Test
+    void succeedSetsProgressTo100() {
+        task.start();
+        task.updateProgress(50, "处理中");
+        task.succeed(null);
+
+        // 成功后进度必须为 100，即使之前是中间值
+        assertEquals(100, task.getProgress());
+    }
+
+    @Test
     void failSetsFailedAndError() {
         task.start();
         task.fail("boom");

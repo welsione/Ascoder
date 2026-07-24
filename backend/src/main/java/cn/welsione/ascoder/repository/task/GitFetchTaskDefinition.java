@@ -7,6 +7,7 @@ import cn.welsione.ascoder.repository.CodeRepository;
 import cn.welsione.ascoder.repository.CodeRepositoryJpaRepository;
 import cn.welsione.ascoder.repository.RepositoryBranchService;
 import cn.welsione.ascoder.repository.git.GitCredentialStore;
+import cn.welsione.ascoder.repository.git.GitProgressMapper;
 import cn.welsione.ascoder.repository.git.GitRepositoryService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -45,6 +46,18 @@ public class GitFetchTaskDefinition implements TaskDefinition<Map<String, String
     }
 
     @Override
+    public long defaultTimeoutMs() {
+        return 30 * 60 * 1000L; // 30 分钟
+    }
+
+    @Override
+    public String resolveBusinessLabel(Long businessId) {
+        return codeRepositoryJpaRepository.findById(businessId)
+                .map(repo -> repo.getName() + " (仓库)")
+                .orElse(null);
+    }
+
+    @Override
     public void execute(Map<String, String> context, TaskProgress progress) throws Exception {
         String repositoryPath = context.get("repositoryPath");
         Long repositoryId = Long.valueOf(context.get("repositoryId"));
@@ -66,10 +79,11 @@ public class GitFetchTaskDefinition implements TaskDefinition<Map<String, String
         String errorMessage = null;
         try {
             Path path = Path.of(repositoryPath);
+            GitProgressMapper progressMapper = new GitProgressMapper(progress, 0, 80);
             if ("pull".equals(operation)) {
-                gitRepositoryService.pull(path);
+                gitRepositoryService.pull(path, progressMapper::onLine);
             } else {
-                gitRepositoryService.fetch(path);
+                gitRepositoryService.fetch(path, progressMapper::onLine);
             }
             log.info("仓库同步完成，repositoryId={}，operation={}", repositoryId, operation);
         } catch (RuntimeException ex) {
@@ -77,7 +91,7 @@ public class GitFetchTaskDefinition implements TaskDefinition<Map<String, String
             log.warn("仓库同步失败，repositoryId={}，operation={}：{}", repositoryId, operation, errorMessage);
         }
 
-        progress.update(50, "同步完成，正在刷新分支...");
+        progress.update(80, "同步完成，正在刷新分支...");
         progress.checkCancelled();
 
         repositoryBranchService.refresh(repositoryId);

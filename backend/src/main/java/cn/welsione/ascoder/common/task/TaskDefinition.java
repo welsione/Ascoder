@@ -36,6 +36,41 @@ public interface TaskDefinition<C> {
     }
 
     /**
+     * 解析业务 ID 为可读标签，供前端展示。
+     *
+     * <p>默认返回 null，表示无法解析。各实现类可覆盖此方法，
+     * 根据 businessId 查询关联实体名称（如仓库名、项目空间名）。</p>
+     *
+     * @param businessId 业务关联 ID
+     * @return 可读标签，如 "ascoder (仓库)"，无法解析时返回 null
+     */
+    default String resolveBusinessLabel(Long businessId) {
+        return null;
+    }
+
+    /**
+     * 该类型任务的默认超时（毫秒）。
+     *
+     * <p>返回 0 表示不超时，适用于：</p>
+     * <ul>
+     *   <li>任务本身时长不可预估（如大型代码库全量索引）</li>
+     *   <li>任务内部已有可靠的超时机制（如 CLI 进程级超时）</li>
+     * </ul>
+     * <p>不超时的任务依赖以下兜底机制：</p>
+     * <ul>
+     *   <li>任务内部超时（如 SafeCommandRunner 的进程超时）</li>
+     *   <li>{@code ensureTerminal} 兜底（进程崩溃时强制标记终态）</li>
+     *   <li>手动清理僵尸任务（前端"清理僵尸任务"按钮）</li>
+     *   <li>重启恢复（{@code recoverTasks}）</li>
+     * </ul>
+     *
+     * @return 默认超时毫秒数，0 表示不超时
+     */
+    default long defaultTimeoutMs() {
+        return 0;
+    }
+
+    /**
      * 序列化业务上下文为 JSON（持久化到 DB）。
      * 重启恢复时由 {@link #deserializeContext(String)} 反序列化。
      */

@@ -45,6 +45,18 @@ public class CodeGraphSyncTaskDefinition implements TaskDefinition<Map<String, S
     }
 
     @Override
+    public long defaultTimeoutMs() {
+        return 30 * 60 * 1000L; // 30 分钟
+    }
+
+    @Override
+    public String resolveBusinessLabel(Long businessId) {
+        return projectSpaceJpaRepository.findById(businessId)
+                .map(space -> space.getName() + " (项目空间)")
+                .orElse(null);
+    }
+
+    @Override
     public void execute(Map<String, String> context, TaskProgress progress) throws Exception {
         String repositoryPath = context.get("repositoryPath");
         Long projectSpaceId = Long.valueOf(context.get("projectSpaceId"));

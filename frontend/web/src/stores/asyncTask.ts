@@ -84,6 +84,35 @@ export const useAsyncTaskStore = defineStore('asyncTask', () => {
     }
   }
 
+  async function retryTask(taskId: number) {
+    cancellingIds.value = new Set([...cancellingIds.value, taskId])
+    try {
+      await api.retry(taskId)
+      await fetchTasks()
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : '重试任务失败'
+    } finally {
+      const next = new Set(cancellingIds.value)
+      next.delete(taskId)
+      cancellingIds.value = next
+    }
+  }
+
+  async function cleanupStaleTasks(staleThresholdHours = 24) {
+    loading.value = true
+    error.value = ''
+    try {
+      const cleaned = await api.cleanupStaleTasks(staleThresholdHours)
+      await fetchTasks()
+      return cleaned
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : '清理僵尸任务失败'
+      return 0
+    } finally {
+      loading.value = false
+    }
+  }
+
   function refresh() {
     fetchTasks()
   }
@@ -107,6 +136,8 @@ export const useAsyncTaskStore = defineStore('asyncTask', () => {
     setFilterKind,
     setFilterStatus,
     cancelTask,
+    retryTask,
+    cleanupStaleTasks,
     refresh,
   }
 })
