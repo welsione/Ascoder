@@ -195,7 +195,8 @@ public class CliCodeGraphClient implements CodeGraphClient {
             }
             int percent = extractPercent(line);
             String cleanLine = TextUtil.stripAnsi(line.trim());
-            if (percent >= 0 && projectSpaceId != null) {
+            if (projectSpaceId != null) {
+                // 有百分比时更新百分比，无百分比时只更新消息（保持上一个百分比）
                 indexProgressTracker.update(projectSpaceId, percent, cleanLine);
             }
             if (line.contains("%") || line.contains("Phase:")) {

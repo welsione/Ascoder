@@ -68,11 +68,19 @@ public class IndexProgressTracker {
     /**
      * 获取指定项目空间的当前进度。
      *
-     * <p>优先从 asyncTasks 表读取（持久化进度），内存进度作为后备。</p>
+     * <p>优先返回内存进度（CLI 实时写入），DB 查询作为重启恢复的后备。
+     * 若优先查 DB，会形成"读旧值→写旧值"的死循环：
+     * CLI 写内存 → 同步线程从 DB 读旧值 → 写回旧值到 DB → 进度永远不更新。</p>
      */
     public IndexProgress get(Long projectSpaceId) {
+        // 优先返回内存进度（CLI 实时写入的）
+        IndexProgress memoryProgress = progressMap.get(projectSpaceId);
+        if (memoryProgress != null) {
+            return memoryProgress;
+        }
+
+        // 内存无记录（重启恢复场景），从 DB 读取
         try {
-            // 优先查活跃任务（QUEUED/RUNNING）
             List<AsyncTask> active = taskRepository.findByKindAndBusinessIdAndStatusIn(
                     TaskKind.CODEGRAPH_INDEX, projectSpaceId,
                     List.of(TaskStatus.QUEUED, TaskStatus.RUNNING));
@@ -84,7 +92,6 @@ public class IndexProgressTracker {
                         message,
                         false);
             }
-            // 查最近完成的任务
             List<AsyncTask> recent = taskRepository.findByKindAndBusinessIdAndStatusIn(
                     TaskKind.CODEGRAPH_INDEX, projectSpaceId,
                     List.of(TaskStatus.SUCCEEDED, TaskStatus.FAILED, TaskStatus.CANCELLED));
@@ -105,9 +112,9 @@ public class IndexProgressTracker {
                 return new IndexProgress(percent, message, true);
             }
         } catch (Exception e) {
-            log.debug("从 asyncTasks 读取进度失败，回退到内存进度，projectSpaceId={}", projectSpaceId);
+            log.debug("从 asyncTasks 读取进度失败，projectSpaceId={}", projectSpaceId);
         }
-        return progressMap.getOrDefault(projectSpaceId, new IndexProgress(0, "未开始", false));
+        return new IndexProgress(0, "未开始", false);
     }
 
     /**
