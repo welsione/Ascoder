@@ -13,10 +13,17 @@ import cn.welsione.ascoder.common.exception.ResourceNotFoundException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.security.oauth2.client.servlet.OAuth2ClientAutoConfiguration;
+import org.springframework.boot.autoconfigure.security.oauth2.resource.servlet.OAuth2ResourceServerAutoConfiguration;
+import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
@@ -32,8 +39,24 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * AgentConfigController REST 端点 MockMvc 测试。
  */
-@WebMvcTest(AgentConfigController.class)
+@WebMvcTest(
+        controllers = AgentConfigController.class,
+        excludeFilters = @ComponentScan.Filter(
+                type = FilterType.REGEX,
+                pattern = "cn\\.welsione\\.ascoder\\.common\\.security\\..*"
+        ),
+        excludeAutoConfiguration = {
+                SecurityAutoConfiguration.class,
+                OAuth2ClientAutoConfiguration.class,
+                OAuth2ResourceServerAutoConfiguration.class
+        }
+)
+@AutoConfigureMockMvc(addFilters = false)
 @Import(GlobalExceptionHandler.class)
+@TestPropertySource(properties = {
+        "ascoder.security.jwt.access-secret=dGVzdC1hY2Nlc3Mtc2VjcmV0LWtleS1mb3Itand0LWF1dGhlbnRpY2F0aW9u",
+        "ascoder.security.jwt.refresh-secret=dGVzdC1yZWZyZXNoLXNlY3JldC1rZXktZm9yLWp3dC1hdXRoZW50aWNhdGlvbg=="
+})
 class AgentConfigControllerTests {
 
     @Autowired private MockMvc mvc;

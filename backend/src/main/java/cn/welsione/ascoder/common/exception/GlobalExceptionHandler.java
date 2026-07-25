@@ -20,6 +20,8 @@ import java.util.stream.Collectors;
 
 import cn.welsione.ascoder.common.task.TaskQueueFullException;
 import cn.welsione.ascoder.common.task.TaskAlreadyRunningException;
+import cn.welsione.ascoder.common.security.AuthenticationException;
+import cn.welsione.ascoder.common.security.AuthorizationException;
 
 /**
  * 全局异常处理器，将领域异常统一转换为 HTTP 响应。
@@ -58,6 +60,16 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleToolError(ToolExecutionException ex) {
         log.error("工具执行失败", ex);
         return buildResponse(HttpStatus.BAD_GATEWAY, ex.getErrorCode(), ex.getMessage());
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<Map<String, Object>> handleAuthentication(AuthenticationException ex) {
+        return buildResponse(HttpStatus.UNAUTHORIZED, ex.getErrorCode(), ex.getMessage());
+    }
+
+    @ExceptionHandler(AuthorizationException.class)
+    public ResponseEntity<Map<String, Object>> handleAuthorization(AuthorizationException ex) {
+        return buildResponse(HttpStatus.FORBIDDEN, ex.getErrorCode(), ex.getMessage());
     }
 
     @ExceptionHandler(TaskQueueFullException.class)

@@ -56,6 +56,13 @@ services:
       # Logback 日志输出目录（对应 logback-spring.xml 中的 LOG_PATH）
       LOG_PATH: /app/logs
       JVM_OPTS: ${JVM_OPTS:--Xmx512m -Xms256m}
+      # JWT 认证配置（生产环境必须配置密钥）
+      ASCODER_JWT_ACCESS_SECRET: ${ASCODER_JWT_ACCESS_SECRET:-}
+      ASCODER_JWT_REFRESH_SECRET: ${ASCODER_JWT_REFRESH_SECRET:-}
+      ASCODER_JWT_ACCESS_VALIDITY_MS: ${ASCODER_JWT_ACCESS_VALIDITY_MS:-1800000}
+      ASCODER_JWT_REFRESH_VALIDITY_MS: ${ASCODER_JWT_REFRESH_VALIDITY_MS:-604800000}
+      ASCODER_LOGIN_MAX_FAIL: ${ASCODER_LOGIN_MAX_FAIL:-5}
+      ASCODER_LOGIN_LOCK_DURATION: ${ASCODER_LOGIN_LOCK_DURATION:-30}
     volumes:
       - ./data/repos:/app/data/repos
       - ./data/worktrees:/app/data/worktrees

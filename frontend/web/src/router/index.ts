@@ -2,10 +2,23 @@ import { createRouter, createWebHistory } from 'vue-router'
 import ChatLayout from '../layouts/ChatLayout.vue'
 import ProjectLayout from '../layouts/ProjectLayout.vue'
 import SettingsLayout from '../layouts/SettingsLayout.vue'
+import { useAuthStore } from '../stores/auth'
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
+    {
+      path: '/login',
+      name: 'login',
+      component: () => import('../views/LoginView.vue'),
+      meta: { public: true },
+    },
+    {
+      path: '/register',
+      name: 'register',
+      component: () => import('../views/RegisterView.vue'),
+      meta: { public: true },
+    },
     {
       path: '/',
       redirect: '/projects',
@@ -91,6 +104,46 @@ const router = createRouter({
       ],
     },
   ],
+})
+
+const WHITE_LIST = ['/login', '/register']
+
+router.beforeEach(async (to) => {
+  const auth = useAuthStore()
+
+  // 白名单路由直接放行
+  if (WHITE_LIST.includes(to.path)) {
+    if (auth.isAuthenticated && to.path === '/login') {
+      return { path: '/' }
+    }
+    return true
+  }
+
+  // 未认证 -> 尝试用 refreshToken 恢复 -> 失败跳转登录
+  if (!auth.isAuthenticated) {
+    if (auth.refreshToken) {
+      try {
+        await auth.refresh()
+        await auth.fetchMe()
+        return true
+      } catch {
+        auth.clearTokens()
+      }
+    }
+    return { name: 'login', query: { redirect: to.fullPath } }
+  }
+
+  // 已认证但无用户信息（页面刷新后）
+  if (!auth.user) {
+    try {
+      await auth.fetchMe()
+    } catch {
+      auth.clearTokens()
+      return { name: 'login', query: { redirect: to.fullPath } }
+    }
+  }
+
+  return true
 })
 
 export default router

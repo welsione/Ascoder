@@ -65,6 +65,15 @@ ascoder:
     index-timeout-seconds: ${CODEGRAPH_INDEX_TIMEOUT_SECONDS:3600}
   git:
     timeout-seconds: ${GIT_TIMEOUT_SECONDS:120}
+  security:
+    jwt:
+      access-secret: ${ASCODER_JWT_ACCESS_SECRET:}
+      refresh-secret: ${ASCODER_JWT_REFRESH_SECRET:}
+      access-token-validity-ms: ${ASCODER_JWT_ACCESS_VALIDITY_MS:1800000}
+      refresh-token-validity-ms: ${ASCODER_JWT_REFRESH_VALIDITY_MS:604800000}
+    login:
+      max-fail-count: ${ASCODER_LOGIN_MAX_FAIL:5}
+      lock-duration-minutes: ${ASCODER_LOGIN_LOCK_DURATION:30}
   log-analysis:
     storage-root: ${LOG_ANALYSIS_STORAGE_ROOT:./data/log-analysis}
     max-file-bytes: ${LOG_ANALYSIS_MAX_FILE_BYTES:104857600}
