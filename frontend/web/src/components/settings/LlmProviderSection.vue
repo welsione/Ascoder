@@ -248,11 +248,11 @@ async function handleToggleEnabled(provider: LlmProvider, enabled: boolean) {
           <label class="field-label">Base URL</label>
           <el-input v-model="form.baseUrl" placeholder="https://api.example.com/v1" clearable />
         </div>
-        <div>
+        <div class="span-2">
           <label class="field-label">模型 ID</label>
           <el-input v-model="form.modelId" placeholder="gpt-4o" maxlength="120" clearable show-word-limit />
         </div>
-        <div>
+        <div class="span-2">
           <label class="field-label">API Key</label>
           <el-input
             v-model="form.apiKey"
