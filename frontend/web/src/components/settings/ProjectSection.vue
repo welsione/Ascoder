@@ -176,6 +176,8 @@ function handleReset() {
           circle
           :title="showCreateProject ? '收起新建项目' : '新建项目'"
           :aria-label="showCreateProject ? '收起新建项目' : '新建项目'"
+          :aria-expanded="showCreateProject"
+          aria-controls="project-create-panel"
           @click="showCreateProject = !showCreateProject"
         >
           <Plus aria-hidden="true" :size="16" :stroke-width="1.8" />
@@ -228,7 +230,7 @@ function handleReset() {
 
     <!-- 新建项目面板 -->
     <el-collapse-transition>
-      <div v-if="showCreateProject" class="project-create-panel">
+      <div v-if="showCreateProject" id="project-create-panel" class="project-create-panel">
         <div class="subsection-heading">
           <strong>新建项目</strong>
           <span>用于归类仓库</span>
@@ -332,7 +334,6 @@ function handleReset() {
           v-model="projectStore.memberForm.repositoryId"
           placeholder="选择仓库"
           clearable
-          style="width: 100%"
         >
           <el-option
             v-for="repo in repositoryStore.repositories"
@@ -364,7 +365,7 @@ function handleReset() {
       </div>
       <div class="config-field">
         <label class="field-label">排序</label>
-        <el-input-number v-model="projectStore.memberForm.sortOrder" :min="0" style="width: 100%" />
+        <el-input-number v-model="projectStore.memberForm.sortOrder" :min="0" />
       </div>
       <div class="config-field inline-field">
         <el-checkbox v-model="projectStore.memberForm.primaryRepository">核心仓库</el-checkbox>
@@ -419,13 +420,6 @@ import type { ProjectRepositoryMember } from '../../types/project'
 </script>
 
 <style scoped>
-.section-actions {
-  display: flex;
-  gap: var(--spacing-2);
-  align-items: center;
-  flex-wrap: wrap;
-}
-
 .config-search-bar {
   margin-bottom: var(--spacing-4);
 }

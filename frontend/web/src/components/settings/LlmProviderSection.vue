@@ -53,6 +53,15 @@ function openCreate() {
   showForm.value = true
 }
 
+/** 新增按钮 toggle：展开时重置为新增态，收起时直接关闭 */
+function toggleCreate() {
+  if (showForm.value) {
+    closeForm()
+  } else {
+    openCreate()
+  }
+}
+
 function openEdit(provider: LlmProvider) {
   editingId.value = provider.id
   form.value = {
@@ -140,13 +149,19 @@ async function handleToggleEnabled(provider: LlmProvider, enabled: boolean) {
         <p class="kicker">LLM 供应商</p>
         <h2>管理 LLM 供应商配置与连接状态</h2>
       </div>
-      <div style="display:flex;gap:8px;">
+      <div class="section-actions">
         <el-button circle :loading="store.loading" title="刷新" @click="store.fetchProviders()">
           <RefreshCw :size="16" :stroke-width="1.8" />
         </el-button>
-        <el-button type="primary" @click="openCreate">
+        <el-button
+          type="primary"
+          :plain="showForm"
+          :aria-expanded="showForm"
+          aria-controls="provider-form-panel"
+          @click="toggleCreate"
+        >
           <Cpu class="button-icon" :size="16" :stroke-width="1.8" />
-          新增供应商
+          {{ showForm ? '收起' : '新增供应商' }}
         </el-button>
       </div>
     </div>
@@ -158,7 +173,6 @@ async function handleToggleEnabled(provider: LlmProvider, enabled: boolean) {
       description="请先添加至少一个 LLM 供应商，否则问答功能将无法使用。"
       show-icon
       :closable="false"
-      style="margin-bottom:12px;"
     />
 
     <el-table v-loading="store.loading" :data="store.providers" empty-text="暂无 LLM 供应商">
@@ -220,13 +234,14 @@ async function handleToggleEnabled(provider: LlmProvider, enabled: boolean) {
   </section>
 
   <!-- 新增/编辑表单 -->
-  <section v-if="showForm" class="surface-panel settings-block">
-    <div class="section-heading">
-      <div>
-        <p class="kicker">{{ editingId ? '编辑供应商' : '新增供应商' }}</p>
-        <h2>配置 LLM 供应商连接参数</h2>
+  <el-collapse-transition>
+    <section v-if="showForm" id="provider-form-panel" class="surface-panel settings-block">
+      <div class="section-heading">
+        <div>
+          <p class="kicker">{{ editingId ? '编辑供应商' : '新增供应商' }}</p>
+          <h2>配置 LLM 供应商连接参数</h2>
+        </div>
       </div>
-    </div>
 
     <p class="field-section-title">基础信息</p>
     <div class="settings-form-grid">
@@ -236,7 +251,7 @@ async function handleToggleEnabled(provider: LlmProvider, enabled: boolean) {
       </div>
       <div>
         <label class="field-label">供应商类型</label>
-        <el-select v-model="form.providerType" style="width:100%;">
+        <el-select v-model="form.providerType">
           <el-option v-for="opt in providerTypeOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
         </el-select>
       </div>
@@ -275,11 +290,11 @@ async function handleToggleEnabled(provider: LlmProvider, enabled: boolean) {
     <div class="settings-form-grid">
       <div>
         <label class="field-label">maxTokens</label>
-        <el-input-number v-model="form.maxTokens" :min="1" :max="999999" style="width:100%;" />
+        <el-input-number v-model="form.maxTokens" :min="1" :max="999999" />
       </div>
       <div>
         <label class="field-label">timeoutSeconds</label>
-        <el-input-number v-model="form.timeoutSeconds" :min="1" :max="3600" style="width:100%;" />
+        <el-input-number v-model="form.timeoutSeconds" :min="1" :max="3600" />
       </div>
     </div>
 
@@ -291,5 +306,6 @@ async function handleToggleEnabled(provider: LlmProvider, enabled: boolean) {
     </div>
 
     <el-alert v-if="store.error" type="error" :title="store.error" show-icon :closable="false" />
-  </section>
+    </section>
+  </el-collapse-transition>
 </template>

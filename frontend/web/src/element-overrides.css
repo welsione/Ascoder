@@ -152,6 +152,14 @@
   color: var(--muted);
 }
 
+/* ── 表单网格内控件撑满（统一替代各处 style="width:100%"） ── */
+.settings-form-grid .el-select,
+.settings-form-grid .el-input-number,
+.config-form-grid .el-select,
+.config-form-grid .el-input-number {
+  width: 100%;
+}
+
 /* ── Switch ── */
 /* Apple toggle：滑块用临界阻尼 spring（点击非手势，无 overshoot） */
 .el-switch__core {

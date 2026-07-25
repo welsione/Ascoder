@@ -346,7 +346,7 @@ async function deleteSpace() {
             {{ project.description || '选择下方分析空间查看分支组合、索引状态和维护操作。' }}
           </p>
         </div>
-        <div class="project-detail-actions">
+        <div class="section-actions">
           <div class="project-command-metrics" aria-label="项目空间统计">
             <div class="project-command-metric">
               <span>分析空间</span>
@@ -453,7 +453,7 @@ async function deleteSpace() {
               {{ space.status === 'READY' ? '空间已完成索引，可直接进入聊天工作台。' : '该分析空间需要准备代码并完成索引后才能提问。' }}
             </p>
           </div>
-          <div class="project-detail-actions">
+          <div class="section-actions">
             <el-tag :type="projectSpaceStore.statusType(space.status)">
               {{ projectSpaceStore.statusLabel(space.status) }}
             </el-tag>
@@ -1191,7 +1191,7 @@ async function deleteSpace() {
   }
 
   .project-command-metrics,
-  .project-detail-actions {
+  .section-actions {
     justify-content: flex-start;
   }
 }

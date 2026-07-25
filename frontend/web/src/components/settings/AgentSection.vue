@@ -108,6 +108,15 @@ function openCreate() {
   renderResult.value = null
 }
 
+/** 新增按钮 toggle：展开时重置为新增态，收起时直接关闭 */
+function toggleCreate() {
+  if (showForm.value) {
+    showForm.value = false
+  } else {
+    openCreate()
+  }
+}
+
 function openEdit(config: AgentConfig) {
   editingId.value = config.id
   agentStore.form.agentId = config.agentId
@@ -226,13 +235,19 @@ const taskKindOptions = [
         <p class="kicker">Agent 列表</p>
         <h2>管理 Agent 定义、提示词与装配配置</h2>
       </div>
-      <div style="display:flex;gap:8px;">
+      <div class="section-actions">
         <el-button circle :loading="agentStore.loading" title="刷新" @click="agentStore.fetch">
           <RefreshCw :size="16" :stroke-width="1.8" />
         </el-button>
-        <el-button type="primary" @click="openCreate">
+        <el-button
+          type="primary"
+          :plain="showForm"
+          :aria-expanded="showForm"
+          aria-controls="agent-form-panel"
+          @click="toggleCreate"
+        >
           <BotMessageSquare class="button-icon" :size="16" :stroke-width="1.8" />
-          新增 Agent
+          {{ showForm ? '收起' : '新增 Agent' }}
         </el-button>
       </div>
     </div>
@@ -244,7 +259,6 @@ const taskKindOptions = [
       description="请先在「模型供应商」设置中添加至少一个供应商，Agent 将无法使用模型。"
       show-icon
       :closable="false"
-      style="margin-bottom:12px;"
     />
 
     <el-table v-loading="agentStore.loading" :data="agentStore.items" empty-text="暂无 Agent">
@@ -364,13 +378,14 @@ const taskKindOptions = [
   </el-drawer>
 
   <!-- 配置表单 -->
-  <section v-if="showForm" class="surface-panel settings-block">
-    <div class="section-heading">
-      <div>
-        <p class="kicker">{{ editingId ? '编辑 Agent' : '新增 Agent' }}</p>
-        <h2>配置 Agent 定义、提示词与装配</h2>
+  <el-collapse-transition>
+    <section v-if="showForm" id="agent-form-panel" class="surface-panel settings-block">
+      <div class="section-heading">
+        <div>
+          <p class="kicker">{{ editingId ? '编辑 Agent' : '新增 Agent' }}</p>
+          <h2>配置 Agent 定义、提示词与装配</h2>
+        </div>
       </div>
-    </div>
 
     <!-- 基础信息 -->
     <p class="field-section-title">基础信息</p>
@@ -385,19 +400,19 @@ const taskKindOptions = [
       </div>
       <div>
         <label class="field-label">角色</label>
-        <el-select v-model="agentStore.form.agentRole" style="width:100%;">
+        <el-select v-model="agentStore.form.agentRole">
           <el-option v-for="opt in roleOptions" :key="opt.value" :label="opt.label" :value="opt.value" :disabled="opt.disabled" />
         </el-select>
       </div>
       <div v-if="agentStore.form.agentRole === 'SPECIALIST'">
         <label class="field-label">taskKind</label>
-        <el-select v-model="agentStore.form.taskKind" style="width:100%;" clearable placeholder="选择输入依赖">
+        <el-select v-model="agentStore.form.taskKind" clearable placeholder="选择输入依赖">
           <el-option v-for="opt in taskKindOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
         </el-select>
       </div>
       <div>
         <label class="field-label">排序</label>
-        <el-input-number v-model="agentStore.form.sortOrder" :min="0" :max="99" style="width:100%;" />
+        <el-input-number v-model="agentStore.form.sortOrder" :min="0" :max="99" />
       </div>
       <div>
         <label class="field-label">启用</label>
@@ -437,7 +452,7 @@ const taskKindOptions = [
     <div class="settings-form-grid">
       <div>
         <label class="field-label">供应商</label>
-        <el-select v-model="agentStore.form.llmProviderId" style="width:100%;" clearable placeholder="默认供应商">
+        <el-select v-model="agentStore.form.llmProviderId" clearable placeholder="默认供应商">
           <el-option :label="'默认供应商'" :value="null" />
           <el-option
             v-for="p in llmProviderStore.enabledProviders"
@@ -456,7 +471,7 @@ const taskKindOptions = [
       </div>
       <div>
         <label class="field-label">maxIters</label>
-        <el-input-number v-model="agentStore.form.maxIters" :min="1" :max="999" style="width:100%;" />
+        <el-input-number v-model="agentStore.form.maxIters" :min="1" :max="999" />
       </div>
       <div>
         <label class="field-label">maxTokens</label>
@@ -464,7 +479,6 @@ const taskKindOptions = [
           v-model="agentStore.form.maxTokens"
           :min="1"
           :max="999999"
-          style="width:100%;"
           :placeholder="agentStore.form.llmProviderId ? String(llmProviderStore.enabledProviders.find(p => p.id === agentStore.form.llmProviderId)?.maxTokens ?? '') : ''"
         />
       </div>
@@ -474,7 +488,6 @@ const taskKindOptions = [
           v-model="agentStore.form.timeoutSeconds"
           :min="1"
           :max="3600"
-          style="width:100%;"
           :placeholder="agentStore.form.llmProviderId ? String(llmProviderStore.enabledProviders.find(p => p.id === agentStore.form.llmProviderId)?.timeoutSeconds ?? '') : ''"
         />
       </div>
@@ -486,13 +499,13 @@ const taskKindOptions = [
     <div class="settings-form-grid">
       <div class="span-2">
         <label class="field-label">角色关键词</label>
-        <el-select v-model="agentStore.form.roleKeys" multiple filterable allow-create collapse-tags style="width:100%;" placeholder="输入后回车添加，如 tester">
+        <el-select v-model="agentStore.form.roleKeys" multiple filterable allow-create collapse-tags placeholder="输入后回车添加，如 tester">
           <el-option v-for="r in ['tester','developer','product_manager']" :key="r" :label="r" :value="r" />
         </el-select>
       </div>
       <div class="span-2">
         <label class="field-label">问题关键词</label>
-        <el-select v-model="agentStore.form.questionKeywords" multiple filterable allow-create collapse-tags style="width:100%;" placeholder="输入后回车添加，如 影响">
+        <el-select v-model="agentStore.form.questionKeywords" multiple filterable allow-create collapse-tags placeholder="输入后回车添加，如 影响">
         </el-select>
       </div>
     </div>
@@ -504,19 +517,19 @@ const taskKindOptions = [
     <div class="settings-form-grid">
       <div class="span-2">
         <label class="field-label">工具组</label>
-        <el-select v-model="agentStore.form.toolGroupKeys" multiple collapse-tags style="width:100%;" placeholder="选择可用工具组">
+        <el-select v-model="agentStore.form.toolGroupKeys" multiple collapse-tags placeholder="选择可用工具组">
           <el-option v-for="t in toolStore.tools" :key="t.toolKey" :label="`${t.displayName} (${t.toolKey})`" :value="t.toolKey" />
         </el-select>
       </div>
       <div>
         <label class="field-label">Skill</label>
-        <el-select v-model="agentStore.form.skillNames" multiple collapse-tags style="width:100%;" placeholder="选择 Skill">
+        <el-select v-model="agentStore.form.skillNames" multiple collapse-tags placeholder="选择 Skill">
           <el-option v-for="s in skillStore.skills" :key="s.name" :label="s.name" :value="s.name" />
         </el-select>
       </div>
       <div>
         <label class="field-label">MCP 服务器</label>
-        <el-select v-model="agentStore.form.mcpServerNames" multiple collapse-tags style="width:100%;" placeholder="选择 MCP">
+        <el-select v-model="agentStore.form.mcpServerNames" multiple collapse-tags placeholder="选择 MCP">
           <el-option v-for="m in mcpStore.servers" :key="m.name" :label="m.name" :value="m.name" />
         </el-select>
       </div>
@@ -554,5 +567,6 @@ const taskKindOptions = [
     </div>
 
     <el-alert v-if="agentStore.error" type="error" :title="agentStore.error" show-icon :closable="false" />
-  </section>
+    </section>
+  </el-collapse-transition>
 </template>

@@ -877,12 +877,12 @@ onMounted(loadAll)
     <section class="learning-workbench">
       <el-tabs v-model="activeTab" class="learning-tabs">
         <el-tab-pane label="原始记录" name="raw">
-          <div class="tab-toolbar">
+          <div class="section-heading">
             <div>
               <h3>Raw Events</h3>
               <p>只做事实留痕，不直接参与回答召回。历史聊天可手动导入，重复导入会自动跳过。</p>
             </div>
-            <div class="toolbar-actions">
+            <div class="section-actions">
               <el-button type="danger" plain :loading="cleaningLegacy" @click="cleanupLegacyRawEvents">
                 清理旧粒度记录
               </el-button>
@@ -906,12 +906,12 @@ onMounted(loadAll)
         </el-tab-pane>
 
         <el-tab-pane label="待审核洞察" name="insights">
-          <div class="tab-toolbar">
+          <div class="section-heading">
             <div>
               <h3>Learning Insights</h3>
               <p>候选洞察需要管理员审核，通过后才会归纳为正式知识。</p>
             </div>
-            <div class="toolbar-actions">
+            <div class="section-actions">
               <el-select v-model="insightStatusFilter" clearable placeholder="状态筛选" @change="loadAll">
                 <el-option v-for="item in insightStatusOptions" :key="item.value" :label="item.label" :value="item.value" />
               </el-select>
@@ -1154,12 +1154,12 @@ onMounted(loadAll)
         </el-tab-pane>
 
         <el-tab-pane label="正式知识" name="knowledge">
-          <div class="tab-toolbar">
+          <div class="section-heading">
             <div>
               <h3>Knowledge Items</h3>
               <p>只有 active / verified 正式知识会作为回答线索召回。</p>
             </div>
-            <div class="toolbar-actions">
+            <div class="section-actions">
               <el-select v-model="knowledgeStatusFilter" clearable placeholder="状态筛选" @change="loadAll">
                 <el-option v-for="item in knowledgeStatusOptions" :key="item.value" :label="item.label" :value="item.value" />
               </el-select>
@@ -1475,7 +1475,7 @@ onMounted(loadAll)
 
 .metric-card p,
 .policy-copy p,
-.tab-toolbar p,
+.section-heading p,
 .knowledge-card p,
 .event-card p {
   margin: var(--spacing-2) 0 0;
@@ -1593,21 +1593,16 @@ onMounted(loadAll)
   padding: var(--spacing-5);
 }
 
-.tab-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--spacing-4);
+/* section-heading 在 tab-pane 内需要底边距（不在 settings-block grid 中） */
+.section-heading {
   margin-bottom: var(--spacing-4);
 }
 
-.tab-toolbar h3 {
+.section-heading h3 {
   margin: 0;
 }
 
-.toolbar-actions {
-  display: flex;
-  align-items: center;
+.section-actions {
   gap: var(--spacing-3);
 }
 
@@ -2165,7 +2160,7 @@ onMounted(loadAll)
     max-height: none;
   }
 
-  .tab-toolbar {
+  .section-heading {
     align-items: flex-start;
     flex-direction: column;
   }

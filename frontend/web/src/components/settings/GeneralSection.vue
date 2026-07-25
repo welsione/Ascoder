@@ -91,7 +91,7 @@ function isDirty(s: RuntimeSetting): boolean {
         <p class="kicker">通用设置</p>
         <h2>运行时调参与默认值管理</h2>
       </div>
-      <div style="display:flex;gap:8px;">
+      <div class="section-actions">
         <el-button circle :loading="store.loading" title="刷新" @click="store.fetchAll">
           <RefreshCw :size="16" :stroke-width="1.8" />
         </el-button>
@@ -105,7 +105,6 @@ function isDirty(s: RuntimeSetting): boolean {
       description="刷新页面或检查后端 /api/settings 是否可访问。"
       show-icon
       :closable="false"
-      style="margin-bottom:12px;"
     />
 
     <div v-for="cat in categoryMeta" :key="cat.key" class="settings-category-block">

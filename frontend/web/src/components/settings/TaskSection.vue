@@ -189,7 +189,7 @@ onUnmounted(() => {
         <p class="kicker">任务管理</p>
         <h2>查看和管理所有异步任务的执行状态与进度</h2>
       </div>
-      <div style="display:flex;gap:8px;">
+      <div class="section-actions">
         <el-button :loading="store.loading" title="清理僵尸任务" @click="handleCleanup">
           <Trash2 :size="16" :stroke-width="1.8" />
           清理僵尸任务
@@ -235,7 +235,7 @@ onUnmounted(() => {
       </el-select>
     </div>
 
-    <el-alert v-if="store.error" type="error" :title="store.error" show-icon :closable="false" style="margin-bottom:12px;" />
+    <el-alert v-if="store.error" type="error" :title="store.error" show-icon :closable="false" />
 
     <el-table
       v-loading="store.loading"

@@ -1582,14 +1582,6 @@ select {
   white-space: pre-wrap;
 }
 
-.project-detail-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--spacing-3);
-  flex-wrap: wrap;
-}
-
 .project-command-panel {
   padding: var(--spacing-6);
   background:
@@ -1849,6 +1841,14 @@ select {
   align-items: center;
   justify-content: flex-end;
   gap: var(--spacing-3);
+  flex-wrap: wrap;
+}
+
+/* section heading 右侧操作按钮组：刷新 / 新增 等 */
+.section-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
   flex-wrap: wrap;
 }
 
