@@ -4,6 +4,7 @@ import cn.welsione.ascoder.common.FileUtil;
 import cn.welsione.ascoder.common.task.TaskDefinition;
 import cn.welsione.ascoder.common.task.TaskKind;
 import cn.welsione.ascoder.common.task.TaskProgress;
+import cn.welsione.ascoder.common.task.TaskContextSerializer;
 import cn.welsione.ascoder.repository.projectspace.ProjectSpace;
 import cn.welsione.ascoder.repository.projectspace.ProjectSpaceJpaRepository;
 import cn.welsione.ascoder.repository.projectspace.ProjectSpaceMember;
@@ -206,20 +207,12 @@ public class ProjectSpacePrepareTaskDefinition implements TaskDefinition<Project
 
     @Override
     public String serializeContext(ProjectSpacePrepareContext context) {
-        try {
-            return objectMapper.writeValueAsString(context);
-        } catch (Exception e) {
-            throw new IllegalStateException("序列化项目空间准备任务上下文失败", e);
-        }
+        return TaskContextSerializer.serialize(objectMapper, context, "项目空间准备");
     }
 
     @Override
     public ProjectSpacePrepareContext deserializeContext(String json) {
-        try {
-            return objectMapper.readValue(json, ProjectSpacePrepareContext.class);
-        } catch (Exception e) {
-            throw new IllegalStateException("反序列化项目空间准备任务上下文失败", e);
-        }
+        return TaskContextSerializer.deserialize(objectMapper, json, ProjectSpacePrepareContext.class, "项目空间准备");
     }
 
     /** 准备任务快照，携带项目空间 ID、根路径和成员列表。 */

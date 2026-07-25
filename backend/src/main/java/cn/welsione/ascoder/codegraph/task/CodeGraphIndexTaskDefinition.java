@@ -7,6 +7,7 @@ import cn.welsione.ascoder.common.FileUtil;
 import cn.welsione.ascoder.common.task.TaskDefinition;
 import cn.welsione.ascoder.common.task.TaskKind;
 import cn.welsione.ascoder.common.task.TaskProgress;
+import cn.welsione.ascoder.common.task.TaskContextSerializer;
 import cn.welsione.ascoder.repository.CodeRepository;
 import cn.welsione.ascoder.repository.CodeRepositoryJpaRepository;
 import cn.welsione.ascoder.repository.projectspace.ProjectSpace;
@@ -247,19 +248,11 @@ public class CodeGraphIndexTaskDefinition implements TaskDefinition<CodeGraphInd
 
     @Override
     public String serializeContext(CodeGraphIndexContext context) {
-        try {
-            return objectMapper.writeValueAsString(context);
-        } catch (Exception e) {
-            throw new IllegalStateException("序列化 CodeGraph 索引任务上下文失败", e);
-        }
+        return TaskContextSerializer.serialize(objectMapper, context, "CodeGraph 索引");
     }
 
     @Override
     public CodeGraphIndexContext deserializeContext(String json) {
-        try {
-            return objectMapper.readValue(json, CodeGraphIndexContext.class);
-        } catch (Exception e) {
-            throw new IllegalStateException("反序列化 CodeGraph 索引任务上下文失败", e);
-        }
+        return TaskContextSerializer.deserialize(objectMapper, json, CodeGraphIndexContext.class, "CodeGraph 索引");
     }
 }

@@ -4,6 +4,7 @@ import cn.welsione.ascoder.common.task.TaskCancelledException;
 import cn.welsione.ascoder.common.task.TaskDefinition;
 import cn.welsione.ascoder.common.task.TaskKind;
 import cn.welsione.ascoder.common.task.TaskProgress;
+import cn.welsione.ascoder.common.task.TaskContextSerializer;
 import cn.welsione.ascoder.repository.CodeRepository;
 import cn.welsione.ascoder.repository.CodeRepositoryJpaRepository;
 import cn.welsione.ascoder.repository.RepositoryBranchService;
@@ -108,19 +109,11 @@ public class GitCloneTaskDefinition implements TaskDefinition<GitCloneContext> {
 
     @Override
     public String serializeContext(GitCloneContext context) {
-        try {
-            return objectMapper.writeValueAsString(context);
-        } catch (Exception e) {
-            throw new IllegalStateException("序列化 Git clone 任务上下文失败", e);
-        }
+        return TaskContextSerializer.serialize(objectMapper, context, "Git clone");
     }
 
     @Override
     public GitCloneContext deserializeContext(String json) {
-        try {
-            return objectMapper.readValue(json, GitCloneContext.class);
-        } catch (Exception e) {
-            throw new IllegalStateException("反序列化 Git clone 任务上下文失败", e);
-        }
+        return TaskContextSerializer.deserialize(objectMapper, json, GitCloneContext.class, "Git clone");
     }
 }

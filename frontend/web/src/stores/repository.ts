@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import * as api from '../services/repositoryApi'
 import type { CodeRepository, RepositoryBranch, RepositoryBranchSourceKind, RepositoryStatus } from '../types/repository'
 import { useCrudStore } from '../composables/useCrudStore'
+import { useAsyncAction } from '../composables/useAsyncAction'
 
 interface RepositoryForm {
   name: string
@@ -26,10 +27,10 @@ export const useRepositoryStore = defineStore('repository', () => {
   })
 
   const branchesByRepository = ref<Record<number, RepositoryBranch[]>>({})
-  const indexingId = ref<number | null>(null)
-  const syncingId = ref<number | null>(null)
+  const { activeId: indexingId, run: runIndex } = useAsyncAction(crud.error)
+  const { activeId: syncingId, run: runSync } = useAsyncAction(crud.error)
+  const { activeId: branchRefreshingId, run: runBranchRefresh } = useAsyncAction(crud.error)
   const branchLoadingId = ref<number | null>(null)
-  const branchRefreshingId = ref<number | null>(null)
 
   const readyRepositories = computed(() =>
     crud.items.value.filter((repo) => repo.status === 'READY')
@@ -92,44 +93,24 @@ export const useRepositoryStore = defineStore('repository', () => {
   }
 
   async function triggerIndex(repositoryId: number) {
-    indexingId.value = repositoryId
-    crud.error.value = ''
-    try {
-      const updated = await api.triggerIndex(repositoryId)
-      updateRepository(updated)
-    } catch (err) {
-      crud.error.value = err instanceof Error ? err.message : '索引失败'
-    } finally {
-      indexingId.value = null
-    }
+    await runIndex(repositoryId, () => api.triggerIndex(repositoryId), '索引失败',
+      (updated) => updateRepository(updated))
   }
 
   async function fetchRemote(repositoryId: number) {
-    syncingId.value = repositoryId
-    crud.error.value = ''
-    try {
-      const updated = await api.fetch(repositoryId)
-      updateRepository(updated)
-      await fetchBranches(repositoryId)
-    } catch (err) {
-      crud.error.value = err instanceof Error ? err.message : '同步远程分支失败'
-    } finally {
-      syncingId.value = null
-    }
+    await runSync(repositoryId, () => api.fetch(repositoryId), '同步远程分支失败',
+      async (updated) => {
+        updateRepository(updated)
+        await fetchBranches(repositoryId)
+      })
   }
 
   async function pullRemote(repositoryId: number) {
-    syncingId.value = repositoryId
-    crud.error.value = ''
-    try {
-      const updated = await api.pull(repositoryId)
-      updateRepository(updated)
-      await fetchBranches(repositoryId)
-    } catch (err) {
-      crud.error.value = err instanceof Error ? err.message : '拉取仓库更新失败'
-    } finally {
-      syncingId.value = null
-    }
+    await runSync(repositoryId, () => api.pull(repositoryId), '拉取仓库更新失败',
+      async (updated) => {
+        updateRepository(updated)
+        await fetchBranches(repositoryId)
+      })
   }
 
   async function updateCredentials(
@@ -183,17 +164,11 @@ export const useRepositoryStore = defineStore('repository', () => {
   }
 
   async function refreshBranches(repositoryId: number) {
-    branchRefreshingId.value = repositoryId
-    crud.error.value = ''
-    try {
+    await runBranchRefresh(repositoryId, async () => {
       await api.refreshBranches(repositoryId)
       // 异步任务已提交，刷新当前分支列表作为基线
       await fetchBranches(repositoryId)
-    } catch (err) {
-      crud.error.value = err instanceof Error ? err.message : '刷新仓库分支失败'
-    } finally {
-      branchRefreshingId.value = null
-    }
+    }, '刷新仓库分支失败')
   }
 
   function updateRepository(updated: CodeRepository) {

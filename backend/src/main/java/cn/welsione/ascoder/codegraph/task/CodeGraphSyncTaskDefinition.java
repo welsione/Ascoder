@@ -6,6 +6,7 @@ import cn.welsione.ascoder.codegraph.port.CodeGraphToolResult;
 import cn.welsione.ascoder.common.task.TaskDefinition;
 import cn.welsione.ascoder.common.task.TaskKind;
 import cn.welsione.ascoder.common.task.TaskProgress;
+import cn.welsione.ascoder.common.task.TaskContextSerializer;
 import cn.welsione.ascoder.repository.projectspace.ProjectSpace;
 import cn.welsione.ascoder.repository.projectspace.ProjectSpaceJpaRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -129,19 +130,11 @@ public class CodeGraphSyncTaskDefinition implements TaskDefinition<CodeGraphSync
 
     @Override
     public String serializeContext(CodeGraphSyncContext context) {
-        try {
-            return objectMapper.writeValueAsString(context);
-        } catch (Exception e) {
-            throw new IllegalStateException("序列化 CodeGraph 同步任务上下文失败", e);
-        }
+        return TaskContextSerializer.serialize(objectMapper, context, "CodeGraph 同步");
     }
 
     @Override
     public CodeGraphSyncContext deserializeContext(String json) {
-        try {
-            return objectMapper.readValue(json, CodeGraphSyncContext.class);
-        } catch (Exception e) {
-            throw new IllegalStateException("反序列化 CodeGraph 同步任务上下文失败", e);
-        }
+        return TaskContextSerializer.deserialize(objectMapper, json, CodeGraphSyncContext.class, "CodeGraph 同步");
     }
 }

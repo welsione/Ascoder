@@ -3,6 +3,7 @@ package cn.welsione.ascoder.repository.task;
 import cn.welsione.ascoder.common.task.TaskDefinition;
 import cn.welsione.ascoder.common.task.TaskKind;
 import cn.welsione.ascoder.common.task.TaskProgress;
+import cn.welsione.ascoder.common.task.TaskContextSerializer;
 import cn.welsione.ascoder.repository.CodeRepositoryJpaRepository;
 import cn.welsione.ascoder.repository.RepositoryBranchService;
 import cn.welsione.ascoder.repository.git.GitProgressMapper;
@@ -58,19 +59,11 @@ public class BranchRefreshTaskDefinition implements TaskDefinition<BranchRefresh
 
     @Override
     public String serializeContext(BranchRefreshContext context) {
-        try {
-            return objectMapper.writeValueAsString(context);
-        } catch (Exception e) {
-            throw new IllegalStateException("序列化分支刷新任务上下文失败", e);
-        }
+        return TaskContextSerializer.serialize(objectMapper, context, "分支刷新");
     }
 
     @Override
     public BranchRefreshContext deserializeContext(String json) {
-        try {
-            return objectMapper.readValue(json, BranchRefreshContext.class);
-        } catch (Exception e) {
-            throw new IllegalStateException("反序列化分支刷新任务上下文失败", e);
-        }
+        return TaskContextSerializer.deserialize(objectMapper, json, BranchRefreshContext.class, "分支刷新");
     }
 }

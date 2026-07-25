@@ -4,6 +4,7 @@ import * as api from '../services/projectSpaceApi'
 import type { ProjectRepositoryMember } from '../types/project'
 import type { ProjectSpace, ProjectSpaceMember, ProjectSpaceStatus } from '../types/projectSpace'
 import { useCrudStore } from '../composables/useCrudStore'
+import { useAsyncAction } from '../composables/useAsyncAction'
 
 interface MemberBranch {
   repositoryId: number
@@ -38,15 +39,23 @@ export const useProjectSpaceStore = defineStore('projectSpace', () => {
   })
 
   const members = ref<ProjectSpaceMember[]>([])
-  const preparingId = ref<number | null>(null)
+  const { activeId: preparingId, run: runPrepare } = useAsyncAction(crud.error)
+  const { activeId: refreshingId, run: runRefresh } = useAsyncAction(crud.error)
+  const { activeId: pullingId, run: runPull } = useAsyncAction(crud.error)
+  const { activeId: deletingId, run: runDelete } = useAsyncAction(crud.error)
   const indexingId = ref<number | null>(null)
-  const refreshingId = ref<number | null>(null)
-  const pullingId = ref<number | null>(null)
-  const deletingId = ref<number | null>(null)
   const indexProgress = ref<{ percent: number; message: string; completed: boolean } | null>(null)
   let indexProgressTimer: ReturnType<typeof setInterval> | null = null
   let indexProgressAbortController: AbortController | null = null
   let indexingResetTimer: ReturnType<typeof setTimeout> | null = null
+
+  /** 将更新后的空间替换到列表中对应位置。 */
+  function upsertItem(updated: ProjectSpace) {
+    const idx = crud.items.value.findIndex((space) => space.id === updated.id)
+    if (idx !== -1) {
+      crud.items.value[idx] = updated
+    }
+  }
 
   function statusType(status: ProjectSpaceStatus) {
     if (status === 'READY') return 'success'
@@ -134,23 +143,12 @@ export const useProjectSpaceStore = defineStore('projectSpace', () => {
   }
 
   async function prepare(projectSpaceId: number) {
-    preparingId.value = projectSpaceId
-    crud.error.value = ''
-    try {
-      const updated = await api.prepare(projectSpaceId)
-      const idx = crud.items.value.findIndex((space) => space.id === projectSpaceId)
-      if (idx !== -1) {
-        crud.items.value[idx] = updated
-      }
-      crud.selectedId.value = projectSpaceId
-      await fetchMembers(projectSpaceId)
-      return updated
-    } catch (err) {
-      crud.error.value = err instanceof Error ? err.message : '准备项目空间失败'
-      return null
-    } finally {
-      preparingId.value = null
-    }
+    return runPrepare(projectSpaceId, () => api.prepare(projectSpaceId), '准备项目空间失败',
+      async (updated) => {
+        upsertItem(updated)
+        crud.selectedId.value = projectSpaceId
+        await fetchMembers(projectSpaceId)
+      })
   }
 
   async function index(projectSpaceId: number) {
@@ -193,10 +191,7 @@ export const useProjectSpaceStore = defineStore('projectSpace', () => {
 
     try {
       const updated = await invoke()
-      const idx = crud.items.value.findIndex((space) => space.id === projectSpaceId)
-      if (idx !== -1) {
-        crud.items.value[idx] = updated
-      }
+      upsertItem(updated)
       crud.selectedId.value = projectSpaceId
       return updated
     } catch (err) {
@@ -243,66 +238,37 @@ export const useProjectSpaceStore = defineStore('projectSpace', () => {
   }
 
   async function refresh(projectSpaceId: number) {
-    refreshingId.value = projectSpaceId
-    crud.error.value = ''
-    try {
-      const updated = await api.refresh(projectSpaceId)
-      const idx = crud.items.value.findIndex((space) => space.id === projectSpaceId)
-      if (idx !== -1) {
-        crud.items.value[idx] = updated
-      }
-      crud.selectedId.value = projectSpaceId
-      await fetchMembers(projectSpaceId)
-      return updated
-    } catch (err) {
-      crud.error.value = err instanceof Error ? err.message : '刷新项目空间失败'
-      return null
-    } finally {
-      refreshingId.value = null
-    }
+    return runRefresh(projectSpaceId, () => api.refresh(projectSpaceId), '刷新项目空间失败',
+      async (updated) => {
+        upsertItem(updated)
+        crud.selectedId.value = projectSpaceId
+        await fetchMembers(projectSpaceId)
+      })
   }
 
   async function pullRemote(projectSpaceId: number) {
-    pullingId.value = projectSpaceId
-    crud.error.value = ''
-    try {
-      const updated = await api.pull(projectSpaceId)
-      const idx = crud.items.value.findIndex((space) => space.id === projectSpaceId)
-      if (idx !== -1) {
-        crud.items.value[idx] = updated
-      }
-      crud.selectedId.value = projectSpaceId
-      // 不在此处 fetchMembers：异步 fetch 任务尚未完成，提交记录仍是旧数据
-      // 用户点击刷新按钮时 fetchMembers 会获取最新数据
-      return updated
-    } catch (err) {
-      crud.error.value = err instanceof Error ? err.message : '拉取项目空间代码失败'
-      return null
-    } finally {
-      pullingId.value = null
-    }
+    return runPull(projectSpaceId, () => api.pull(projectSpaceId), '拉取项目空间代码失败',
+      (updated) => {
+        upsertItem(updated)
+        crud.selectedId.value = projectSpaceId
+        // 不在此处 fetchMembers：异步 fetch 任务尚未完成，提交记录仍是旧数据
+        // 用户点击刷新按钮时 fetchMembers 会获取最新数据
+      })
   }
 
   async function remove(projectSpaceId: number) {
-    deletingId.value = projectSpaceId
-    crud.error.value = ''
-    try {
-      await api.remove(projectSpaceId)
-      crud.items.value = crud.items.value.filter((space) => space.id !== projectSpaceId)
-      if (crud.selectedId.value === projectSpaceId) {
-        crud.selectedId.value = crud.items.value[0]?.id ?? null
-        members.value = []
-        if (crud.selectedId.value) {
-          await fetchMembers(crud.selectedId.value)
+    const result = await runDelete(projectSpaceId, () => api.remove(projectSpaceId), '删除项目空间失败',
+      async () => {
+        crud.items.value = crud.items.value.filter((space) => space.id !== projectSpaceId)
+        if (crud.selectedId.value === projectSpaceId) {
+          crud.selectedId.value = crud.items.value[0]?.id ?? null
+          members.value = []
+          if (crud.selectedId.value) {
+            await fetchMembers(crud.selectedId.value)
+          }
         }
-      }
-      return true
-    } catch (err) {
-      crud.error.value = err instanceof Error ? err.message : '删除项目空间失败'
-      return false
-    } finally {
-      deletingId.value = null
-    }
+      })
+    return result !== null
   }
 
   return {
