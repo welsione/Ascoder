@@ -2009,6 +2009,11 @@ select {
   margin-top: 0;
 }
 
+/* ── Drawer footer 辅助操作与主操作分隔 ── */
+.footer-spacer {
+  flex: 1;
+}
+
 .tool-summary-card strong {
   display: block;
   margin-top: var(--spacing-1);

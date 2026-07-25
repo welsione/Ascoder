@@ -249,8 +249,8 @@ function handleReset() {
     @closed="onDrawerClosed"
   >
     <div class="drawer-form">
-      <div class="config-form-grid">
-        <div class="config-field">
+      <div class="settings-form-grid">
+        <div>
           <label class="field-label">
             项目名称 <span class="required-star">*</span>
           </label>
@@ -264,25 +264,21 @@ function handleReset() {
           />
           <p v-if="nameError" class="field-error">{{ nameError }}</p>
         </div>
-        <div class="config-field">
+        <div>
           <label class="field-label">描述</label>
           <el-input
             v-model="projectStore.form.description"
-            placeholder="可选，用于说明项目边界"
-            clearable
+            type="textarea"
+            :rows="3"
+            placeholder="可选，用于说明项目边界与包含的仓库范围"
           />
         </div>
       </div>
     </div>
 
     <template #footer>
-      <el-button title="重置表单" aria-label="重置表单" @click="handleReset">
-        <RotateCcw class="button-icon" aria-hidden="true" :size="16" :stroke-width="1.8" />
-        重置
-      </el-button>
       <el-button
         v-if="hasDraft"
-        type="info"
         text
         title="恢复草稿"
         aria-label="恢复草稿"
@@ -291,6 +287,10 @@ function handleReset() {
         <Undo2 class="button-icon" aria-hidden="true" :size="16" :stroke-width="1.8" />
         恢复草稿
       </el-button>
+      <div class="footer-spacer" />
+      <el-button title="重置表单" aria-label="重置表单" @click="handleReset">
+        重置
+      </el-button>
       <el-button
         type="primary"
         :loading="projectStore.loading"
@@ -298,7 +298,7 @@ function handleReset() {
         @click="handleCreateProject"
       >
         <Save class="button-icon" aria-hidden="true" :size="16" :stroke-width="1.8" />
-        创建项目
+        创建
       </el-button>
     </template>
   </el-drawer>
