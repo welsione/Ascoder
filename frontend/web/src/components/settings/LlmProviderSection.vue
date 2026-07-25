@@ -17,7 +17,7 @@ const initialForm = (): CreateLlmProviderRequest & { enabled?: boolean } => ({
   apiKey: '',
   baseUrl: '',
   modelId: '',
-  maxTokens: undefined,
+  maxTokens: 4096,
   timeoutSeconds: 240,
   isDefault: false,
   enabled: true,
