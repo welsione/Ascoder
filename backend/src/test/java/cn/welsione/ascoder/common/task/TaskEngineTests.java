@@ -303,6 +303,76 @@ class TaskEngineTests {
         assertNull(engine.getHandle(999L));
     }
 
+    @Test
+    void executeTimeoutMarksFailed() throws Exception {
+        TaskEngine engine = newEngine();
+        // 用异步执行器，让超时看门狗能真正中断执行线程
+        AsyncExecutor asyncExecutor = new AsyncExecutor();
+        when(executorRegistry.getExecutor(any(TaskKind.class))).thenReturn(asyncExecutor);
+        mockSaveAndFindById();
+
+        // 设置 100ms 超时
+        TaskSubmitRequest<Map<String, String>> req = submitRequest();
+        req.setTimeoutMs(100L);
+
+        // 任务阻塞不退出，等待超时看门狗触发中断
+        // 被中断后抛出 RuntimeException（非 TaskCancelledException），验证超时标记为 FAILED
+        definition.behavior = ctx -> {
+            try { Thread.sleep(5000); } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException("超时中断");
+            }
+        };
+
+        engine.submit(req);
+
+        // 等待超时看门狗触发 + 兜底处理
+        awaitCondition(() -> savedRef.get().isTerminal(), 3000);
+        assertEquals(TaskStatus.FAILED, savedRef.get().getStatus());
+        asyncExecutor.shutdown();
+    }
+
+    @Test
+    void executeErrorMarksFailed() {
+        TaskEngine engine = newEngine();
+        mockSaveAndFindById();
+
+        // 抛出 Error（而非 Exception），验证 catch(Throwable) 能捕获并更新状态
+        definition.behavior = ctx -> { throw new Error("模拟 OOM"); };
+
+        engine.submit(submitRequest());
+        assertEquals(TaskStatus.FAILED, savedRef.get().getStatus());
+        assertNotNull(savedRef.get().getErrorMessage());
+        assertTrue(savedRef.get().getErrorMessage().contains("模拟 OOM"));
+    }
+
+    @Test
+    void noTimeoutDoesNotKillLongRunningTask() throws Exception {
+        TaskEngine engine = newEngine();
+        AsyncExecutor asyncExecutor = new AsyncExecutor();
+        when(executorRegistry.getExecutor(any(TaskKind.class))).thenReturn(asyncExecutor);
+        mockSaveAndFindById();
+
+        // 不设置 timeoutMs，TestTaskDefinition.defaultTimeoutMs() 返回 0（不超时）
+        TaskSubmitRequest<Map<String, String>> req = submitRequest();
+        // req.setTimeoutMs 不设置，默认 0
+
+        // 任务执行 500ms（长于之前的 100ms 超时测试，验证不会被误杀）
+        definition.behavior = ctx -> {
+            try { Thread.sleep(500); } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException("不应被中断");
+            }
+        };
+
+        engine.submit(req);
+
+        // 等待任务自然完成，应为 SUCCEEDED 而非 FAILED
+        awaitCondition(() -> savedRef.get().isTerminal(), 3000);
+        assertEquals(TaskStatus.SUCCEEDED, savedRef.get().getStatus());
+        asyncExecutor.shutdown();
+    }
+
     // ==================== 测试辅助 ====================
 
     /** 同步执行器：submit 时立即运行。 */

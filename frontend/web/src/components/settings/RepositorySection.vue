@@ -3,11 +3,12 @@ import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { GitBranch, KeyRound, Plus, RefreshCw } from 'lucide-vue-next'
 import { useRepositoryStore } from '../../stores/repository'
+import { formatTime } from '../../utils/format'
 import type { CodeRepository } from '../../types/repository'
 
 const repositoryStore = useRepositoryStore()
 const sourceMode = ref<'remote' | 'local'>('remote')
-const showCreateRepository = ref(false)
+const drawerVisible = ref(false)
 
 // 凭据编辑对话框状态
 const credentialDialogVisible = ref(false)
@@ -34,15 +35,19 @@ function displayLocation(repository: CodeRepository) {
   return parts.length >= 2 ? parts.slice(-2).join('/') : value
 }
 
-function formatTime(value?: string | null) {
-  if (!value) return '未同步'
-  try {
-    const date = new Date(value)
-    const pad = (n: number) => String(n).padStart(2, '0')
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
-  } catch {
-    return value
-  }
+function openCreateRepository() {
+  repositoryStore.resetForm()
+  sourceMode.value = 'remote'
+  drawerVisible.value = true
+}
+
+function closeRepositoryDrawer() {
+  drawerVisible.value = false
+}
+
+function onRepositoryDrawerClosed() {
+  repositoryStore.resetForm()
+  sourceMode.value = 'remote'
 }
 
 async function createRepository() {
@@ -53,16 +58,14 @@ async function createRepository() {
   }
   const created = await repositoryStore.create()
   if (created) {
-    showCreateRepository.value = false
+    drawerVisible.value = false
     ElMessage.success('仓库已添加')
   }
 }
 
-async function refreshRepositoryBranches(repoId: number) {
-  const branches = await repositoryStore.refreshBranches(repoId)
-  if (branches.length > 0) {
-    ElMessage.success('分支发现已刷新')
-  }
+async function refreshBranches(repoId: number) {
+  await repositoryStore.refreshBranches(repoId)
+  ElMessage.info('分支刷新任务已提交，完成后请刷新查看最新分支')
 }
 
 function openCredentialDialog(repository: CodeRepository) {
@@ -99,15 +102,21 @@ async function saveCredentials() {
         <p class="kicker">仓库列表</p>
         <h2>同步状态</h2>
       </div>
-      <el-button
-        circle
-        :loading="repositoryStore.loading"
-        title="刷新仓库"
-        aria-label="刷新仓库"
-        @click="repositoryStore.fetch"
-      >
-        <RefreshCw aria-hidden="true" :size="16" :stroke-width="1.8" />
-      </el-button>
+      <div class="section-actions">
+        <el-button
+          circle
+          :loading="repositoryStore.loading"
+          title="刷新仓库"
+          aria-label="刷新仓库"
+          @click="repositoryStore.fetch"
+        >
+          <RefreshCw aria-hidden="true" :size="16" :stroke-width="1.8" />
+        </el-button>
+        <el-button type="primary" @click="openCreateRepository">
+          <Plus class="button-icon" aria-hidden="true" :size="16" :stroke-width="1.8" />
+          添加仓库
+        </el-button>
+      </div>
     </div>
 
     <el-alert v-if="repositoryStore.error" type="error" :title="repositoryStore.error" show-icon :closable="false" />
@@ -138,7 +147,7 @@ async function saveCredentials() {
       </el-table-column>
       <el-table-column label="状态" width="112">
         <template #default="{ row }">
-          <el-tag :type="repositoryStore.statusType(row.status)">{{ row.status }}</el-tag>
+          <el-tag size="small" :type="repositoryStore.statusType(row.status)">{{ row.status }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column label="分支" width="104">
@@ -146,9 +155,9 @@ async function saveCredentials() {
           {{ repositoryBranchCount(row.id) ?? '未加载' }}
         </template>
       </el-table-column>
-      <el-table-column prop="lastPulledAt" label="最近同步" min-width="150">
+      <el-table-column label="最近同步" min-width="150">
         <template #default="{ row }">
-          {{ formatTime(row.lastPulledAt) }}
+          {{ formatTime(row.lastPulledAt, '未同步') }}
         </template>
       </el-table-column>
       <el-table-column label="操作" width="168" fixed="right">
@@ -172,7 +181,7 @@ async function saveCredentials() {
                 circle
                 :loading="repositoryStore.branchRefreshingId === row.id"
                 aria-label="刷新分支"
-                @click="refreshRepositoryBranches(row.id)"
+                @click="refreshBranches(row.id)"
               >
                 <GitBranch aria-hidden="true" :size="15" :stroke-width="1.8" />
               </el-button>
@@ -195,95 +204,85 @@ async function saveCredentials() {
     </el-table>
   </section>
 
-  <section class="surface-panel settings-block repository-create-section">
-    <div class="section-heading repository-card-heading">
-      <div>
-        <p class="kicker">新增仓库</p>
-        <h2>添加一个代码仓库</h2>
+  <!-- 新增仓库抽屉 -->
+  <el-drawer
+    v-model="drawerVisible"
+    title="添加仓库"
+    direction="rtl"
+    size="480px"
+    destroy-on-close
+    @closed="onRepositoryDrawerClosed"
+  >
+    <div class="drawer-form">
+      <div class="source-switch" aria-label="仓库来源">
+        <el-segmented
+          v-model="sourceMode"
+          :options="[
+            { label: '远程仓库', value: 'remote' },
+            { label: '本地仓库', value: 'local' },
+          ]"
+        />
       </div>
-      <div class="section-actions">
-        <el-button
-          type="primary"
-          :plain="showCreateRepository"
-          :aria-expanded="showCreateRepository"
-          aria-controls="repository-create-panel"
-          @click="showCreateRepository = !showCreateRepository"
-        >
-          <Plus class="button-icon" aria-hidden="true" :size="16" :stroke-width="1.8" />
-          {{ showCreateRepository ? '收起' : '添加仓库' }}
-        </el-button>
+
+      <div class="settings-form-grid settings-form-grid-repo repository-form-grid">
+        <div>
+          <label class="field-label">仓库名称</label>
+          <el-input v-model="repositoryStore.form.name" placeholder="例如 ascoder" maxlength="120" clearable show-word-limit />
+        </div>
+        <div>
+          <label class="field-label">默认分支</label>
+          <el-input v-model="repositoryStore.form.defaultBranch" placeholder="例如 main / develop" maxlength="255" clearable />
+        </div>
+        <div class="span-2">
+          <label class="field-label">远程 Git 地址</label>
+          <el-input
+            v-model="repositoryStore.form.remoteUrl"
+            placeholder="例如 https://github.com/org/repo.git；填写后会 clone 到 REPO_ROOT"
+            :disabled="sourceMode === 'local'"
+            clearable
+          />
+        </div>
+        <div class="span-2">
+          <label class="field-label">本地路径</label>
+          <el-input
+            v-model="repositoryStore.form.localPath"
+            :placeholder="sourceMode === 'remote' ? '远程仓库 clone 目标路径；为空时使用仓库名称' : '本地仓库路径，必须位于 REPO_ROOT 下'"
+            clearable
+          />
+        </div>
+        <template v-if="sourceMode === 'remote'">
+          <div class="span-2"><p class="field-section-title">认证信息（可选）</p></div>
+          <div>
+            <label class="field-label">认证用户名</label>
+            <el-input
+              v-model="repositoryStore.form.authUsername"
+              placeholder="Git HTTPS 认证用户名（可选）"
+              maxlength="255"
+              clearable
+            />
+          </div>
+          <div>
+            <label class="field-label">认证密码</label>
+            <el-input
+              v-model="repositoryStore.form.authPassword"
+              type="password"
+              placeholder="Git HTTPS 认证密码（可选）"
+              show-password
+              clearable
+            />
+          </div>
+        </template>
       </div>
     </div>
 
-    <el-collapse-transition>
-      <div v-if="showCreateRepository" id="repository-create-panel" class="repository-create-panel">
-        <div class="source-switch" aria-label="仓库来源">
-          <el-segmented
-            v-model="sourceMode"
-            :options="[
-              { label: '远程仓库', value: 'remote' },
-              { label: '本地仓库', value: 'local' },
-            ]"
-          />
-        </div>
-
-        <div class="settings-form-grid settings-form-grid-repo repository-form-grid">
-          <div>
-            <label class="field-label">仓库名称</label>
-            <el-input v-model="repositoryStore.form.name" placeholder="例如 ascoder" maxlength="120" clearable />
-          </div>
-          <div>
-            <label class="field-label">默认分支</label>
-            <el-input v-model="repositoryStore.form.defaultBranch" placeholder="例如 main / develop" maxlength="255" clearable />
-          </div>
-          <div class="span-2">
-            <label class="field-label">远程 Git 地址</label>
-            <el-input
-              v-model="repositoryStore.form.remoteUrl"
-              placeholder="例如 https://github.com/org/repo.git；填写后会 clone 到 REPO_ROOT"
-              :disabled="sourceMode === 'local'"
-              clearable
-            />
-          </div>
-          <div class="span-2">
-            <label class="field-label">本地路径</label>
-            <el-input
-              v-model="repositoryStore.form.localPath"
-              :placeholder="sourceMode === 'remote' ? '远程仓库 clone 目标路径；为空时使用仓库名称' : '本地仓库路径，必须位于 REPO_ROOT 下'"
-              clearable
-            />
-          </div>
-          <template v-if="sourceMode === 'remote'">
-            <div>
-              <label class="field-label">认证用户名</label>
-              <el-input
-                v-model="repositoryStore.form.authUsername"
-                placeholder="Git HTTPS 认证用户名（可选）"
-                maxlength="255"
-                clearable
-              />
-            </div>
-            <div>
-              <label class="field-label">认证密码</label>
-              <el-input
-                v-model="repositoryStore.form.authPassword"
-                type="password"
-                placeholder="Git HTTPS 认证密码（可选）"
-                show-password
-                clearable
-              />
-            </div>
-          </template>
-          <div class="form-submit">
-            <el-button type="primary" :loading="repositoryStore.createLoading" @click="createRepository">
-              <Plus class="button-icon" aria-hidden="true" :size="16" :stroke-width="1.8" />
-              添加仓库
-            </el-button>
-          </div>
-        </div>
-      </div>
-    </el-collapse-transition>
-  </section>
+    <template #footer>
+      <el-button @click="closeRepositoryDrawer">取消</el-button>
+      <el-button type="primary" :loading="repositoryStore.createLoading" @click="createRepository">
+        <Plus class="button-icon" aria-hidden="true" :size="16" :stroke-width="1.8" />
+        添加仓库
+      </el-button>
+    </template>
+  </el-drawer>
 
   <el-dialog
     v-model="credentialDialogVisible"
@@ -343,23 +342,13 @@ async function saveCredentials() {
   font-size: var(--font-size-xl);
 }
 
-.repository-create-panel {
-  display: grid;
-  gap: var(--spacing-4);
-}
-
 .source-switch {
   margin-top: calc(-1 * var(--spacing-1));
+  margin-bottom: var(--spacing-4);
 }
 
 .repository-form-grid {
   align-items: end;
-}
-
-.form-submit {
-  grid-column: span 2;
-  display: flex;
-  justify-content: flex-end;
 }
 
 .repo-cell,
@@ -407,8 +396,7 @@ async function saveCredentials() {
 }
 
 @media (max-width: 900px) {
-  .repository-flow,
-  .form-submit {
+  .repository-flow {
     justify-content: flex-start;
   }
 
@@ -416,8 +404,7 @@ async function saveCredentials() {
     grid-template-columns: 1fr;
   }
 
-  .repository-form-grid .span-2,
-  .form-submit {
+  .repository-form-grid .span-2 {
     grid-column: span 1;
   }
 }

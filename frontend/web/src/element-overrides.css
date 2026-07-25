@@ -91,6 +91,7 @@
 }
 
 /* ── 输入控件 ── */
+/* Apple 风格：默认下沉（surface-soft）→ 聚焦浮起（surface）+ 明确聚焦环 */
 .el-input__wrapper,
 .el-select__wrapper,
 .el-textarea__inner {
@@ -98,19 +99,45 @@
   background: var(--surface-soft);
   box-shadow: 0 0 0 1px var(--stroke) inset;
   transition:
-    box-shadow 180ms var(--ease-snappy),
-    background 180ms var(--ease-snappy);
+    box-shadow 200ms var(--ease-spring),
+    background 200ms var(--ease-spring);
+}
+
+/* 桌面端舒适触控高度 */
+.el-input__wrapper,
+.el-select__wrapper {
+  min-height: 38px;
 }
 
 .el-input__wrapper:hover,
-.el-select__wrapper:hover,
+.el-select__wrapper:hover {
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--stroke-strong) inset;
+}
+
 .el-input__wrapper.is-focus,
 .el-select__wrapper.is-focused,
 .el-textarea__inner:focus {
   background: var(--surface);
   box-shadow:
     0 0 0 1px var(--chat-composer-focus) inset,
-    0 0 0 3px rgba(79, 110, 247, 0.08);
+    0 0 0 4px rgba(79, 110, 247, 0.12);
+}
+
+/* 错误状态：红色边框 + 聚焦时红色环（配合 .is-error 类） */
+.el-input.is-error .el-input__wrapper,
+.el-select.is-error .el-select__wrapper,
+.el-textarea.is-error .el-textarea__inner {
+  box-shadow: 0 0 0 1px var(--danger) inset;
+}
+
+.el-input.is-error .el-input__wrapper.is-focus,
+.el-select.is-error .el-select__wrapper.is-focused,
+.el-textarea.is-error .el-textarea__inner:focus {
+  background: var(--surface);
+  box-shadow:
+    0 0 0 1px var(--danger) inset,
+    0 0 0 4px rgba(220, 38, 38, 0.12);
 }
 
 .el-input__inner,
@@ -123,6 +150,30 @@
 .el-input__inner::placeholder,
 .el-textarea__inner::placeholder {
   color: var(--muted);
+}
+
+/* ── 表单网格内控件撑满（统一替代各处 style="width:100%"） ── */
+.settings-form-grid .el-select,
+.settings-form-grid .el-input-number,
+.config-form-grid .el-select,
+.config-form-grid .el-input-number {
+  width: 100%;
+}
+
+/* ── Switch ── */
+/* Apple toggle：滑块用临界阻尼 spring（点击非手势，无 overshoot） */
+.el-switch__core {
+  transition:
+    background-color var(--transition-normal),
+    border-color var(--transition-normal);
+}
+
+.el-switch__button {
+  transition: transform 280ms var(--ease-spring);
+}
+
+.el-switch.is-focus .el-switch__core {
+  box-shadow: 0 0 0 4px rgba(79, 110, 247, 0.12);
 }
 
 /* ── 表格 ── */
@@ -247,5 +298,51 @@
 @media (max-width: 900px) {
   .composer-actions .el-button {
     min-width: 96px;
+  }
+}
+
+/* ── Drawer 抽屉（设置页新增/编辑表单） ── */
+.el-drawer__header {
+  padding: var(--spacing-5) var(--spacing-6);
+  border-bottom: 1px solid var(--stroke);
+  margin-bottom: 0;
+}
+
+.el-drawer__title {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+}
+
+.el-drawer__body {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.el-drawer__footer {
+  padding: var(--spacing-4) var(--spacing-6);
+  border-top: 1px solid var(--stroke);
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-2);
+}
+
+/* ── Reduced motion：退化为非弹簧的简短过渡 ── */
+@media (prefers-reduced-motion: reduce) {
+  .el-input__wrapper,
+  .el-select__wrapper,
+  .el-textarea__inner {
+    transition:
+      box-shadow 200ms ease,
+      background 200ms ease;
+  }
+
+  .el-switch__button {
+    transition: transform 200ms ease;
+  }
+
+  .field-error {
+    animation: none;
   }
 }

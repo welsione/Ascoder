@@ -75,13 +75,13 @@ public class AgentScopeModelFactory implements ChatModelFactory {
 
     @Override
     public AnthropicChatModel createDefaultModel() {
-        return createAnthropicCompatibleModel();
+        return createAnthropicModel();
     }
 
     /**
      * 创建 Anthropic 兼容的默认模型，使用全局配置参数。
      */
-    public AnthropicChatModel createAnthropicCompatibleModel() {
+    public AnthropicChatModel createAnthropicModel() {
         return createModel(modelId, maxTokens);
     }
 

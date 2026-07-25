@@ -95,7 +95,7 @@ function stripTags(value: string) {
   return value.replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<[^>]+>/g, ' ')
 }
 
-function cleanupMermaidErrorArtifacts() {
+function cleanupMermaidErrors() {
   const errorPattern = /Syntax error in text|Parse error on line|Lexical error on line|No diagram type detected|mermaid version \d/i
   document.body?.querySelectorAll<HTMLElement>(':scope > *').forEach((el) => {
     if (el.id === 'app' || el.matches('script, style, link')) {
@@ -119,18 +119,18 @@ export async function renderMermaidBlocks(container: HTMLElement) {
     if (!source) continue
     try {
       await mermaid.parse(source)
-      cleanupMermaidErrorArtifacts()
+      cleanupMermaidErrors()
       const { svg } = await mermaid.render(el.dataset.mermaidId ?? 'mermaid', source)
       if (isMermaidErrorSvg(svg)) {
         throw new Error('Mermaid syntax error')
       }
-      cleanupMermaidErrorArtifacts()
+      cleanupMermaidErrors()
       el.innerHTML = sanitizeMermaidSvg(svg)
       el.classList.remove('mermaid-placeholder')
       el.classList.add('mermaid-rendered')
     } catch (error) {
       console.warn('Mermaid render failed, fallback to code block.', error)
-      cleanupMermaidErrorArtifacts()
+      cleanupMermaidErrors()
       el.innerHTML = `<pre><code>${markdown.utils.escapeHtml(source)}</code></pre>`
       el.classList.remove('mermaid-placeholder')
       el.classList.add('mermaid-fallback')

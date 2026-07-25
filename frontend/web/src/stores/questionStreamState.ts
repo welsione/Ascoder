@@ -84,7 +84,7 @@ const ERROR_CATEGORY_LABELS: Record<string, string> = {
   unknown: '未知错误',
 }
 
-export function createInitialQuestionStreamState(): QuestionStreamState {
+export function createInitialState(): QuestionStreamState {
   return {
     streaming: false,
     streamingContent: '',
@@ -116,7 +116,7 @@ function agentHasActivity(agent: StreamingAgentState) {
   return Boolean(agent.status || agent.reasoning || agent.result || agent.toolEvents.length)
 }
 
-export function applyQuestionStreamEvent(
+export function applyStreamEvent(
   event: StreamEvent,
   questions: QuestionRecord[],
   state: QuestionStreamState,

@@ -44,7 +44,7 @@ public class ConversationRecordHelper {
         return SelfLearningTextUtil.jsonString(objectMapper, value);
     }
 
-    public Set<String> existingConversationRecordKeys(Long projectSpaceId) {
+    public Set<String> existingRecordKeys(Long projectSpaceId) {
         return rawEventRepository.findByProjectSpace_IdOrderByCreatedAtDesc(projectSpaceId).stream()
                 .filter(item -> item.getEventType() == LearningRawEventType.CONVERSATION_RECORD)
                 .map(this::conversationRecordKey)
@@ -118,7 +118,7 @@ public class ConversationRecordHelper {
                 .collect(Collectors.toMap(item -> item.getQuestion().getId(), item -> item));
     }
 
-    public List<List<Question>> groupQuestionsByConversation(List<Question> questions) {
+    public List<List<Question>> groupByConversation(List<Question> questions) {
         Map<String, List<Question>> groups = new LinkedHashMap<>();
         for (Question question : questions) {
             groups.computeIfAbsent(conversationRecordKey(question), ignored -> new ArrayList<>()).add(question);

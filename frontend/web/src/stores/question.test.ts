@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../utils/browserNotification', () => ({
   notifyAnswerCompleted: vi.fn(),
-  requestAnswerNotificationPermission: vi.fn(),
+  requestNotificationPermission: vi.fn(),
 }))
 
 vi.mock('../services/questionApi', () => ({

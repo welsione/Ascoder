@@ -14,6 +14,7 @@
 <script setup lang="ts">
 import { ref, onBeforeUnmount, watch } from 'vue'
 import { getAgentEvents, type AgentEventRecord } from '../../services/questionApi'
+import { formatTime } from '../../utils/format'
 
 const props = defineProps<{
   questionId: number
@@ -89,14 +90,6 @@ function eventPayloadText(event: AgentEventRecord): string {
     if (obj.text) return String(obj.text)
     if (obj.message) return String(obj.message)
     return JSON.stringify(event.payload, null, 2)
-  } catch {
-    return ''
-  }
-}
-
-function formatTime(iso: string): string {
-  try {
-    return new Date(iso).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
   } catch {
     return ''
   }

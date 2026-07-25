@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { CircleX, RefreshCw } from 'lucide-vue-next'
+import { CircleX, RefreshCw, RotateCcw, Trash2 } from 'lucide-vue-next'
 import { useAsyncTaskStore } from '../../stores/asyncTask'
+import { formatTime } from '../../utils/format'
 import type { TaskKind, TaskStatus } from '../../types/asyncTask'
 
 const store = useAsyncTaskStore()
@@ -61,17 +62,6 @@ function onFilterStatusChange() {
   store.setFilterStatus(filterStatus.value)
 }
 
-function formatTime(value?: string | null) {
-  if (!value) return '--'
-  try {
-    const date = new Date(value)
-    const pad = (n: number) => String(n).padStart(2, '0')
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
-  } catch {
-    return value
-  }
-}
-
 function formatDuration(startedAt?: string | null, finishedAt?: string | null) {
   if (!startedAt) return '--'
   const start = new Date(startedAt).getTime()
@@ -92,6 +82,10 @@ function isCancellable(status: TaskStatus) {
   return status === 'QUEUED' || status === 'RUNNING'
 }
 
+function isRetryable(status: TaskStatus) {
+  return status === 'FAILED' || status === 'CANCELLED'
+}
+
 async function handleCancel(taskId: number) {
   try {
     await ElMessageBox.confirm('确定要取消该任务吗？运行中的任务将被中断。', '取消任务', {
@@ -102,7 +96,43 @@ async function handleCancel(taskId: number) {
     await store.cancelTask(taskId)
     ElMessage.success('任务已取消')
   } catch {
-    // 用户点击了返回，不做任何操作
+    // 用户点击了返回
+  }
+}
+
+async function handleRetry(taskId: number) {
+  try {
+    await ElMessageBox.confirm('确定要重试该任务吗？', '重试任务', {
+      confirmButtonText: '确定重试',
+      cancelButtonText: '返回',
+      type: 'info',
+    })
+    await store.retryTask(taskId)
+    ElMessage.success('任务已重新提交')
+  } catch {
+    // 用户点击了返回
+  }
+}
+
+async function handleCleanup() {
+  try {
+    await ElMessageBox.confirm(
+      '将超过 24 小时仍在排队或运行状态的任务标记为失败。确定清理？',
+      '清理僵尸任务',
+      {
+        confirmButtonText: '确定清理',
+        cancelButtonText: '返回',
+        type: 'warning',
+      },
+    )
+    const cleaned = await store.cleanupStaleTasks(24)
+    if (cleaned > 0) {
+      ElMessage.success(`已清理 ${cleaned} 个僵尸任务`)
+    } else {
+      ElMessage.info('没有需要清理的僵尸任务')
+    }
+  } catch {
+    // 用户点击了返回
   }
 }
 
@@ -149,9 +179,13 @@ onUnmounted(() => {
         <p class="kicker">任务管理</p>
         <h2>查看和管理所有异步任务的执行状态与进度</h2>
       </div>
-      <div style="display:flex;gap:8px;">
-        <el-button circle :loading="store.loading" title="刷新" @click="store.refresh">
-          <RefreshCw :size="16" :stroke-width="1.8" />
+      <div class="section-actions">
+        <el-button :loading="store.loading" title="清理僵尸任务" @click="handleCleanup">
+          <Trash2 :size="16" :stroke-width="1.8" />
+          清理僵尸任务
+        </el-button>
+        <el-button circle :loading="store.loading" title="刷新" aria-label="刷新" @click="store.refresh">
+          <RefreshCw aria-hidden="true" :size="16" :stroke-width="1.8" />
         </el-button>
       </div>
     </div>
@@ -191,7 +225,7 @@ onUnmounted(() => {
       </el-select>
     </div>
 
-    <el-alert v-if="store.error" type="error" :title="store.error" show-icon :closable="false" style="margin-bottom:12px;" />
+    <el-alert v-if="store.error" type="error" :title="store.error" show-icon :closable="false" />
 
     <el-table
       v-loading="store.loading"
@@ -238,9 +272,11 @@ onUnmounted(() => {
           <span v-else class="task-progress-unknown">--</span>
         </template>
       </el-table-column>
-      <el-table-column label="业务 ID" width="100">
+      <el-table-column label="关联对象" min-width="140">
         <template #default="{ row }">
-          {{ row.businessId ?? '--' }}
+          <span v-if="row.businessLabel">{{ row.businessLabel }}</span>
+          <span v-else-if="row.businessId" class="task-progress-unknown">ID: {{ row.businessId }}</span>
+          <span v-else class="task-progress-unknown">--</span>
         </template>
       </el-table-column>
       <el-table-column label="提交时间" width="170">
@@ -253,20 +289,34 @@ onUnmounted(() => {
           {{ formatDuration(row.startedAt, row.finishedAt) }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="100" fixed="right">
+      <el-table-column label="操作" width="120" fixed="right">
         <template #default="{ row }">
-          <el-tooltip v-if="isCancellable(row.status)" content="取消任务" placement="top" :show-after="300">
-            <el-button
-              size="small"
-              circle
-              type="danger"
-              :loading="store.cancellingIds.has(row.id)"
-              aria-label="取消任务"
-              @click="handleCancel(row.id)"
-            >
-              <CircleX :size="15" :stroke-width="1.8" />
-            </el-button>
-          </el-tooltip>
+          <div class="table-actions">
+            <el-tooltip v-if="isCancellable(row.status)" content="取消任务" placement="top" :show-after="300">
+              <el-button
+                size="small"
+                circle
+                type="danger"
+                :loading="store.cancellingIds.has(row.id)"
+                aria-label="取消任务"
+                @click="handleCancel(row.id)"
+              >
+                <CircleX :size="15" :stroke-width="1.8" />
+              </el-button>
+            </el-tooltip>
+            <el-tooltip v-if="isRetryable(row.status)" content="重试任务" placement="top" :show-after="300">
+              <el-button
+                size="small"
+                circle
+                type="primary"
+                :loading="store.cancellingIds.has(row.id)"
+                aria-label="重试任务"
+                @click="handleRetry(row.id)"
+              >
+                <RotateCcw :size="15" :stroke-width="1.8" />
+              </el-button>
+            </el-tooltip>
+          </div>
         </template>
       </el-table-column>
     </el-table>

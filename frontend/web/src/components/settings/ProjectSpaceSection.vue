@@ -17,6 +17,7 @@ import { useProjectSpaceStore } from '../../stores/projectSpace'
 import { useRepositoryStore } from '../../stores/repository'
 import { useDraftAutoSave } from '../../composables/useDraftAutoSave'
 import { useChangeHistory } from '../../composables/useChangeHistory'
+import { formatTime } from '../../utils/format'
 import type { RepositoryBranch } from '../../types/repository'
 
 const props = withDefaults(defineProps<{
@@ -96,17 +97,6 @@ const filteredSpaces = computed(() => {
       projectSpaceStore.statusLabel(space.status).includes(q)
   )
 })
-
-function formatTime(iso?: string | null): string {
-  if (!iso) return '未索引'
-  try {
-    const d = new Date(iso)
-    const pad = (n: number) => String(n).padStart(2, '0')
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
-  } catch {
-    return iso
-  }
-}
 
 function suggestedCopyName(name: string) {
   const base = `${name}-copy`
@@ -406,7 +396,7 @@ function handleReset() {
         <span>{{ isDeriveMode ? '来源项目' : '基于当前项目' }}</span>
         <strong>{{ selectedProject.name }}</strong>
       </div>
-      <el-tag type="info">{{ projectSpaceStore.form.memberBranches.length }} 个仓库参与分析</el-tag>
+      <el-tag type="info" size="small">{{ projectSpaceStore.form.memberBranches.length }} 个仓库参与分析</el-tag>
     </div>
 
     <template v-if="selectedProject">
@@ -450,8 +440,8 @@ function handleReset() {
       <h3 class="config-group-title">仓库分支</h3>
       <p class="config-group-desc">{{ selectedProjectMemberText }}</p>
       <el-table class="workspace-table" :data="projectSpaceStore.form.memberBranches" empty-text="选择项目后自动生成仓库分支" max-height="360">
-        <el-table-column prop="repositoryName" label="仓库" min-width="140" />
-        <el-table-column label="目录别名" min-width="140">
+        <el-table-column prop="repositoryName" label="仓库" min-width="140" show-overflow-tooltip />
+        <el-table-column label="目录别名" min-width="140" show-overflow-tooltip>
           <template #default="{ row }">
             <span>{{ row.alias }}</span>
           </template>
@@ -535,11 +525,11 @@ function handleReset() {
 
   <!-- 已有空间管理 -->
   <section v-if="!isDeriveMode" class="surface-panel settings-block existing-space-panel config-section">
-    <div class="existing-space-header" @click="showExistingSpaces = !showExistingSpaces">
-      <span>
-        <span class="kicker">已有分析空间</span>
-        <strong>查看已创建空间和维护操作</strong>
-      </span>
+    <div class="section-heading existing-space-header" @click="showExistingSpaces = !showExistingSpaces">
+      <div>
+        <p class="kicker">已有分析空间</p>
+        <h2>查看已创建空间和维护操作</h2>
+      </div>
       <span class="existing-space-count">{{ filteredSpaces.length }} 个空间</span>
     </div>
 
@@ -557,82 +547,85 @@ function handleReset() {
     </div>
 
     <el-table v-loading="projectSpaceStore.loading" :data="filteredSpaces" empty-text="暂无项目空间" max-height="400">
-      <el-table-column prop="name" label="空间" min-width="160" />
-      <el-table-column v-if="!projectId" prop="project" label="项目" min-width="140" />
+      <el-table-column prop="name" label="空间" min-width="160" show-overflow-tooltip />
+      <el-table-column v-if="!projectId" prop="project" label="项目" min-width="140" show-overflow-tooltip />
       <el-table-column label="状态" width="130">
         <template #default="{ row }">
-          <el-tag :type="projectSpaceStore.statusType(row.status)">{{ projectSpaceStore.statusLabel(row.status) }}</el-tag>
+          <el-tag size="small" :type="projectSpaceStore.statusType(row.status)">{{ projectSpaceStore.statusLabel(row.status) }}</el-tag>
           <div v-if="projectSpaceStore.indexingId === row.id && projectSpaceStore.indexProgress">
             <el-progress :percentage="projectSpaceStore.indexProgress.percent" :stroke-width="4" />
             <span class="index-progress-mini">{{ projectSpaceStore.indexProgress.message }}</span>
           </div>
         </template>
       </el-table-column>
-      <el-table-column prop="lastIndexedAt" label="最近索引" min-width="170">
+      <el-table-column label="最近索引" min-width="170">
         <template #default="{ row }">
-          {{ formatTime(row.lastIndexedAt) }}
+          {{ formatTime(row.lastIndexedAt, '未索引') }}
         </template>
       </el-table-column>
       <el-table-column label="操作" width="232" fixed="right">
         <template #default="{ row }">
           <div class="table-actions">
-            <el-button
-              v-if="row.status === 'READY'"
-              size="small"
-              circle
-              type="primary"
-              title="进入提问"
-              aria-label="进入提问"
-              @click="openSpace(row.id)"
-            >
-              <MessageSquare aria-hidden="true" :size="15" :stroke-width="1.8" />
-            </el-button>
-            <el-button
-              v-if="row.status !== 'READY'"
-              size="small"
-              circle
-              type="primary"
-              :loading="projectSpaceStore.preparingId === row.id || projectSpaceStore.indexingId === row.id"
-              :disabled="row.status === 'PREPARING' || row.status === 'INDEXING'"
-              title="准备并索引"
-              aria-label="准备并索引"
-              @click="prepareAndIndexSpace(row.id)"
-            >
-              <DatabaseZap aria-hidden="true" :size="15" :stroke-width="1.8" />
-            </el-button>
-            <el-button
-              size="small"
-              circle
-              :loading="projectSpaceStore.refreshingId === row.id"
-              :disabled="row.status === 'PREPARING' || row.status === 'INDEXING'"
-              title="刷新状态"
-              aria-label="刷新状态"
-              @click="refreshSpace(row.id)"
-            >
-              <RefreshCw aria-hidden="true" :size="15" :stroke-width="1.8" />
-            </el-button>
-            <el-button
-              size="small"
-              circle
-              title="查看成员"
-              aria-label="查看成员"
-              @click="selectSpace(row.id)"
-            >
-              <Eye aria-hidden="true" :size="15" :stroke-width="1.8" />
-            </el-button>
-            <el-button
-              size="small"
-              circle
-              type="danger"
-              plain
-              :loading="projectSpaceStore.deletingId === row.id"
-              :disabled="row.status === 'PREPARING' || row.status === 'INDEXING'"
-              title="删除空间"
-              aria-label="删除空间"
-              @click="deleteSpace(row.id)"
-            >
-              <Trash2 aria-hidden="true" :size="15" :stroke-width="1.8" />
-            </el-button>
+            <el-tooltip v-if="row.status === 'READY'" content="进入提问" placement="top" :show-after="300">
+              <el-button
+                size="small"
+                circle
+                type="primary"
+                aria-label="进入提问"
+                @click="openSpace(row.id)"
+              >
+                <MessageSquare aria-hidden="true" :size="15" :stroke-width="1.8" />
+              </el-button>
+            </el-tooltip>
+            <el-tooltip v-if="row.status !== 'READY'" content="准备并索引" placement="top" :show-after="300">
+              <el-button
+                size="small"
+                circle
+                type="primary"
+                :loading="projectSpaceStore.preparingId === row.id || projectSpaceStore.indexingId === row.id"
+                :disabled="row.status === 'PREPARING' || row.status === 'INDEXING'"
+                aria-label="准备并索引"
+                @click="prepareAndIndexSpace(row.id)"
+              >
+                <DatabaseZap aria-hidden="true" :size="15" :stroke-width="1.8" />
+              </el-button>
+            </el-tooltip>
+            <el-tooltip content="刷新状态" placement="top" :show-after="300">
+              <el-button
+                size="small"
+                circle
+                :loading="projectSpaceStore.refreshingId === row.id"
+                :disabled="row.status === 'PREPARING' || row.status === 'INDEXING'"
+                aria-label="刷新状态"
+                @click="refreshSpace(row.id)"
+              >
+                <RefreshCw aria-hidden="true" :size="15" :stroke-width="1.8" />
+              </el-button>
+            </el-tooltip>
+            <el-tooltip content="查看成员" placement="top" :show-after="300">
+              <el-button
+                size="small"
+                circle
+                aria-label="查看成员"
+                @click="selectSpace(row.id)"
+              >
+                <Eye aria-hidden="true" :size="15" :stroke-width="1.8" />
+              </el-button>
+            </el-tooltip>
+            <el-tooltip content="删除空间" placement="top" :show-after="300">
+              <el-button
+                size="small"
+                circle
+                type="danger"
+                plain
+                :loading="projectSpaceStore.deletingId === row.id"
+                :disabled="row.status === 'PREPARING' || row.status === 'INDEXING'"
+                aria-label="删除空间"
+                @click="deleteSpace(row.id)"
+              >
+                <Trash2 aria-hidden="true" :size="15" :stroke-width="1.8" />
+              </el-button>
+            </el-tooltip>
           </div>
         </template>
       </el-table-column>
@@ -665,9 +658,9 @@ function handleReset() {
           </div>
         </template>
       </el-table-column>
-      <el-table-column prop="repositoryName" label="仓库" min-width="140" />
-      <el-table-column prop="alias" label="目录别名" min-width="140" />
-      <el-table-column prop="branchName" label="真实分支" min-width="160" />
+      <el-table-column prop="repositoryName" label="仓库" min-width="140" show-overflow-tooltip />
+      <el-table-column prop="alias" label="目录别名" min-width="140" show-overflow-tooltip />
+      <el-table-column prop="branchName" label="真实分支" min-width="160" show-overflow-tooltip />
       <el-table-column prop="commitMessage" label="当前 Commit Message" min-width="220">
         <template #default="{ row }">
           <el-tooltip v-if="row.commitMessage" :content="row.commitSha ?? ''" placement="top">
@@ -698,19 +691,9 @@ function handleReset() {
   color: var(--muted);
 }
 
-.config-field {
-  display: grid;
-  gap: var(--spacing-1);
-}
-
-.required-star {
-  color: var(--danger, #dc2626);
-  font-weight: 700;
-}
-
 .member-commit-history {
   padding: var(--spacing-3) var(--spacing-4);
-  background: var(--surface-muted);
+  background: var(--surface-soft);
 }
 
 .member-commit-history strong {
@@ -730,13 +713,6 @@ function handleReset() {
   display: grid;
   grid-template-columns: 72px minmax(160px, 1fr);
   gap: var(--spacing-2);
-}
-
-.field-error {
-  margin: 2px 0 0;
-  color: var(--danger, #dc2626);
-  font-size: 12px;
-  line-height: 1.4;
 }
 
 .branch-option {
@@ -769,10 +745,6 @@ function handleReset() {
 
 .branch-meta.muted {
   justify-content: space-between;
-}
-
-.config-search-bar {
-  margin-bottom: var(--spacing-4);
 }
 
 .index-progress-mini {
@@ -815,18 +787,7 @@ function handleReset() {
 }
 
 .existing-space-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--spacing-4);
-  padding: var(--spacing-5);
   cursor: pointer;
-}
-
-.existing-space-header strong {
-  display: block;
-  margin-top: 4px;
-  font-size: var(--font-size-xl);
 }
 
 .existing-space-count {
@@ -837,13 +798,6 @@ function handleReset() {
 
 .existing-space-panel .el-table {
   border-top: 1px solid var(--stroke);
-}
-
-.config-section {
-  border-radius: var(--radius-xl);
-  transition:
-    border-color var(--transition-normal),
-    box-shadow var(--transition-normal);
 }
 
 @media (max-width: 900px) {

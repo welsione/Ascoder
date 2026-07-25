@@ -4,6 +4,7 @@ import cn.welsione.ascoder.common.FileUtil;
 import cn.welsione.ascoder.common.task.TaskDefinition;
 import cn.welsione.ascoder.common.task.TaskKind;
 import cn.welsione.ascoder.common.task.TaskProgress;
+import cn.welsione.ascoder.common.task.TaskContextSerializer;
 import cn.welsione.ascoder.repository.projectspace.ProjectSpace;
 import cn.welsione.ascoder.repository.projectspace.ProjectSpaceJpaRepository;
 import cn.welsione.ascoder.repository.projectspace.ProjectSpaceMember;
@@ -11,7 +12,6 @@ import cn.welsione.ascoder.repository.projectspace.ProjectSpaceMemberJpaReposito
 import cn.welsione.ascoder.repository.workspace.BranchWorkspace;
 import cn.welsione.ascoder.repository.workspace.BranchWorkspaceService;
 import cn.welsione.ascoder.repository.workspace.CreateBranchWorkspaceRequest;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,20 +24,17 @@ import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.Date;
 import java.util.List;
-import java.util.Map;
 
 /**
  * 项目空间准备异步任务定义，负责为项目空间的所有成员仓库执行 clone/fetch/checkout 并创建符号链接。
  *
- * <p>上下文仅包含 projectSpaceId 字段。执行过程中逐个准备成员仓库，
+ * <p>上下文为 {@link ProjectSpacePrepareContext}，仅携带 projectSpaceId。执行过程中逐个准备成员仓库，
  * 每完成一个成员更新进度百分比。成功后更新实体状态为 READY_TO_INDEX。</p>
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class ProjectSpacePrepareTaskDefinition implements TaskDefinition<Map<String, String>> {
-
-    private static final TypeReference<Map<String, String>> CONTEXT_TYPE = new TypeReference<>() {};
+public class ProjectSpacePrepareTaskDefinition implements TaskDefinition<ProjectSpacePrepareContext> {
 
     private final ProjectSpaceJpaRepository projectSpaceJpaRepository;
     private final ProjectSpaceMemberJpaRepository memberJpaRepository;
@@ -57,8 +54,20 @@ public class ProjectSpacePrepareTaskDefinition implements TaskDefinition<Map<Str
     }
 
     @Override
-    public void execute(Map<String, String> context, TaskProgress progress) throws Exception {
-        Long projectSpaceId = Long.valueOf(context.get("projectSpaceId"));
+    public long defaultTimeoutMs() {
+        return 120 * 60 * 1000L; // 2 小时（多成员仓库逐个准备）
+    }
+
+    @Override
+    public String resolveBusinessLabel(Long businessId) {
+        return projectSpaceJpaRepository.findById(businessId)
+                .map(space -> space.getName() + " (项目空间)")
+                .orElse(null);
+    }
+
+    @Override
+    public void execute(ProjectSpacePrepareContext context, TaskProgress progress) throws Exception {
+        Long projectSpaceId = context.getProjectSpaceId();
 
         log.info("开始项目空间准备任务，projectSpaceId={}", projectSpaceId);
 
@@ -197,21 +206,13 @@ public class ProjectSpacePrepareTaskDefinition implements TaskDefinition<Map<Str
     }
 
     @Override
-    public String serializeContext(Map<String, String> context) {
-        try {
-            return objectMapper.writeValueAsString(context);
-        } catch (Exception e) {
-            throw new IllegalStateException("序列化项目空间准备任务上下文失败", e);
-        }
+    public String serializeContext(ProjectSpacePrepareContext context) {
+        return TaskContextSerializer.serialize(objectMapper, context, "项目空间准备");
     }
 
     @Override
-    public Map<String, String> deserializeContext(String json) {
-        try {
-            return objectMapper.readValue(json, CONTEXT_TYPE);
-        } catch (Exception e) {
-            throw new IllegalStateException("反序列化项目空间准备任务上下文失败", e);
-        }
+    public ProjectSpacePrepareContext deserializeContext(String json) {
+        return TaskContextSerializer.deserialize(objectMapper, json, ProjectSpacePrepareContext.class, "项目空间准备");
     }
 
     /** 准备任务快照，携带项目空间 ID、根路径和成员列表。 */

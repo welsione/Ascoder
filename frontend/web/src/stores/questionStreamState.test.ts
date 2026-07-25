@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import type { StreamEvent } from '../services/questionApi'
 import type { QuestionRecord } from '../types/question'
 import {
-  applyQuestionStreamEvent,
-  createInitialQuestionStreamState,
+  applyStreamEvent,
+  createInitialState,
   resetLiveStreamState,
   sortedStreamingAgents,
 } from './questionStreamState'
@@ -18,11 +18,11 @@ describe('questionStreamState', () => {
   }
 
   it('adds created question and returns conversation side effects', () => {
-    const state = createInitialQuestionStreamState()
+    const state = createInitialState()
     const questions: QuestionRecord[] = []
     const record = question({ id: 17, conversationId: 23 })
 
-    const result = applyQuestionStreamEvent({ type: 'created', data: record }, questions, state, context)
+    const result = applyStreamEvent({ type: 'created', data: record }, questions, state, context)
 
     expect(questions).toEqual([record])
     expect(result).toEqual({
@@ -33,12 +33,12 @@ describe('questionStreamState', () => {
   })
 
   it('tracks orchestrator summary and result content', () => {
-    const state = createInitialQuestionStreamState()
+    const state = createInitialState()
     const questions: QuestionRecord[] = []
 
-    applyQuestionStreamEvent(contentEvent('summary', '第一步', true), questions, state, context)
-    applyQuestionStreamEvent(contentEvent('summary', '，继续', false), questions, state, context)
-    applyQuestionStreamEvent(contentEvent('result', '最终答案', false), questions, state, context)
+    applyStreamEvent(contentEvent('summary', '第一步', true), questions, state, context)
+    applyStreamEvent(contentEvent('summary', '，继续', false), questions, state, context)
+    applyStreamEvent(contentEvent('result', '最终答案', false), questions, state, context)
 
     expect(state.streamingContent).toBe('最终答案')
     expect(state.streamingAgents.orchestrator.reasoning).toBe('第一步，继续')
@@ -46,10 +46,10 @@ describe('questionStreamState', () => {
   })
 
   it('tracks tool events on the source agent and global stream list', () => {
-    const state = createInitialQuestionStreamState()
+    const state = createInitialState()
     const questions: QuestionRecord[] = []
 
-    applyQuestionStreamEvent({
+    applyStreamEvent({
       type: 'tool_call',
       data: {
         agentId: 'code-researcher',
@@ -61,7 +61,7 @@ describe('questionStreamState', () => {
         last: false,
       },
     }, questions, state, context)
-    applyQuestionStreamEvent({
+    applyStreamEvent({
       type: 'tool_result',
       data: {
         agentId: 'code-researcher',
@@ -82,10 +82,10 @@ describe('questionStreamState', () => {
   })
 
   it('tracks handoff events as explicit agent collaboration signals', () => {
-    const state = createInitialQuestionStreamState()
+    const state = createInitialState()
     const questions: QuestionRecord[] = []
 
-    applyQuestionStreamEvent({
+    applyStreamEvent({
       type: 'handoff',
       data: {
         agentId: 'orchestrator',
@@ -119,10 +119,10 @@ describe('questionStreamState', () => {
   })
 
   it('keeps skipped handoffs out of active agent list', () => {
-    const state = createInitialQuestionStreamState()
+    const state = createInitialState()
     const questions: QuestionRecord[] = []
 
-    applyQuestionStreamEvent({
+    applyStreamEvent({
       type: 'handoff',
       data: {
         agentId: 'orchestrator',
@@ -150,12 +150,12 @@ describe('questionStreamState', () => {
   })
 
   it('updates matching question on complete and stops streaming', () => {
-    const state = createInitialQuestionStreamState()
+    const state = createInitialState()
     state.streaming = true
     state.streamingStatus = '正在分析'
     const questions = [question({ id: 17, status: 'RUNNING' })]
 
-    applyQuestionStreamEvent({
+    applyStreamEvent({
       type: 'complete',
       data: {
         status: 'SUCCEEDED',
@@ -183,10 +183,10 @@ describe('questionStreamState', () => {
   })
 
   it('records retry context and localized error on stream error', () => {
-    const state = createInitialQuestionStreamState()
+    const state = createInitialState()
     state.streaming = true
 
-    applyQuestionStreamEvent({
+    applyStreamEvent({
       type: 'error',
       data: {
         status: 'FAILED',
@@ -201,7 +201,7 @@ describe('questionStreamState', () => {
   })
 
   it('resets live-only state without clearing error or retry context', () => {
-    const state = createInitialQuestionStreamState()
+    const state = createInitialState()
     state.streamingContent = 'answer'
     state.streamingStatus = 'running'
     state.streamingToolEvents = [{ type: 'call', name: 'x', content: '{}' }]
@@ -241,7 +241,7 @@ describe('questionStreamState', () => {
   })
 
   it('sorts agents by depth then display name', () => {
-    const state = createInitialQuestionStreamState()
+    const state = createInitialState()
     state.streamingAgents = {
       b: agent('b', 'Beta', 1, '思考中'),
       a: agent('a', 'Alpha', 1, '思考中'),
@@ -253,7 +253,7 @@ describe('questionStreamState', () => {
   })
 
   it('filters agents that have not produced activity yet', () => {
-    const state = createInitialQuestionStreamState()
+    const state = createInitialState()
     state.streamingAgents = {
       quiet: agent('quiet', 'Quiet', 1),
       active: agent('active', 'Active', 1, '分析中'),

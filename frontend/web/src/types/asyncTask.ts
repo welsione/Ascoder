@@ -18,6 +18,8 @@ export type AsyncTask = {
   kind: TaskKind
   status: TaskStatus
   businessId: number | null
+  /** businessId 的可读标签，如 "ascoder (仓库)"。 */
+  businessLabel: string | null
   progress: number
   statusMessage: string | null
   errorMessage: string | null

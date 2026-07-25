@@ -39,11 +39,6 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.CONFLICT, ex.getErrorCode(), ex.getMessage());
     }
 
-    @ExceptionHandler(cn.welsione.ascoder.selflearning.SelfLearningInsightException.class)
-    public ResponseEntity<Map<String, Object>> handleSelfLearningInsightError(cn.welsione.ascoder.selflearning.SelfLearningInsightException ex) {
-        return buildResponse(HttpStatus.UNPROCESSABLE_ENTITY, "INSIGHT_ERROR", ex.getMessage());
-    }
-
     @ExceptionHandler(DuplicateException.class)
     public ResponseEntity<Map<String, Object>> handleDuplicate(DuplicateException ex) {
         return buildResponse(HttpStatus.CONFLICT, ex.getErrorCode(), ex.getMessage());
@@ -68,6 +63,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(TaskAlreadyRunningException.class)
     public ResponseEntity<Map<String, Object>> handleTaskAlreadyRunning(TaskAlreadyRunningException ex) {
         return buildResponse(HttpStatus.CONFLICT, ex.getErrorCode(), ex.getMessage());
+    }
+
+    /**
+     * 兜底处理未明确映射的领域异常，避免遗漏时降级为 500。
+     * 各 DomainException 子类应优先由上述具体处理器映射到语义化状态码。
+     */
+    @ExceptionHandler(DomainException.class)
+    public ResponseEntity<Map<String, Object>> handleDomainException(DomainException ex) {
+        log.warn("未映射的领域异常，降级为 400：{} ({})", ex.getErrorCode(), ex.getMessage());
+        return buildResponse(HttpStatus.BAD_REQUEST, ex.getErrorCode(), ex.getMessage());
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
@@ -149,7 +154,7 @@ public class GlobalExceptionHandler {
         }
     }
 
-    private ResponseEntity<Map<String, Object>> buildResponse(HttpStatus status, String code, String message) {
+    public static ResponseEntity<Map<String, Object>> buildResponse(HttpStatus status, String code, String message) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("timestamp", Instant.now().toString());
         body.put("status", status.value());

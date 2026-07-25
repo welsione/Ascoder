@@ -74,7 +74,8 @@ public class RepositoryController {
     }
 
     @PostMapping("/{id}/branches/refresh")
-    public List<RepositoryBranchResponse> refreshBranches(@PathVariable Long id) {
-        return repositoryBranchService.refresh(id).stream().map(RepositoryBranchResponse::from).toList();
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public void refreshBranches(@PathVariable Long id) {
+        repositoryService.refreshBranches(id);
     }
 }

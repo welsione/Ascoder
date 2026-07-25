@@ -7,6 +7,7 @@ import { useProjectStore } from '../../stores/project'
 import { useProjectSpaceStore } from '../../stores/projectSpace'
 import ChatHistoryItem from './HistoryItem.vue'
 import logoUrl from '../../images/logo.svg'
+import { formatTime } from '../../utils/format'
 
 const route = useRoute()
 const router = useRouter()
@@ -65,7 +66,7 @@ function isGroupExpanded(conversationId: number) {
   return expandedGroups.value[conversationId] ?? false
 }
 
-function formatTime(dateStr: string) {
+function relativeTime(dateStr: string) {
   const d = new Date(dateStr)
   const now = new Date()
   const diff = now.getTime() - d.getTime()
@@ -114,15 +115,8 @@ function shortSha(sha?: string | null) {
   return sha ? sha.slice(0, 7) : '未准备'
 }
 
-function formatCommitTime(dateStr?: string | null) {
-  if (!dateStr) return ''
-  return new Date(dateStr).toLocaleString('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
+
+
 
 const searchKeyword = ref('')
 
@@ -250,7 +244,7 @@ function exportChat() {
                 <code>{{ shortSha(member.commitSha) }}</code>
                 <span>{{ member.commitMessage || '暂无 Commit Message' }}</span>
               </div>
-              <time v-if="member.recentCommits?.[0]?.committedAt">{{ formatCommitTime(member.recentCommits[0].committedAt) }}</time>
+              <time v-if="member.recentCommits?.[0]?.committedAt">{{ formatTime(member.recentCommits[0].committedAt, '') }}</time>
             </div>
           </div>
         </div>
@@ -293,7 +287,7 @@ function exportChat() {
                   <div class="card-meta">
                     <span class="card-count">{{ group.questionCount }} 轮</span>
                     <span class="card-dot">·</span>
-                    <span class="card-time">{{ formatTime(group.lastActiveAt) }}</span>
+                    <span class="card-time">{{ relativeTime(group.lastActiveAt) }}</span>
                   </div>
                 </div>
                 <button

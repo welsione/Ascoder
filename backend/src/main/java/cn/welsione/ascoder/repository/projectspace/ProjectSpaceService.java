@@ -3,6 +3,8 @@ package cn.welsione.ascoder.repository.projectspace;
 import cn.welsione.ascoder.repository.workspace.BranchWorkspace;
 import cn.welsione.ascoder.repository.workspace.BranchWorkspaceService;
 import cn.welsione.ascoder.codegraph.infrastructure.cli.IndexProgressTracker;
+import cn.welsione.ascoder.codegraph.task.CodeGraphIndexContext;
+import cn.welsione.ascoder.codegraph.task.CodeGraphSyncContext;
 import cn.welsione.ascoder.common.FileUtil;
 import cn.welsione.ascoder.common.exception.DuplicateException;
 import cn.welsione.ascoder.common.exception.InvalidStateException;
@@ -12,6 +14,7 @@ import cn.welsione.ascoder.common.task.TaskKind;
 import cn.welsione.ascoder.common.task.TaskSubmitRequest;
 import cn.welsione.ascoder.question.application.QuestionRunningGuard;
 import cn.welsione.ascoder.repository.CodeRepository;
+import cn.welsione.ascoder.repository.GitSyncOperation;
 import cn.welsione.ascoder.repository.RepositoryBranch;
 import cn.welsione.ascoder.repository.RepositoryBranchService;
 import cn.welsione.ascoder.repository.project.Project;
@@ -20,22 +23,30 @@ import cn.welsione.ascoder.repository.project.ProjectService;
 import cn.welsione.ascoder.repository.git.GitCommitInfo;
 import cn.welsione.ascoder.repository.git.GitCredentialStore;
 import cn.welsione.ascoder.repository.git.GitRepositoryService;
+import cn.welsione.ascoder.repository.task.GitFetchContext;
+import cn.welsione.ascoder.repository.projectspace.task.ProjectSpacePrepareContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.event.EventListener;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import jakarta.annotation.PreDestroy;
+
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -122,9 +133,8 @@ public class ProjectSpaceService {
     public ProjectSpace prepare(Long id) {
         ProjectSpacePrepareSnapshot snapshot = beginPrepare(id);
 
-        Map<String, String> context = new LinkedHashMap<>();
-        context.put("projectSpaceId", id.toString());
-        TaskSubmitRequest<Map<String, String>> request = new TaskSubmitRequest<>();
+        ProjectSpacePrepareContext context = new ProjectSpacePrepareContext(id);
+        TaskSubmitRequest<ProjectSpacePrepareContext> request = new TaskSubmitRequest<>();
         request.setKind(TaskKind.PROJECT_SPACE_PREPARE);
         request.setContext(context);
         request.setBusinessId(id);
@@ -139,15 +149,9 @@ public class ProjectSpaceService {
         boolean previouslyIndexed = snapshot.isPreviouslyIndexed();
 
         TaskKind kind = previouslyIndexed ? TaskKind.CODEGRAPH_SYNC : TaskKind.CODEGRAPH_INDEX;
-        Map<String, String> context = new LinkedHashMap<>();
-        context.put("repositoryPath", snapshot.getRootPath().toString());
-        context.put("projectSpaceId", id.toString());
-        if (!previouslyIndexed) {
-            context.put("codegraphIndexPath", snapshot.getCodegraphIndexPath().toString());
-        }
-        TaskSubmitRequest<Map<String, String>> request = new TaskSubmitRequest<>();
-        request.setKind(kind);
-        request.setContext(context);
+        TaskSubmitRequest<?> request = previouslyIndexed
+                ? buildSyncRequest(id, snapshot)
+                : buildIndexRequest(id, snapshot, false);
         request.setBusinessId(id);
         taskEngine.submit(request);
         log.info("已提交 CodeGraph {} 异步任务，projectSpaceId={}",
@@ -166,19 +170,33 @@ public class ProjectSpaceService {
     public ProjectSpace reindex(Long id) {
         ProjectSpaceIndexSnapshot snapshot = beginIndex(id, true);
 
-        Map<String, String> context = new LinkedHashMap<>();
-        context.put("repositoryPath", snapshot.getRootPath().toString());
-        context.put("codegraphIndexPath", snapshot.getCodegraphIndexPath().toString());
-        context.put("projectSpaceId", id.toString());
-        context.put("isReindex", "true");
-        TaskSubmitRequest<Map<String, String>> request = new TaskSubmitRequest<>();
-        request.setKind(TaskKind.CODEGRAPH_INDEX);
-        request.setContext(context);
+        TaskSubmitRequest<CodeGraphIndexContext> request = buildIndexRequest(id, snapshot, true);
         request.setBusinessId(id);
         taskEngine.submit(request);
         log.info("已提交 CodeGraph 重新索引异步任务，projectSpaceId={}", id);
 
         return transactionTemplate.execute(status -> getEntity(id));
+    }
+
+    private TaskSubmitRequest<CodeGraphSyncContext> buildSyncRequest(Long id, ProjectSpaceIndexSnapshot snapshot) {
+        CodeGraphSyncContext context = new CodeGraphSyncContext(snapshot.getRootPath().toString(), id);
+        TaskSubmitRequest<CodeGraphSyncContext> request = new TaskSubmitRequest<>();
+        request.setKind(TaskKind.CODEGRAPH_SYNC);
+        request.setContext(context);
+        return request;
+    }
+
+    private TaskSubmitRequest<CodeGraphIndexContext> buildIndexRequest(
+            Long id, ProjectSpaceIndexSnapshot snapshot, boolean isReindex) {
+        CodeGraphIndexContext context = new CodeGraphIndexContext(
+                snapshot.getRootPath().toString(),
+                snapshot.getCodegraphIndexPath().toString(),
+                isReindex, id, null
+        );
+        TaskSubmitRequest<CodeGraphIndexContext> request = new TaskSubmitRequest<>();
+        request.setKind(TaskKind.CODEGRAPH_INDEX);
+        request.setContext(context);
+        return request;
     }
 
     @Transactional
@@ -211,30 +229,33 @@ public class ProjectSpaceService {
     }
 
     /**
-     * 拉取项目空间所有成员仓库的远端引用，并重新计算空间是否落后。
+     * 拉取项目空间所有成员仓库的远端引用。
+     *
+     * <p>提交异步 fetch 任务后立即返回，不等待 fetch 完成。
+     * fetch 完成后由 {@link cn.welsione.ascoder.repository.task.GitFetchTaskDefinition}
+     * 自动刷新关联的项目空间状态。用户可通过刷新按钮获取最新提交记录。</p>
      */
     public ProjectSpace pullRemote(Long id) {
         ensureNoRunningQuestions(id);
         upsertMemberCredentials(id);
 
-        List<CodeRepository> memberRepos = distinctMemberRepositories(id);
+        List<CodeRepository> memberRepos = distinctRepositories(id);
         for (CodeRepository repo : memberRepos) {
-            Map<String, String> context = new LinkedHashMap<>();
-            context.put("repositoryPath", repo.resolveLocalPath(repoRoot));
-            context.put("repositoryId", repo.getId().toString());
-            context.put("operation", "fetch");
-            context.put("authUsername", repo.getAuthUsername());
-            context.put("authPassword", repo.getAuthPassword());
-            context.put("remoteUrl", repo.getRemoteUrl());
-            TaskSubmitRequest<Map<String, String>> fetchRequest = new TaskSubmitRequest<>();
+            GitFetchContext context = new GitFetchContext(
+                    repo.resolveLocalPath(repoRoot),
+                    repo.getId(), GitSyncOperation.FETCH,
+                    repo.getAuthUsername(), repo.getAuthPassword(), repo.getRemoteUrl(),
+                    id
+            );
+            TaskSubmitRequest<GitFetchContext> fetchRequest = new TaskSubmitRequest<>();
             fetchRequest.setKind(TaskKind.GIT_FETCH);
             fetchRequest.setContext(context);
             fetchRequest.setBusinessId(repo.getId());
             taskEngine.submit(fetchRequest);
-            log.info("已提交 Git fetch 异步任务（pullRemote），repositoryId={}", repo.getId());
+            log.info("已提交 Git fetch 异步任务（pullRemote），repositoryId={}，projectSpaceId={}", repo.getId(), id);
         }
 
-        return refreshInTransaction(id);
+        return getEntity(id);
     }
 
     /**
@@ -402,7 +423,7 @@ public class ProjectSpaceService {
     /**
      * 获取项目空间中去重后的成员仓库列表。
      */
-    private List<CodeRepository> distinctMemberRepositories(Long id) {
+    private List<CodeRepository> distinctRepositories(Long id) {
         return transactionTemplate.execute(status -> memberRepository.findByProjectSpace_IdOrderByCreatedAtAsc(id)
                 .stream()
                 .map(ProjectSpaceMember::getRepository)
@@ -414,6 +435,50 @@ public class ProjectSpaceService {
 
     private ProjectSpace refreshInTransaction(Long id) {
         return transactionTemplate.execute(status -> refresh(id));
+    }
+
+    /** fetch 完成事件防抖延迟：等待该时间内无新 fetch 完成，再执行一次 refresh。 */
+    private static final long FETCH_COMPLETED_DEBOUNCE_MS = 2000;
+
+    private final ScheduledExecutorService fetchRefreshScheduler =
+            java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread t = new Thread(r, "project-space-fetch-refresh");
+                t.setDaemon(true);
+                return t;
+            });
+
+    /** 按 projectSpaceId 维护待执行的刷新任务，新事件到达时取消旧任务，实现防抖。 */
+    private final ConcurrentHashMap<Long, ScheduledFuture<?>> pendingRefreshBySpace = new ConcurrentHashMap<>();
+
+    /**
+     * 监听项目空间关联仓库 fetch 完成事件，防抖刷新项目空间状态。
+     *
+     * <p>项目空间拉取会为每个成员仓库提交独立的 fetch 任务，N 个任务完成会触发 N 次事件。
+     * 通过防抖（debounce）合并为最后一次事件后的单次 refresh，避免对每个成员重复执行 git 命令
+     * 读取远端 commit。fetch 完成后本地 git 数据已更新，此时刷新可正确读取最新的 commitSha 和提交记录。</p>
+     */
+    @EventListener
+    public void onFetchCompleted(ProjectSpaceFetchCompletedEvent event) {
+        Long projectSpaceId = event.getProjectSpaceId();
+        ScheduledFuture<?> existing = pendingRefreshBySpace.get(projectSpaceId);
+        if (existing != null) {
+            existing.cancel(false);
+        }
+        ScheduledFuture<?> future = fetchRefreshScheduler.schedule(() -> {
+            pendingRefreshBySpace.remove(projectSpaceId);
+            try {
+                refreshInTransaction(projectSpaceId);
+                log.info("fetch 完成后刷新项目空间，projectSpaceId={}", projectSpaceId);
+            } catch (Exception ex) {
+                log.warn("fetch 完成后刷新项目空间失败，projectSpaceId={}：{}", projectSpaceId, ex.getMessage());
+            }
+        }, FETCH_COMPLETED_DEBOUNCE_MS, TimeUnit.MILLISECONDS);
+        pendingRefreshBySpace.put(projectSpaceId, future);
+    }
+
+    @PreDestroy
+    void shutdownFetchRefreshScheduler() {
+        fetchRefreshScheduler.shutdownNow();
     }
 
     private void ensureNoRunningQuestions(Long projectSpaceId) {

@@ -20,6 +20,7 @@ import { useProjectSpaceStore } from '../stores/projectSpace'
 import { useQuestionStore } from '../stores/question'
 import type { QuestionRecord } from '../types/question'
 import type { ProjectSpaceStatus } from '../types/projectSpace'
+import { formatTime } from '../utils/format'
 
 const route = useRoute()
 const router = useRouter()
@@ -221,7 +222,7 @@ function openChatWorkspace() {
   router.push({ name: 'chat', query: { spaceId: String(space.value.id) } })
 }
 
-function formatHistoryTime(dateStr: string) {
+function relativeTime(dateStr: string) {
   const d = new Date(dateStr)
   const now = new Date()
   const diff = now.getTime() - d.getTime()
@@ -229,16 +230,6 @@ function formatHistoryTime(dateStr: string) {
   if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} 分钟前`
   if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} 小时前`
   return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
-}
-
-function formatCommitTime(dateStr: string | null) {
-  if (!dateStr) return ''
-  return new Date(dateStr).toLocaleString('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
 }
 
 function canIndexSpace(status: ProjectSpaceStatus) {
@@ -305,11 +296,8 @@ async function refreshSpace() {
 async function pullSpace() {
   if (!space.value) return
   const updated = await projectSpaceStore.pullRemote(space.value.id)
-  if (updated?.status === 'STALE' || staleMembers.value.length) {
-    questionStore.form.projectSpaceId = null
-    ElMessage.warning('已拉取远端代码，当前空间落后远端，请重新准备并索引')
-  } else if (updated) {
-    ElMessage.success('已拉取远端代码，当前空间为最新')
+  if (updated) {
+    ElMessage.info('拉取任务已提交，fetch 完成后请点击刷新按钮查看最新提交记录')
   }
 }
 
@@ -349,7 +337,7 @@ async function deleteSpace() {
             {{ project.description || '选择下方分析空间查看分支组合、索引状态和维护操作。' }}
           </p>
         </div>
-        <div class="project-detail-actions">
+        <div class="section-actions">
           <div class="project-command-metrics" aria-label="项目空间统计">
             <div class="project-command-metric">
               <span>分析空间</span>
@@ -431,7 +419,7 @@ async function deleteSpace() {
               </el-tag>
             </span>
             <span class="space-console-count">{{ questionCountOf(item.id) }}</span>
-            <span class="space-console-time">{{ formatCommitTime(item.updatedAt) }}</span>
+            <span class="space-console-time">{{ formatTime(item.updatedAt, '') }}</span>
             <span class="space-console-action">
               {{ item.status === 'READY' ? '进入聊天' : '查看维护' }}
               <span aria-hidden="true">→</span>
@@ -456,7 +444,7 @@ async function deleteSpace() {
               {{ space.status === 'READY' ? '空间已完成索引，可直接进入聊天工作台。' : '该分析空间需要准备代码并完成索引后才能提问。' }}
             </p>
           </div>
-          <div class="project-detail-actions">
+          <div class="section-actions">
             <el-tag :type="projectSpaceStore.statusType(space.status)">
               {{ projectSpaceStore.statusLabel(space.status) }}
             </el-tag>
@@ -515,12 +503,12 @@ async function deleteSpace() {
           <div class="selected-space-stat">
             <span>空间状态</span>
             <strong>{{ projectSpaceStore.statusLabel(space.status) }}</strong>
-            <em>{{ space.lastIndexedAt ? `上次索引 ${formatCommitTime(space.lastIndexedAt)}` : '尚未完成索引' }}</em>
+            <em>{{ space.lastIndexedAt ? `上次索引 ${formatTime(space.lastIndexedAt, '')}` : '尚未完成索引' }}</em>
           </div>
           <div class="selected-space-stat">
             <span>累计问答</span>
             <strong>{{ totalQuestionCount }}</strong>
-            <em>{{ latestConversation ? `最近 ${formatHistoryTime(latestConversation.lastActiveAt)}` : '暂无对话' }}</em>
+            <em>{{ latestConversation ? `最近 ${relativeTime(latestConversation.lastActiveAt)}` : '暂无对话' }}</em>
           </div>
           <div class="selected-space-stat">
             <span>仓库成员</span>
@@ -730,15 +718,15 @@ async function deleteSpace() {
                     <li v-for="commit in row.recentCommits" :key="commit.commitSha" class="commit-item">
                       <code>{{ commit.shortSha }}</code>
                       <span class="commit-message">{{ commit.commitMessage || '无 Commit Message' }}</span>
-                      <span class="commit-time">{{ formatCommitTime(commit.committedAt) }}</span>
+                      <span class="commit-time">{{ formatTime(commit.committedAt, '') }}</span>
                     </li>
                   </ol>
                   <p v-else class="commit-empty">暂无提交记录</p>
                 </div>
               </template>
             </el-table-column>
-            <el-table-column prop="repositoryName" label="仓库" min-width="140" />
-            <el-table-column prop="alias" label="目录别名" min-width="120" />
+            <el-table-column prop="repositoryName" label="仓库" min-width="140" show-overflow-tooltip />
+            <el-table-column prop="alias" label="目录别名" min-width="120" show-overflow-tooltip />
             <el-table-column prop="branchName" label="真实分支" min-width="170">
               <template #default="{ row }">
                 <div class="branch-cell">
@@ -1194,7 +1182,7 @@ async function deleteSpace() {
   }
 
   .project-command-metrics,
-  .project-detail-actions {
+  .section-actions {
     justify-content: flex-start;
   }
 }

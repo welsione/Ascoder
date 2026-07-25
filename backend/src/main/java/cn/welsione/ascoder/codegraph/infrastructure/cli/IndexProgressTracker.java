@@ -36,10 +36,17 @@ public class IndexProgressTracker {
 
     /**
      * 更新指定项目空间的索引进度。
+     *
+     * <p>当 percent < 0 时保留上一次的百分比，只更新消息文本。
+     * 这确保了无法提取百分比的输出行不会导致进度倒退。</p>
      */
     public void update(Long projectSpaceId, int percent, String message) {
-        progressMap.put(projectSpaceId, new IndexProgress(percent, message, false));
-        log.debug("项目空间 {} 索引进度: {}% - {}", projectSpaceId, percent, message);
+        progressMap.compute(projectSpaceId, (id, existing) -> {
+            int effectivePercent = percent >= 0 ? percent : (existing != null ? existing.getPercent() : 0);
+            return new IndexProgress(effectivePercent, message, existing != null && existing.isCompleted());
+        });
+        log.debug("项目空间 {} 索引进度: {}% - {}", projectSpaceId,
+                percent >= 0 ? percent : "保留", message);
     }
 
     /**
@@ -61,11 +68,19 @@ public class IndexProgressTracker {
     /**
      * 获取指定项目空间的当前进度。
      *
-     * <p>优先从 asyncTasks 表读取（持久化进度），内存进度作为后备。</p>
+     * <p>优先返回内存进度（CLI 实时写入），DB 查询作为重启恢复的后备。
+     * 若优先查 DB，会形成"读旧值→写旧值"的死循环：
+     * CLI 写内存 → 同步线程从 DB 读旧值 → 写回旧值到 DB → 进度永远不更新。</p>
      */
     public IndexProgress get(Long projectSpaceId) {
+        // 优先返回内存进度（CLI 实时写入的）
+        IndexProgress memoryProgress = progressMap.get(projectSpaceId);
+        if (memoryProgress != null) {
+            return memoryProgress;
+        }
+
+        // 内存无记录（重启恢复场景），从 DB 读取
         try {
-            // 优先查活跃任务（QUEUED/RUNNING）
             List<AsyncTask> active = taskRepository.findByKindAndBusinessIdAndStatusIn(
                     TaskKind.CODEGRAPH_INDEX, projectSpaceId,
                     List.of(TaskStatus.QUEUED, TaskStatus.RUNNING));
@@ -77,7 +92,6 @@ public class IndexProgressTracker {
                         message,
                         false);
             }
-            // 查最近完成的任务
             List<AsyncTask> recent = taskRepository.findByKindAndBusinessIdAndStatusIn(
                     TaskKind.CODEGRAPH_INDEX, projectSpaceId,
                     List.of(TaskStatus.SUCCEEDED, TaskStatus.FAILED, TaskStatus.CANCELLED));
@@ -98,9 +112,9 @@ public class IndexProgressTracker {
                 return new IndexProgress(percent, message, true);
             }
         } catch (Exception e) {
-            log.debug("从 asyncTasks 读取进度失败，回退到内存进度，projectSpaceId={}", projectSpaceId);
+            log.debug("从 asyncTasks 读取进度失败，projectSpaceId={}", projectSpaceId);
         }
-        return progressMap.getOrDefault(projectSpaceId, new IndexProgress(0, "未开始", false));
+        return new IndexProgress(0, "未开始", false);
     }
 
     /**

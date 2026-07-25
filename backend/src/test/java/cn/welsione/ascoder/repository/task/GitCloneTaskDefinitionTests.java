@@ -74,19 +74,14 @@ class GitCloneTaskDefinitionTests {
         when(codeRepositoryJpaRepository.findById(1L)).thenReturn(Optional.of(entity));
         when(codeRepositoryJpaRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        Map<String, String> context = Map.of(
-                "remoteUrl", "https://github.com/foo/bar.git",
-                "targetPath", "/tmp/repos/bar",
-                "branchName", "main",
-                "repositoryId", "1"
-        );
+        GitCloneContext context = new GitCloneContext("https://github.com/foo/bar.git", "/tmp/repos/bar", "main", 1L, null, null);
 
         definition.execute(context, progress);
 
         verify(gitRepositoryService).cloneRepository(eq("https://github.com/foo/bar.git"),
-                eq(Path.of("/tmp/repos/bar")), eq("main"));
+                eq(Path.of("/tmp/repos/bar")), eq("main"), any());
         verify(repositoryBranchService).refresh(1L);
-        verify(progress).update(50, "克隆完成，正在刷新分支...");
+        verify(progress).update(80, "克隆完成，正在刷新分支...");
         verify(progress).update(100, "完成");
         verify(codeRepositoryJpaRepository).save(entity);
         assertEquals(RepositoryStatus.CREATED, entity.getStatus());
@@ -101,13 +96,7 @@ class GitCloneTaskDefinitionTests {
         when(codeRepositoryJpaRepository.findById(1L)).thenReturn(Optional.of(entity));
         when(codeRepositoryJpaRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        Map<String, String> context = new java.util.HashMap<>();
-        context.put("remoteUrl", "https://github.com/foo/bar.git");
-        context.put("targetPath", "/tmp/repos/bar");
-        context.put("branchName", "main");
-        context.put("repositoryId", "1");
-        context.put("authUsername", "user");
-        context.put("authPassword", "pass");
+        GitCloneContext context = new GitCloneContext("https://github.com/foo/bar.git", "/tmp/repos/bar", "main", 1L, "user", "pass");
 
         definition.execute(context, progress);
 
@@ -121,12 +110,7 @@ class GitCloneTaskDefinitionTests {
         when(codeRepositoryJpaRepository.findById(1L)).thenReturn(Optional.of(entity));
         when(codeRepositoryJpaRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        Map<String, String> context = Map.of(
-                "remoteUrl", "https://github.com/foo/bar.git",
-                "targetPath", "/tmp/repos/bar",
-                "branchName", "main",
-                "repositoryId", "1"
-        );
+        GitCloneContext context = new GitCloneContext("https://github.com/foo/bar.git", "/tmp/repos/bar", "main", 1L, null, null);
 
         definition.execute(context, progress);
 
@@ -136,14 +120,9 @@ class GitCloneTaskDefinitionTests {
     @Test
     void executeCloneThrowsExceptionPropagates() {
         doThrow(new IllegalStateException("clone failed"))
-                .when(gitRepositoryService).cloneRepository(anyString(), any(), any());
+                .when(gitRepositoryService).cloneRepository(anyString(), any(), any(), any());
 
-        Map<String, String> context = Map.of(
-                "remoteUrl", "https://github.com/foo/bar.git",
-                "targetPath", "/tmp/repos/bar",
-                "branchName", "main",
-                "repositoryId", "1"
-        );
+        GitCloneContext context = new GitCloneContext("https://github.com/foo/bar.git", "/tmp/repos/bar", "main", 1L, null, null);
 
         assertThrows(IllegalStateException.class, () -> definition.execute(context, progress));
         verify(repositoryBranchService, never()).refresh(anyLong());
@@ -157,12 +136,7 @@ class GitCloneTaskDefinitionTests {
         when(codeRepositoryJpaRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(gitRepositoryService.currentBranch(Path.of("/tmp/repos/bar"))).thenReturn("develop");
 
-        Map<String, String> context = Map.of(
-                "remoteUrl", "https://github.com/foo/bar.git",
-                "targetPath", "/tmp/repos/bar",
-                "branchName", "",
-                "repositoryId", "1"
-        );
+        GitCloneContext context = new GitCloneContext("https://github.com/foo/bar.git", "/tmp/repos/bar", "", 1L, null, null);
 
         definition.execute(context, progress);
 
@@ -175,29 +149,17 @@ class GitCloneTaskDefinitionTests {
         // checkCancelled() 在 clone 完成后调用，直接令 isCancelled 返回 true
         when(progress.isCancelled()).thenReturn(true);
 
-        Map<String, String> context = Map.of(
-                "remoteUrl", "https://github.com/foo/bar.git",
-                "targetPath", "/tmp/repos/bar",
-                "branchName", "main",
-                "repositoryId", "1"
-        );
+        GitCloneContext context = new GitCloneContext("https://github.com/foo/bar.git", "/tmp/repos/bar", "main", 1L, null, null);
 
         assertThrows(TaskCancelledException.class, () -> definition.execute(context, progress));
     }
 
     @Test
     void serializeAndDeserializeContextRoundTrip() {
-        Map<String, String> context = Map.of(
-                "remoteUrl", "https://github.com/foo/bar.git",
-                "targetPath", "/tmp/repos/bar",
-                "branchName", "main",
-                "repositoryId", "1",
-                "authUsername", "user",
-                "authPassword", "pass"
-        );
+        GitCloneContext context = new GitCloneContext("https://github.com/foo/bar.git", "/tmp/repos/bar", "main", 1L, "user", "pass");
 
         String json = definition.serializeContext(context);
-        Map<String, String> deserialized = definition.deserializeContext(json);
+        GitCloneContext deserialized = definition.deserializeContext(json);
 
         assertEquals(context, deserialized);
     }

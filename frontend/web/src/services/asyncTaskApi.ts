@@ -26,3 +26,11 @@ export function get(taskId: number) {
 export function cancel(taskId: number) {
   return request<AsyncTask>(`/api/tasks/${taskId}/cancel`, { method: 'POST' })
 }
+
+export function retry(taskId: number) {
+  return request<AsyncTask>(`/api/tasks/${taskId}/retry`, { method: 'POST' })
+}
+
+export function cleanupStaleTasks(staleThresholdHours = 24) {
+  return request<number>(`/api/tasks/cleanup?staleThresholdHours=${staleThresholdHours}`, { method: 'POST' })
+}

@@ -62,10 +62,10 @@ class AgentScopeModelFactoryTests {
     }
 
     @Test
-    void createAnthropicCompatibleModelUnchanged() {
+    void createAnthropicModelUsesGlobalConfig() {
         AgentScopeModelFactory factory = factory();
 
-        AnthropicChatModel model = factory.createAnthropicCompatibleModel();
+        AnthropicChatModel model = factory.createAnthropicModel();
 
         assertEquals("global-model", model.getModelName());
     }

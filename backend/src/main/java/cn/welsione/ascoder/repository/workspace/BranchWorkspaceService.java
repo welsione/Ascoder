@@ -99,7 +99,7 @@ public class BranchWorkspaceService {
                     ? gitRepositoryService.commitSha(Path.of(codeRepo.resolveLocalPath(repoRoot)), branchName)
                     : selectedCommitSha.trim();
             String commitMessage = gitRepositoryService.commitMessage(Path.of(codeRepo.resolveLocalPath(repoRoot)), commitSha);
-            gitRepositoryService.createOrUpdateDetachedWorktree(
+            gitRepositoryService.upsertDetachedWorktree(
                     Path.of(codeRepo.resolveLocalPath(repoRoot)),
                     branchName,
                     commitSha,
@@ -128,7 +128,7 @@ public class BranchWorkspaceService {
                     Path.of(workspace.getRepository().resolveLocalPath(repoRoot)),
                     workspace.getBranchName()
             );
-            gitRepositoryService.createOrUpdateDetachedWorktree(
+            gitRepositoryService.upsertDetachedWorktree(
                     Path.of(workspace.getRepository().resolveLocalPath(repoRoot)),
                     workspace.getBranchName(),
                     commitSha,

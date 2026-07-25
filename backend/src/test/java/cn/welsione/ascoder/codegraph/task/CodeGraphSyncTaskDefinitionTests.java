@@ -14,7 +14,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.file.Path;
-import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -75,10 +74,7 @@ class CodeGraphSyncTaskDefinitionTests {
         when(codeGraphClient.sync(any(Path.class), anyLong()))
                 .thenReturn(CodeGraphToolResult.success("同步完成"));
 
-        Map<String, String> context = Map.of(
-                "repositoryPath", "/tmp/repos/bar",
-                "projectSpaceId", "1"
-        );
+        CodeGraphSyncContext context = new CodeGraphSyncContext("/tmp/repos/bar", 1L);
 
         definition.execute(context, progress);
 
@@ -100,10 +96,7 @@ class CodeGraphSyncTaskDefinitionTests {
         when(codeGraphClient.sync(any(Path.class), anyLong()))
                 .thenReturn(CodeGraphToolResult.error("同步引擎错误"));
 
-        Map<String, String> context = Map.of(
-                "repositoryPath", "/tmp/repos/bar",
-                "projectSpaceId", "1"
-        );
+        CodeGraphSyncContext context = new CodeGraphSyncContext("/tmp/repos/bar", 1L);
 
         RuntimeException ex = assertThrows(RuntimeException.class,
                 () -> definition.execute(context, progress));
@@ -126,10 +119,7 @@ class CodeGraphSyncTaskDefinitionTests {
         when(codeGraphClient.sync(any(Path.class), anyLong()))
                 .thenThrow(new RuntimeException("网络中断"));
 
-        Map<String, String> context = Map.of(
-                "repositoryPath", "/tmp/repos/bar",
-                "projectSpaceId", "1"
-        );
+        CodeGraphSyncContext context = new CodeGraphSyncContext("/tmp/repos/bar", 1L);
 
         RuntimeException ex = assertThrows(RuntimeException.class,
                 () -> definition.execute(context, progress));
@@ -142,13 +132,10 @@ class CodeGraphSyncTaskDefinitionTests {
 
     @Test
     void serializeAndDeserializeContextRoundTrip() {
-        Map<String, String> context = Map.of(
-                "repositoryPath", "/tmp/repos/bar",
-                "projectSpaceId", "1"
-        );
+        CodeGraphSyncContext context = new CodeGraphSyncContext("/tmp/repos/bar", 1L);
 
         String json = definition.serializeContext(context);
-        Map<String, String> deserialized = definition.deserializeContext(json);
+        CodeGraphSyncContext deserialized = definition.deserializeContext(json);
 
         assertEquals(context, deserialized);
     }

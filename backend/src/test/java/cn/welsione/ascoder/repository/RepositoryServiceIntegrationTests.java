@@ -28,6 +28,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.when;
 
 /**
@@ -212,7 +213,8 @@ class RepositoryServiceIntegrationTests extends AbstractIntegrationTest {
                 name, name, null, null, null, null));
         createdRepoIds.add(repo.getId());
 
-        when(codeGraphClient.index(any(Path.class))).thenReturn(
+        // executeRepositoryIndex 调用双参 index(Path, Long)（default 方法），需单独 stub
+        when(codeGraphClient.index(any(Path.class), anyLong())).thenReturn(
                 CodeGraphToolResult.success("索引完成"));
 
         CodeRepository indexed = service.index(repo.getId());
@@ -234,7 +236,7 @@ class RepositoryServiceIntegrationTests extends AbstractIntegrationTest {
                 name, name, null, null, null, null));
         createdRepoIds.add(repo.getId());
 
-        when(codeGraphClient.index(any(Path.class))).thenReturn(
+        when(codeGraphClient.index(any(Path.class), anyLong())).thenReturn(
                 CodeGraphToolResult.success("索引完成"));
         service.index(repo.getId()); // 第一次索引
 

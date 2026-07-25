@@ -46,7 +46,7 @@ class IndexProgressTrackerTests {
         tracker.start(100L);
 
         IndexProgressTracker.IndexProgress p = tracker.get(100L);
-        // DB 中无活跃任务，回退到内存
+        // 内存优先，start 写入内存
         assertEquals(0, p.getPercent());
         assertEquals("开始索引", p.getMessage());
         assertFalse(p.isCompleted());
@@ -54,9 +54,6 @@ class IndexProgressTrackerTests {
 
     @Test
     void updateSetsProgress() {
-        when(taskRepository.findByKindAndBusinessIdAndStatusIn(any(), any(), anyList()))
-                .thenReturn(Collections.emptyList());
-
         tracker.update(100L, 50, "halfway");
 
         IndexProgressTracker.IndexProgress p = tracker.get(100L);
@@ -67,9 +64,6 @@ class IndexProgressTrackerTests {
 
     @Test
     void completeSetsHundredPercent() {
-        when(taskRepository.findByKindAndBusinessIdAndStatusIn(any(), any(), anyList()))
-                .thenReturn(Collections.emptyList());
-
         tracker.complete(100L);
 
         IndexProgressTracker.IndexProgress p = tracker.get(100L);
@@ -80,9 +74,6 @@ class IndexProgressTrackerTests {
 
     @Test
     void failSetsError() {
-        when(taskRepository.findByKindAndBusinessIdAndStatusIn(any(), any(), anyList()))
-                .thenReturn(Collections.emptyList());
-
         tracker.fail(100L, "boom");
 
         IndexProgressTracker.IndexProgress p = tracker.get(100L);
@@ -93,22 +84,23 @@ class IndexProgressTrackerTests {
 
     @Test
     void clearRemovesInMemoryProgress() {
-        when(taskRepository.findByKindAndBusinessIdAndStatusIn(any(), any(), anyList()))
-                .thenReturn(Collections.emptyList());
-
         tracker.start(100L);
         tracker.clear(100L);
 
+        // 内存被清除，DB 也无记录，返回默认值
+        when(taskRepository.findByKindAndBusinessIdAndStatusIn(any(), any(), anyList()))
+                .thenReturn(Collections.emptyList());
         IndexProgressTracker.IndexProgress p = tracker.get(100L);
         assertEquals(0, p.getPercent());
         assertEquals("未开始", p.getMessage());
         assertFalse(p.isCompleted());
     }
 
-    // ---- DB 优先读取 ----
+    // ---- 内存优先读取 ----
 
     @Test
-    void getPrefersActiveTaskFromDb() {
+    void getPrefersMemoryOverDb() {
+        // 内存中有 CLI 实时写入的进度，DB 中有旧值
         AsyncTask active = buildTask(TaskStatus.RUNNING, 60, "indexing", null);
         when(taskRepository.findByKindAndBusinessIdAndStatusIn(
                 eq(TaskKind.CODEGRAPH_INDEX), eq(100L),
@@ -117,28 +109,26 @@ class IndexProgressTrackerTests {
 
         tracker.update(100L, 10, "memory");
 
+        // 内存优先，应返回内存中的值而非 DB 中的旧值
         IndexProgressTracker.IndexProgress p = tracker.get(100L);
-        assertEquals(60, p.getPercent());
-        assertEquals("indexing", p.getMessage());
+        assertEquals(10, p.getPercent());
+        assertEquals("memory", p.getMessage());
         assertFalse(p.isCompleted());
     }
 
     @Test
-    void getFallsBackToMemoryWhenNoActiveTask() {
+    void getFallsBackToDbWhenNoMemoryProgress() {
+        // 内存无记录（重启恢复场景），从 DB 读取
+        AsyncTask active = buildTask(TaskStatus.RUNNING, 30, "from db", null);
         when(taskRepository.findByKindAndBusinessIdAndStatusIn(
                 eq(TaskKind.CODEGRAPH_INDEX), eq(100L),
                 eq(List.of(TaskStatus.QUEUED, TaskStatus.RUNNING))))
-                .thenReturn(Collections.emptyList());
-        when(taskRepository.findByKindAndBusinessIdAndStatusIn(
-                eq(TaskKind.CODEGRAPH_INDEX), eq(100L),
-                eq(List.of(TaskStatus.SUCCEEDED, TaskStatus.FAILED, TaskStatus.CANCELLED))))
-                .thenReturn(Collections.emptyList());
+                .thenReturn(List.of(active));
 
-        tracker.update(100L, 30, "memory progress");
-
+        // 不调用 tracker.update/start，内存无记录
         IndexProgressTracker.IndexProgress p = tracker.get(100L);
         assertEquals(30, p.getPercent());
-        assertEquals("memory progress", p.getMessage());
+        assertEquals("from db", p.getMessage());
         assertFalse(p.isCompleted());
     }
 
@@ -182,7 +172,7 @@ class IndexProgressTrackerTests {
     }
 
     @Test
-    void getFallsBackToMemoryWhenDbThrows() {
+    void getReturnsMemoryWhenDbThrows() {
         when(taskRepository.findByKindAndBusinessIdAndStatusIn(any(), any(), anyList()))
                 .thenThrow(new RuntimeException("db down"));
 
@@ -206,7 +196,8 @@ class IndexProgressTrackerTests {
     }
 
     @Test
-    void getActiveTaskFallsBackToStatusNameWhenMessageNull() {
+    void getDbFallbackUsesStatusNameWhenMessageNull() {
+        // 内存无记录，从 DB 读取，message 为 null 时回退到 status name
         AsyncTask active = buildTask(TaskStatus.RUNNING, 0, null, null);
         when(taskRepository.findByKindAndBusinessIdAndStatusIn(any(), any(), anyList()))
                 .thenReturn(List.of(active));

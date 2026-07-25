@@ -3,8 +3,8 @@ const ANSWER_NOTIFICATION_TITLE = 'Ascoder 回答完成'
 /**
  * 在用户触发提问或恢复时预先申请浏览器通知权限。
  */
-export async function requestAnswerNotificationPermission() {
-  if (!supportsBrowserNotification() || Notification.permission !== 'default') {
+export async function requestNotificationPermission() {
+  if (!isNotificationSupported() || Notification.permission !== 'default') {
     return
   }
   try {
@@ -18,7 +18,7 @@ export async function requestAnswerNotificationPermission() {
  * 回答完成后发送浏览器通知；未授权或环境不支持时静默跳过。
  */
 export function notifyAnswerCompleted(questionText: string) {
-  if (!supportsBrowserNotification() || Notification.permission !== 'granted') {
+  if (!isNotificationSupported() || Notification.permission !== 'granted') {
     return
   }
   const body = questionText
@@ -34,7 +34,7 @@ export function notifyAnswerCompleted(questionText: string) {
   }
 }
 
-function supportsBrowserNotification() {
+function isNotificationSupported() {
   return typeof window !== 'undefined' && 'Notification' in window
 }
 

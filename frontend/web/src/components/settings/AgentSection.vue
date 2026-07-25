@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { RefreshCw, BotMessageSquare, Play, Eye, CircleCheck, Clock } from 'lucide-vue-next'
+import { RefreshCw, BotMessageSquare, Pencil, Eye, Activity, Trash2 } from 'lucide-vue-next'
 import { useAgentStore } from '../../stores/agent'
 import { useAgentToolStore } from '../../stores/agentTool'
 import { useSkillStore } from '../../stores/skill'
 import { useMcpServerStore } from '../../stores/mcpServer'
 import { useLlmProviderStore } from '../../stores/llmProvider'
 import * as api from '../../services/agentApi'
+import { formatTime } from '../../utils/format'
 import type { AgentConfig, AgentRuntimeStatus, AgentRunRecord, TestRenderResponse } from '../../types/agent'
 import AgentEventList from './AgentEventList.vue'
 
@@ -61,13 +62,6 @@ function runningSeconds(startedAt: string | null | undefined): number {
   return Math.max(0, Math.floor((now.value - new Date(startedAt).getTime()) / 1000))
 }
 
-function formatTime(iso: string | null | undefined): string {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return '—'
-  return d.toLocaleString('zh-CN', { hour12: false })
-}
-
 async function openRunsDrawer(config: AgentConfig) {
   drawerAgent.value = config
   drawerMode.value = 'runs'
@@ -95,7 +89,7 @@ async function selectRun(run: AgentRunRecord) {
 }
 
 const activeView = ref<'form' | 'runs'>('form')
-const showForm = ref(false)
+const formDrawerVisible = ref(false)
 const editingId = ref<number | null>(null)
 const renderResult = ref<TestRenderResponse | null>(null)
 
@@ -104,7 +98,17 @@ onUnmounted(() => agentStore.unsubscribeStatus())
 function openCreate() {
   agentStore.resetForm()
   editingId.value = null
-  showForm.value = true
+  renderResult.value = null
+  formDrawerVisible.value = true
+}
+
+function closeFormDrawer() {
+  formDrawerVisible.value = false
+}
+
+function onFormDrawerClosed() {
+  agentStore.resetForm()
+  editingId.value = null
   renderResult.value = null
 }
 
@@ -134,8 +138,8 @@ function openEdit(config: AgentConfig) {
   agentStore.form.returnTitle = config.returnTitle ?? undefined
   agentStore.form.returnDescription = config.returnDescription ?? undefined
   agentStore.form.sortOrder = config.sortOrder
-  showForm.value = true
   renderResult.value = null
+  formDrawerVisible.value = true
 }
 
 async function handleSubmit() {
@@ -147,7 +151,7 @@ async function handleSubmit() {
       await api.create(agentStore.form)
       ElMessage.success('Agent 已创建')
     }
-    showForm.value = false
+    formDrawerVisible.value = false
     await agentStore.fetch()
   } catch {
     // error 已在 store 中
@@ -226,9 +230,9 @@ const taskKindOptions = [
         <p class="kicker">Agent 列表</p>
         <h2>管理 Agent 定义、提示词与装配配置</h2>
       </div>
-      <div style="display:flex;gap:8px;">
-        <el-button circle :loading="agentStore.loading" title="刷新" @click="agentStore.fetch">
-          <RefreshCw :size="16" :stroke-width="1.8" />
+      <div class="section-actions">
+        <el-button circle :loading="agentStore.loading" title="刷新" aria-label="刷新" @click="agentStore.fetch">
+          <RefreshCw aria-hidden="true" :size="16" :stroke-width="1.8" />
         </el-button>
         <el-button type="primary" @click="openCreate">
           <BotMessageSquare class="button-icon" :size="16" :stroke-width="1.8" />
@@ -244,14 +248,13 @@ const taskKindOptions = [
       description="请先在「模型供应商」设置中添加至少一个供应商，Agent 将无法使用模型。"
       show-icon
       :closable="false"
-      style="margin-bottom:12px;"
     />
 
     <el-table v-loading="agentStore.loading" :data="agentStore.items" empty-text="暂无 Agent">
       <el-table-column label="名称" min-width="160">
         <template #default="{ row }">
-          <span style="font-weight:600;">{{ row.displayName }}</span>
-          <br><small style="color:var(--muted);">{{ row.agentId }}</small>
+          <span class="cell-name">{{ row.displayName }}</span>
+          <br><small class="cell-sub">{{ row.agentId }}</small>
         </template>
       </el-table-column>
       <el-table-column label="角色" width="140">
@@ -278,7 +281,7 @@ const taskKindOptions = [
       </el-table-column>
       <el-table-column label="最近运行" width="170">
         <template #default="{ row }">
-          {{ formatTime(agentStore.lastRunAt[row.agentId]) }}
+          {{ formatTime(agentStore.lastRunAt[row.agentId], '—') }}
         </template>
       </el-table-column>
       <el-table-column label="启用" width="80">
@@ -291,16 +294,30 @@ const taskKindOptions = [
           <el-tag v-if="row.builtin" size="small" type="info">是</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="200" fixed="right">
+      <el-table-column label="操作" width="160" fixed="right">
         <template #default="{ row }">
-          <el-button text size="small" @click="openEdit(row)">编辑</el-button>
-          <el-button text size="small" @click="openRunsDrawer(row)">
-            <Eye class="button-icon" :size="14" :stroke-width="1.8" />查看
-          </el-button>
-          <el-button text size="small" @click="openLiveDrawer(row)">
-            <CircleCheck class="button-icon" :size="14" :stroke-width="1.8" />实时
-          </el-button>
-          <el-button text size="small" :disabled="row.builtin" @click="handleDelete(row)">删除</el-button>
+          <div class="table-actions">
+            <el-tooltip content="编辑" placement="top" :show-after="300">
+              <el-button size="small" circle aria-label="编辑" @click="openEdit(row)">
+                <Pencil aria-hidden="true" :size="15" :stroke-width="1.8" />
+              </el-button>
+            </el-tooltip>
+            <el-tooltip content="查看详情" placement="top" :show-after="300">
+              <el-button size="small" circle aria-label="查看详情" @click="openRunsDrawer(row)">
+                <Eye aria-hidden="true" :size="15" :stroke-width="1.8" />
+              </el-button>
+            </el-tooltip>
+            <el-tooltip content="实时观测" placement="top" :show-after="300">
+              <el-button size="small" circle aria-label="实时观测" @click="openLiveDrawer(row)">
+                <Activity aria-hidden="true" :size="15" :stroke-width="1.8" />
+              </el-button>
+            </el-tooltip>
+            <el-tooltip content="删除" placement="top" :show-after="300">
+              <el-button size="small" circle type="danger" plain :disabled="row.builtin" aria-label="删除" @click="handleDelete(row)">
+                <Trash2 aria-hidden="true" :size="15" :stroke-width="1.8" />
+              </el-button>
+            </el-tooltip>
+          </div>
         </template>
       </el-table-column>
     </el-table>
@@ -322,12 +339,16 @@ const taskKindOptions = [
         <el-table-column prop="id" label="ID" width="70" />
         <el-table-column prop="status" label="状态" width="100" />
         <el-table-column prop="questionId" label="问题ID" width="90" />
-        <el-table-column prop="startedAt" label="开始" />
+        <el-table-column label="开始" min-width="170">
+          <template #default="{ row }">
+            {{ formatTime(row.startedAt) }}
+          </template>
+        </el-table-column>
         <el-table-column prop="durationMs" label="耗时(ms)" width="100" />
       </el-table>
-      <div v-if="selectedRunId" style="margin-top:12px;">
+      <div v-if="selectedRunId" class="mt-3">
         <h4>单条详情</h4>
-        <pre style="background:var(--surface-soft);padding:8px;border-radius:6px;white-space:pre-wrap;max-height:200px;overflow:auto;">
+        <pre class="code-preview">
 {{ ((agentStore.runs.find(r => r.id === selectedRunId)?.inputSummary) || '') + '\n---\n' + ((agentStore.runs.find(r => r.id === selectedRunId)?.outputSummary) || '') }}
         </pre>
         <template v-if="agentStore.runs.find(r => r.id === selectedRunId)?.questionId">
@@ -342,7 +363,7 @@ const taskKindOptions = [
       </div>
     </template>
     <template v-else-if="drawerAgent && drawerMode === 'live'">
-      <el-alert type="info" :closable="false" style="margin-bottom:8px;">
+      <el-alert type="info" :closable="false" class="mb-2">
         SSE 状态流已订阅：<code>/api/agents/{{ drawerAgent.agentId }}/status</code>
       </el-alert>
       <p>当前状态：<el-tag :type="statusBadge(agentStore.runtimeStatuses[drawerAgent.agentId] || 'IDLE').type">
@@ -359,45 +380,46 @@ const taskKindOptions = [
         <p class="field-section-title">实时事件流</p>
         <AgentEventList :question-id="agentStore.runtimeQuestionIds[drawerAgent.agentId]!" :auto-poll="true" />
       </template>
-      <p v-else style="color:var(--muted);">当前空闲</p>
+      <p v-else class="cell-sub">当前空闲</p>
     </template>
   </el-drawer>
 
-  <!-- 配置表单 -->
-  <section v-if="showForm" class="surface-panel settings-block">
-    <div class="section-heading">
-      <div>
-        <p class="kicker">{{ editingId ? '编辑 Agent' : '新增 Agent' }}</p>
-        <h2>配置 Agent 定义、提示词与装配</h2>
-      </div>
-    </div>
-
+  <!-- 配置表单抽屉 -->
+  <el-drawer
+    v-model="formDrawerVisible"
+    :title="editingId ? '编辑 Agent' : '新增 Agent'"
+    direction="rtl"
+    size="640px"
+    destroy-on-close
+    @closed="onFormDrawerClosed"
+  >
+    <div class="drawer-form">
     <!-- 基础信息 -->
     <p class="field-section-title">基础信息</p>
-    <div class="settings-form-grid">
+    <div class="settings-form-grid settings-form-grid-repo">
       <div>
         <label class="field-label">Agent ID</label>
-        <el-input v-model="agentStore.form.agentId" placeholder="code-researcher" :disabled="!!editingId" />
+        <el-input v-model="agentStore.form.agentId" placeholder="code-researcher" :disabled="!!editingId" clearable />
       </div>
       <div>
         <label class="field-label">显示名</label>
-        <el-input v-model="agentStore.form.displayName" placeholder="Code Researcher" />
+        <el-input v-model="agentStore.form.displayName" placeholder="Code Researcher" maxlength="120" clearable show-word-limit />
       </div>
       <div>
         <label class="field-label">角色</label>
-        <el-select v-model="agentStore.form.agentRole" style="width:100%;">
+        <el-select v-model="agentStore.form.agentRole" placeholder="选择角色">
           <el-option v-for="opt in roleOptions" :key="opt.value" :label="opt.label" :value="opt.value" :disabled="opt.disabled" />
         </el-select>
       </div>
       <div v-if="agentStore.form.agentRole === 'SPECIALIST'">
         <label class="field-label">taskKind</label>
-        <el-select v-model="agentStore.form.taskKind" style="width:100%;" clearable placeholder="选择输入依赖">
+        <el-select v-model="agentStore.form.taskKind" clearable placeholder="选择输入依赖">
           <el-option v-for="opt in taskKindOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
         </el-select>
       </div>
       <div>
         <label class="field-label">排序</label>
-        <el-input-number v-model="agentStore.form.sortOrder" :min="0" :max="99" style="width:100%;" />
+        <el-input-number v-model="agentStore.form.sortOrder" :min="0" :max="99" />
       </div>
       <div>
         <label class="field-label">启用</label>
@@ -411,33 +433,33 @@ const taskKindOptions = [
 
     <!-- 提示词 -->
     <p class="field-section-title">提示词</p>
-    <div class="settings-form-grid">
-      <div class="span-4">
+    <div class="settings-form-grid settings-form-grid-repo">
+      <div class="span-2">
         <label class="field-label">系统提示词</label>
-        <el-input v-model="agentStore.form.systemPrompt" type="textarea" :rows="8" placeholder="Agent 角色与行为约束" />
+        <el-input v-model="agentStore.form.systemPrompt" type="textarea" :rows="8" placeholder="定义 Agent 的角色与行为约束" />
       </div>
-      <div class="span-3">
-        <label class="field-label">任务模板（{{}} 模板语法）</label>
+      <div class="span-2">
+        <label class="field-label">任务模板（使用 <code v-pre>{{变量名}}</code> 模板语法）</label>
         <el-input v-model="agentStore.form.taskTemplate" type="textarea" :rows="6" placeholder="SPECIALIST 必填，ORCHESTRATOR 可选" />
       </div>
-      <div style="align-self:end;">
+      <div class="form-align-end">
         <el-button @click="handleTestRender">渲染预览</el-button>
       </div>
     </div>
-    <el-alert v-if="renderResult" type="info" :closable="false" style="margin-top:8px;">
+    <el-alert v-if="renderResult" type="info" :closable="false" class="mt-2">
       <template #title>渲染预览</template>
-      <pre style="white-space:pre-wrap;max-height:200px;overflow:auto;">{{ renderResult.renderedText }}</pre>
-      <p v-if="renderResult.warnings.length" style="color:var(--warning);margin-top:4px;">
+      <pre class="code-preview">{{ renderResult.renderedText }}</pre>
+      <p v-if="renderResult.warnings.length" class="cell-warning">
         ⚠️ {{ renderResult.warnings.join('; ') }}
       </p>
     </el-alert>
 
     <!-- 模型参数 -->
     <p class="field-section-title">模型参数（留空用全局默认）</p>
-    <div class="settings-form-grid">
+    <div class="settings-form-grid settings-form-grid-repo">
       <div>
         <label class="field-label">供应商</label>
-        <el-select v-model="agentStore.form.llmProviderId" style="width:100%;" clearable placeholder="默认供应商">
+        <el-select v-model="agentStore.form.llmProviderId" clearable placeholder="默认供应商">
           <el-option :label="'默认供应商'" :value="null" />
           <el-option
             v-for="p in llmProviderStore.enabledProviders"
@@ -451,12 +473,13 @@ const taskKindOptions = [
         <label class="field-label">modelId</label>
         <el-input
           v-model="agentStore.form.modelId"
-          :placeholder="agentStore.form.llmProviderId ? (llmProviderStore.enabledProviders.find(p => p.id === agentStore.form.llmProviderId)?.modelId ?? 'MiniMax-M2.7') : 'MiniMax-M2.7'"
+          placeholder="留空用供应商默认"
+          clearable
         />
       </div>
       <div>
         <label class="field-label">maxIters</label>
-        <el-input-number v-model="agentStore.form.maxIters" :min="1" :max="999" style="width:100%;" />
+        <el-input-number v-model="agentStore.form.maxIters" :min="1" :max="999" />
       </div>
       <div>
         <label class="field-label">maxTokens</label>
@@ -464,8 +487,7 @@ const taskKindOptions = [
           v-model="agentStore.form.maxTokens"
           :min="1"
           :max="999999"
-          style="width:100%;"
-          :placeholder="agentStore.form.llmProviderId ? String(llmProviderStore.enabledProviders.find(p => p.id === agentStore.form.llmProviderId)?.maxTokens ?? '') : ''"
+          placeholder="留空用供应商默认"
         />
       </div>
       <div>
@@ -474,8 +496,7 @@ const taskKindOptions = [
           v-model="agentStore.form.timeoutSeconds"
           :min="1"
           :max="3600"
-          style="width:100%;"
-          :placeholder="agentStore.form.llmProviderId ? String(llmProviderStore.enabledProviders.find(p => p.id === agentStore.form.llmProviderId)?.timeoutSeconds ?? '') : ''"
+          placeholder="留空用供应商默认"
         />
       </div>
     </div>
@@ -483,16 +504,16 @@ const taskKindOptions = [
     <!-- 触发条件 -->
     <template v-if="agentStore.form.agentRole !== 'SELF_LEARNING'">
     <p class="field-section-title">触发条件（SPECIALIST）</p>
-    <div class="settings-form-grid">
+    <div class="settings-form-grid settings-form-grid-repo">
       <div class="span-2">
         <label class="field-label">角色关键词</label>
-        <el-select v-model="agentStore.form.roleKeys" multiple filterable allow-create collapse-tags style="width:100%;" placeholder="输入后回车添加，如 tester">
+        <el-select v-model="agentStore.form.roleKeys" multiple filterable allow-create collapse-tags placeholder="输入后回车添加，如 tester">
           <el-option v-for="r in ['tester','developer','product_manager']" :key="r" :label="r" :value="r" />
         </el-select>
       </div>
       <div class="span-2">
         <label class="field-label">问题关键词</label>
-        <el-select v-model="agentStore.form.questionKeywords" multiple filterable allow-create collapse-tags style="width:100%;" placeholder="输入后回车添加，如 影响">
+        <el-select v-model="agentStore.form.questionKeywords" multiple filterable allow-create collapse-tags placeholder="输入后回车添加，如 影响">
         </el-select>
       </div>
     </div>
@@ -501,22 +522,22 @@ const taskKindOptions = [
     <!-- 工具装配 -->
     <template v-if="agentStore.form.agentRole !== 'SELF_LEARNING'">
     <p class="field-section-title">工具装配</p>
-    <div class="settings-form-grid">
+    <div class="settings-form-grid settings-form-grid-repo">
       <div class="span-2">
         <label class="field-label">工具组</label>
-        <el-select v-model="agentStore.form.toolGroupKeys" multiple collapse-tags style="width:100%;" placeholder="选择可用工具组">
+        <el-select v-model="agentStore.form.toolGroupKeys" multiple collapse-tags placeholder="选择可用工具组">
           <el-option v-for="t in toolStore.tools" :key="t.toolKey" :label="`${t.displayName} (${t.toolKey})`" :value="t.toolKey" />
         </el-select>
       </div>
       <div>
         <label class="field-label">Skill</label>
-        <el-select v-model="agentStore.form.skillNames" multiple collapse-tags style="width:100%;" placeholder="选择 Skill">
+        <el-select v-model="agentStore.form.skillNames" multiple collapse-tags placeholder="选择 Skill">
           <el-option v-for="s in skillStore.skills" :key="s.name" :label="s.name" :value="s.name" />
         </el-select>
       </div>
       <div>
         <label class="field-label">MCP 服务器</label>
-        <el-select v-model="agentStore.form.mcpServerNames" multiple collapse-tags style="width:100%;" placeholder="选择 MCP">
+        <el-select v-model="agentStore.form.mcpServerNames" multiple collapse-tags placeholder="选择 MCP">
           <el-option v-for="m in mcpStore.servers" :key="m.name" :label="m.name" :value="m.name" />
         </el-select>
       </div>
@@ -526,44 +547,34 @@ const taskKindOptions = [
     <!-- 委派描述 -->
     <template v-if="agentStore.form.agentRole !== 'SELF_LEARNING'">
     <p class="field-section-title">委派描述</p>
-    <div class="settings-form-grid">
+    <div class="settings-form-grid settings-form-grid-repo">
       <div>
         <label class="field-label">委派标题</label>
-        <el-input v-model="agentStore.form.handoffTitle" placeholder="任务委派" />
+        <el-input v-model="agentStore.form.handoffTitle" placeholder="任务委派" clearable />
       </div>
-      <div class="span-3">
+      <div class="span-2">
         <label class="field-label">委派描述</label>
-        <el-input v-model="agentStore.form.handoffDescription" type="textarea" :rows="2" />
+        <el-input v-model="agentStore.form.handoffDescription" type="textarea" :rows="2" placeholder="说明委派给该 Agent 的任务内容" />
       </div>
       <div>
         <label class="field-label">回传标题</label>
-        <el-input v-model="agentStore.form.returnTitle" placeholder="证据回传" />
+        <el-input v-model="agentStore.form.returnTitle" placeholder="证据回传" clearable />
       </div>
-      <div class="span-3">
+      <div class="span-2">
         <label class="field-label">回传描述</label>
-        <el-input v-model="agentStore.form.returnDescription" type="textarea" :rows="2" />
+        <el-input v-model="agentStore.form.returnDescription" type="textarea" :rows="2" placeholder="说明该 Agent 回传证据的格式与要求" />
       </div>
     </div>
     </template>
 
-    <div class="settings-actions">
-      <el-button @click="showForm=false">取消</el-button>
+    <el-alert v-if="agentStore.error" type="error" :title="agentStore.error" show-icon :closable="false" />
+    </div>
+
+    <template #footer>
+      <el-button @click="closeFormDrawer">取消</el-button>
       <el-button type="primary" :loading="agentStore.createLoading" @click="handleSubmit">
         {{ editingId ? '保存' : '创建' }}
       </el-button>
-    </div>
-
-    <el-alert v-if="agentStore.error" type="error" :title="agentStore.error" show-icon :closable="false" />
-  </section>
+    </template>
+  </el-drawer>
 </template>
-
-<style scoped>
-.field-section-title {
-  font-size: var(--font-size-sm);
-  font-weight: 600;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin: var(--spacing-5) 0 var(--spacing-2);
-}
-</style>

@@ -17,7 +17,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.file.Path;
-import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -86,10 +85,7 @@ class CodeGraphIndexTaskDefinitionTests {
         when(codeGraphClient.index(any(Path.class), anyLong()))
                 .thenReturn(CodeGraphToolResult.success("索引完成"));
 
-        Map<String, String> context = Map.of(
-                "repositoryPath", "/tmp/repos/bar",
-                "projectSpaceId", "1"
-        );
+        CodeGraphIndexContext context = new CodeGraphIndexContext("/tmp/repos/bar", null, false, 1L, null);
 
         definition.execute(context, progress);
 
@@ -111,11 +107,7 @@ class CodeGraphIndexTaskDefinitionTests {
         when(codeGraphClient.index(any(Path.class), any(Path.class), anyLong()))
                 .thenReturn(CodeGraphToolResult.success("索引完成"));
 
-        Map<String, String> context = Map.of(
-                "repositoryPath", "/tmp/repos/bar",
-                "codegraphIndexPath", "/tmp/repos/bar/.codegraph",
-                "projectSpaceId", "1"
-        );
+        CodeGraphIndexContext context = new CodeGraphIndexContext("/tmp/repos/bar", "/tmp/repos/bar/.codegraph", false, 1L, null);
 
         definition.execute(context, progress);
 
@@ -137,10 +129,7 @@ class CodeGraphIndexTaskDefinitionTests {
         when(codeGraphClient.index(any(Path.class), anyLong()))
                 .thenReturn(CodeGraphToolResult.error("索引引擎错误"));
 
-        Map<String, String> context = Map.of(
-                "repositoryPath", "/tmp/repos/bar",
-                "projectSpaceId", "1"
-        );
+        CodeGraphIndexContext context = new CodeGraphIndexContext("/tmp/repos/bar", null, false, 1L, null);
 
         RuntimeException ex = assertThrows(RuntimeException.class,
                 () -> definition.execute(context, progress));
@@ -163,10 +152,7 @@ class CodeGraphIndexTaskDefinitionTests {
         when(codeGraphClient.index(any(Path.class), anyLong()))
                 .thenThrow(new RuntimeException("CLI 连接超时"));
 
-        Map<String, String> context = Map.of(
-                "repositoryPath", "/tmp/repos/bar",
-                "projectSpaceId", "1"
-        );
+        CodeGraphIndexContext context = new CodeGraphIndexContext("/tmp/repos/bar", null, false, 1L, null);
 
         RuntimeException ex = assertThrows(RuntimeException.class,
                 () -> definition.execute(context, progress));
@@ -192,12 +178,7 @@ class CodeGraphIndexTaskDefinitionTests {
         java.nio.file.Path indexPath = tempDir.resolve(".codegraph");
         java.nio.file.Files.createDirectories(indexPath);
 
-        Map<String, String> context = Map.of(
-                "repositoryPath", tempDir.toString(),
-                "codegraphIndexPath", indexPath.toString(),
-                "projectSpaceId", "1",
-                "isReindex", "true"
-        );
+        CodeGraphIndexContext context = new CodeGraphIndexContext(tempDir.toString(), indexPath.toString(), true, 1L, null);
 
         definition.execute(context, progress);
 
@@ -220,17 +201,15 @@ class CodeGraphIndexTaskDefinitionTests {
         when(codeRepositoryJpaRepository.findById(2L)).thenReturn(Optional.of(entity));
         when(codeRepositoryJpaRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        when(codeGraphClient.index(any(Path.class)))
+        when(codeGraphClient.index(any(Path.class), anyLong()))
                 .thenReturn(CodeGraphToolResult.success("索引完成"));
 
-        Map<String, String> context = Map.of(
-                "repositoryPath", "/tmp/repos/baz",
-                "repositoryId", "2"
-        );
+        CodeGraphIndexContext context = new CodeGraphIndexContext("/tmp/repos/baz", null, false, null, 2L);
 
         definition.execute(context, progress);
 
-        verify(codeGraphClient).index(Path.of("/tmp/repos/baz"));
+        verify(indexProgressTracker).start(2L);
+        verify(codeGraphClient).index(Path.of("/tmp/repos/baz"), 2L);
         verify(progress).update(100, "索引完成");
         verify(codeRepositoryJpaRepository).save(entity);
         assertEquals(RepositoryStatus.READY, entity.getStatus());
@@ -244,18 +223,16 @@ class CodeGraphIndexTaskDefinitionTests {
         when(codeRepositoryJpaRepository.findById(2L)).thenReturn(Optional.of(entity));
         when(codeRepositoryJpaRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        when(codeGraphClient.index(any(Path.class)))
+        when(codeGraphClient.index(any(Path.class), anyLong()))
                 .thenReturn(CodeGraphToolResult.error("仓库格式不支持"));
 
-        Map<String, String> context = Map.of(
-                "repositoryPath", "/tmp/repos/baz",
-                "repositoryId", "2"
-        );
+        CodeGraphIndexContext context = new CodeGraphIndexContext("/tmp/repos/baz", null, false, null, 2L);
 
         RuntimeException ex = assertThrows(RuntimeException.class,
                 () -> definition.execute(context, progress));
         assertTrue(ex.getMessage().startsWith("CodeGraph 索引失败"));
 
+        verify(indexProgressTracker).start(2L);
         verify(progress).update(0, "索引失败");
         verify(codeRepositoryJpaRepository).save(entity);
         assertEquals(RepositoryStatus.FAILED, entity.getStatus());
@@ -269,18 +246,16 @@ class CodeGraphIndexTaskDefinitionTests {
         when(codeRepositoryJpaRepository.findById(2L)).thenReturn(Optional.of(entity));
         when(codeRepositoryJpaRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        when(codeGraphClient.index(any(Path.class)))
+        when(codeGraphClient.index(any(Path.class), anyLong()))
                 .thenThrow(new RuntimeException("OOM"));
 
-        Map<String, String> context = Map.of(
-                "repositoryPath", "/tmp/repos/baz",
-                "repositoryId", "2"
-        );
+        CodeGraphIndexContext context = new CodeGraphIndexContext("/tmp/repos/baz", null, false, null, 2L);
 
         RuntimeException ex = assertThrows(RuntimeException.class,
                 () -> definition.execute(context, progress));
         assertEquals("OOM", ex.getMessage());
 
+        verify(indexProgressTracker).start(2L);
         verify(codeRepositoryJpaRepository).save(entity);
         assertEquals(RepositoryStatus.FAILED, entity.getStatus());
     }
@@ -289,7 +264,7 @@ class CodeGraphIndexTaskDefinitionTests {
 
     @Test
     void executeWithoutProjectSpaceIdOrRepositoryIdThrows() {
-        Map<String, String> context = Map.of("repositoryPath", "/tmp/repos/baz");
+        CodeGraphIndexContext context = new CodeGraphIndexContext("/tmp/repos/baz", null, false, null, null);
 
         IllegalStateException ex = assertThrows(IllegalStateException.class,
                 () -> definition.execute(context, progress));
@@ -301,15 +276,10 @@ class CodeGraphIndexTaskDefinitionTests {
 
     @Test
     void serializeAndDeserializeContextRoundTrip() {
-        Map<String, String> context = Map.of(
-                "repositoryPath", "/tmp/repos/bar",
-                "codegraphIndexPath", "/tmp/repos/bar/.codegraph",
-                "projectSpaceId", "1",
-                "isReindex", "true"
-        );
+        CodeGraphIndexContext context = new CodeGraphIndexContext("/tmp/repos/bar", "/tmp/repos/bar/.codegraph", true, 1L, null);
 
         String json = definition.serializeContext(context);
-        Map<String, String> deserialized = definition.deserializeContext(json);
+        CodeGraphIndexContext deserialized = definition.deserializeContext(json);
 
         assertEquals(context, deserialized);
     }

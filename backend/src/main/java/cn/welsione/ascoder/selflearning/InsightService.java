@@ -128,7 +128,7 @@ public class InsightService {
                 .map(LearningInsight::getId)
                 .filter(id -> id != null)
                 .collect(Collectors.toSet());
-        List<LearningKnowledgeItem> staleKnowledge = entityLoader.knowledgeItemsByProjectSpace(projectSpaceId).stream()
+        List<LearningKnowledgeItem> staleKnowledge = entityLoader.knowledgeItemsBySpace(projectSpaceId).stream()
                 .filter(item -> referencesAnyRawEvent(item.getSourceInsightIdsJson(), legacyInsightIds))
                 .filter(item -> item.getStatus() == LearningKnowledgeStatus.ACTIVE
                         || item.getStatus() == LearningKnowledgeStatus.VERIFIED)

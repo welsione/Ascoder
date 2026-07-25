@@ -7,11 +7,11 @@ import cn.welsione.ascoder.common.FileUtil;
 import cn.welsione.ascoder.common.task.TaskDefinition;
 import cn.welsione.ascoder.common.task.TaskKind;
 import cn.welsione.ascoder.common.task.TaskProgress;
+import cn.welsione.ascoder.common.task.TaskContextSerializer;
 import cn.welsione.ascoder.repository.CodeRepository;
 import cn.welsione.ascoder.repository.CodeRepositoryJpaRepository;
 import cn.welsione.ascoder.repository.projectspace.ProjectSpace;
 import cn.welsione.ascoder.repository.projectspace.ProjectSpaceJpaRepository;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,27 +20,24 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.file.Path;
 import java.util.Date;
-import java.util.Map;
 
 /**
  * CodeGraph 全量索引异步任务定义，负责执行代码图索引并同步进度到任务引擎。
  *
- * <p>支持两种索引场景：</p>
+ * <p>上下文为 {@link CodeGraphIndexContext}，支持两种索引场景：</p>
  * <ul>
- *   <li>项目空间级索引：上下文包含 projectSpaceId，索引完成后更新 ProjectSpace 状态</li>
- *   <li>仓库级索引：上下文包含 repositoryId，索引完成后更新 CodeRepository 状态</li>
+ *   <li>项目空间级索引：{@code projectSpaceId} 非空，索引完成后更新 ProjectSpace 状态</li>
+ *   <li>仓库级索引：{@code repositoryId} 非空，索引完成后更新 CodeRepository 状态</li>
  * </ul>
  *
- * <p>通用字段：repositoryPath、codegraphIndexPath（可选）、isReindex。
- * 若 isReindex 为 "true"，先删除旧 .codegraph 目录再执行全量索引。
+ * <p>若 {@link CodeGraphIndexContext#isReindex()} 为 true，先删除旧 .codegraph 目录再执行全量索引。
  * 进度通过后台线程从 IndexProgressTracker 定期同步到 TaskProgress。</p>
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class CodeGraphIndexTaskDefinition implements TaskDefinition<Map<String, String>> {
+public class CodeGraphIndexTaskDefinition implements TaskDefinition<CodeGraphIndexContext> {
 
-    private static final TypeReference<Map<String, String>> CONTEXT_TYPE = new TypeReference<>() {};
     private static final long PROGRESS_SYNC_INTERVAL_MS = 1000;
 
     private final CodeGraphClient codeGraphClient;
@@ -55,22 +52,41 @@ public class CodeGraphIndexTaskDefinition implements TaskDefinition<Map<String, 
         return TaskKind.CODEGRAPH_INDEX;
     }
 
+    /**
+     * 全量索引时长不可预估（大型代码库可能数小时），不设引擎层超时。
+     * 依赖 codegraph.index-timeout-seconds（CLI 进程级超时）+ ensureTerminal 兜底。
+     */
     @Override
-    public void execute(Map<String, String> context, TaskProgress progress) throws Exception {
-        String repositoryPath = context.get("repositoryPath");
-        String codegraphIndexPath = context.get("codegraphIndexPath");
-        boolean isReindex = "true".equals(context.get("isReindex"));
+    public long defaultTimeoutMs() {
+        return 0;
+    }
+
+    @Override
+    public String resolveBusinessLabel(Long businessId) {
+        // CODEGRAPH_INDEX 的 businessId 可能是 projectSpaceId 或 repositoryId
+        return projectSpaceJpaRepository.findById(businessId)
+                .map(space -> space.getName() + " (项目空间)")
+                .orElseGet(() -> codeRepositoryJpaRepository.findById(businessId)
+                        .map(repo -> repo.getName() + " (仓库)")
+                        .orElse(null));
+    }
+
+    @Override
+    public void execute(CodeGraphIndexContext context, TaskProgress progress) throws Exception {
+        String repositoryPath = context.getRepositoryPath();
+        String codegraphIndexPath = context.getCodegraphIndexPath();
+        boolean isReindex = context.isReindex();
 
         // 判断索引场景：projectSpaceId 或 repositoryId
-        String projectSpaceIdStr = context.get("projectSpaceId");
-        String repositoryIdStr = context.get("repositoryId");
-        boolean isProjectSpaceIndex = projectSpaceIdStr != null && !projectSpaceIdStr.isBlank();
+        Long projectSpaceId = context.getProjectSpaceId();
+        Long repositoryId = context.getRepositoryId();
+        boolean isProjectSpaceIndex = projectSpaceId != null;
 
         if (isProjectSpaceIndex) {
-            executeProjectSpaceIndex(context, repositoryPath, codegraphIndexPath,
-                    Long.valueOf(projectSpaceIdStr), isReindex, progress);
-        } else if (repositoryIdStr != null && !repositoryIdStr.isBlank()) {
-            executeRepositoryIndex(repositoryPath, Long.valueOf(repositoryIdStr), isReindex, progress);
+            executeProjectSpaceIndex(repositoryPath, codegraphIndexPath,
+                    projectSpaceId, isReindex, progress);
+        } else if (repositoryId != null) {
+            executeRepositoryIndex(repositoryPath, repositoryId, isReindex, progress);
         } else {
             throw new IllegalStateException("任务上下文必须包含 projectSpaceId 或 repositoryId");
         }
@@ -79,7 +95,7 @@ public class CodeGraphIndexTaskDefinition implements TaskDefinition<Map<String, 
     /**
      * 项目空间级索引，索引完成后更新 ProjectSpace 状态。
      */
-    private void executeProjectSpaceIndex(Map<String, String> context, String repositoryPath,
+    private void executeProjectSpaceIndex(String repositoryPath,
                                           String codegraphIndexPath, Long projectSpaceId,
                                           boolean isReindex, TaskProgress progress) throws Exception {
         log.info("开始 CodeGraph 索引任务，projectSpaceId={}，isReindex={}，path={}",
@@ -116,12 +132,12 @@ public class CodeGraphIndexTaskDefinition implements TaskDefinition<Map<String, 
 
                 log.info("CodeGraph 索引任务完成，projectSpaceId={}", projectSpaceId);
             } else {
-                handleProjectSpaceIndexFailure(projectSpaceId, result.getOutput(), progress);
+                handleIndexFailure(projectSpaceId, result.getOutput(), progress);
                 throw new RuntimeException("CodeGraph 索引失败：" + result.getOutput());
             }
         } catch (RuntimeException ex) {
             if (!ex.getMessage().startsWith("CodeGraph 索引失败")) {
-                handleProjectSpaceIndexFailure(projectSpaceId, ex.getMessage(), progress);
+                handleIndexFailure(projectSpaceId, ex.getMessage(), progress);
                 log.error("CodeGraph 索引任务异常，projectSpaceId={}", projectSpaceId, ex);
             }
             throw ex;
@@ -145,8 +161,12 @@ public class CodeGraphIndexTaskDefinition implements TaskDefinition<Map<String, 
             FileUtil.deleteDirectoryIfExists(indexPath);
         }
 
+        // 启动进度同步线程，使用 repositoryId 作为 tracker 标识
+        indexProgressTracker.start(repositoryId);
+        Thread progressSync = startProgressSyncThread(repositoryId, "index-repo-progress-sync-", progress);
+
         try {
-            CodeGraphToolResult result = codeGraphClient.index(Path.of(repositoryPath));
+            CodeGraphToolResult result = codeGraphClient.index(Path.of(repositoryPath), repositoryId);
 
             if (result.isSuccess()) {
                 progress.update(100, "索引完成");
@@ -187,10 +207,12 @@ public class CodeGraphIndexTaskDefinition implements TaskDefinition<Map<String, 
                 log.error("CodeGraph 仓库索引任务异常，repositoryId={}", repositoryId, ex);
             }
             throw ex;
+        } finally {
+            progressSync.interrupt();
         }
     }
 
-    private void handleProjectSpaceIndexFailure(Long projectSpaceId, String errorMessage, TaskProgress progress) {
+    private void handleIndexFailure(Long projectSpaceId, String errorMessage, TaskProgress progress) {
         indexProgressTracker.fail(projectSpaceId, errorMessage);
         progress.update(0, "索引失败");
 
@@ -225,20 +247,12 @@ public class CodeGraphIndexTaskDefinition implements TaskDefinition<Map<String, 
     }
 
     @Override
-    public String serializeContext(Map<String, String> context) {
-        try {
-            return objectMapper.writeValueAsString(context);
-        } catch (Exception e) {
-            throw new IllegalStateException("序列化 CodeGraph 索引任务上下文失败", e);
-        }
+    public String serializeContext(CodeGraphIndexContext context) {
+        return TaskContextSerializer.serialize(objectMapper, context, "CodeGraph 索引");
     }
 
     @Override
-    public Map<String, String> deserializeContext(String json) {
-        try {
-            return objectMapper.readValue(json, CONTEXT_TYPE);
-        } catch (Exception e) {
-            throw new IllegalStateException("反序列化 CodeGraph 索引任务上下文失败", e);
-        }
+    public CodeGraphIndexContext deserializeContext(String json) {
+        return TaskContextSerializer.deserialize(objectMapper, json, CodeGraphIndexContext.class, "CodeGraph 索引");
     }
 }

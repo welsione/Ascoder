@@ -202,7 +202,6 @@ select {
 .history-item-head,
 .bubble-meta,
 .meta-row,
-.table-actions,
 .settings-actions,
 .composer-actions,
 .composer-toolbar,
@@ -212,6 +211,13 @@ select {
   justify-content: space-between;
   gap: var(--spacing-3);
   flex-wrap: wrap;
+}
+
+/* 表格操作列：紧凑排列 */
+.table-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .section-heading h2,
@@ -1582,14 +1588,6 @@ select {
   white-space: pre-wrap;
 }
 
-.project-detail-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--spacing-3);
-  flex-wrap: wrap;
-}
-
 .project-command-panel {
   padding: var(--spacing-6);
   background:
@@ -1746,12 +1744,97 @@ select {
 .span-3 { grid-column: span 3; }
 .span-4 { grid-column: span 4; }
 
+/* ──────────────────────────────────
+   表单字段系统
+   统一 label / 输入控件 / 描述 / 错误的间距与聚焦联动，
+   消除各 Section 组件内重复的 scoped 样式。
+   ────────────────────────────────── */
+
+/* 字段容器：接管 label ↔ input ↔ hint 的间距，并驱动聚焦联动 */
+.field {
+  display: grid;
+  gap: var(--spacing-1);
+  min-width: 0;
+}
+
 .field-label {
   display: block;
   margin-bottom: var(--spacing-1);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
   color: var(--subtle);
+  letter-spacing: var(--tracking-wide);
+  transition: color var(--transition-fast);
+}
+
+/* .field 容器内由 grid gap 接管间距，避免双重间距 */
+.field > .field-label {
+  margin-bottom: 0;
+}
+
+/* 聚焦时 label 微妙变 accent 色（Apple 连续反馈：交互中而非交互后）
+   覆盖 .field 容器、settings-form-grid 字段、config-form-grid 字段 */
+.field:focus-within .field-label,
+.settings-form-grid > div:focus-within .field-label,
+.config-form-grid > div:focus-within .field-label {
+  color: var(--chat-accent);
+}
+
+/* 必填标记 */
+.required-star {
+  margin-left: 2px;
+  color: var(--danger);
+  font-weight: var(--font-weight-bold);
+}
+
+/* 字段描述 */
+.field-desc {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+  line-height: var(--line-height-normal);
+}
+
+/* 字段元信息（类型 / 当前值 / 默认值等） */
+.field-meta {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+  line-height: var(--line-height-normal);
+}
+
+.field-meta code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* 字段错误：带滑入动画，反馈出现在"交互中"而非提交后 */
+.field-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-normal);
+  animation: field-error-in var(--transition-normal) var(--ease-spring);
+}
+
+@keyframes field-error-in {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 字段分区标题（全局化，消除组件重复） */
+.field-section-title {
+  margin: var(--spacing-5) 0 var(--spacing-2);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
 }
 
 .settings-block {
@@ -1766,6 +1849,80 @@ select {
   gap: var(--spacing-3);
   flex-wrap: wrap;
 }
+
+/* section heading 右侧操作按钮组：刷新 / 新增 等 */
+.section-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  flex-wrap: wrap;
+}
+
+/* 搜索栏：列表上方的筛选输入 */
+.config-search-bar {
+  margin-bottom: var(--spacing-4);
+}
+
+/* 配置区面板：圆角 + 过渡（配置流程页的 section） */
+.config-section {
+  border-radius: var(--radius-xl);
+  transition:
+    border-color var(--transition-normal),
+    box-shadow var(--transition-normal);
+}
+
+/* 配置字段：label + 控件的纵向栈 */
+.config-field {
+  display: grid;
+  gap: var(--spacing-1);
+}
+
+/* ── 表格单元格文本 ── */
+.cell-name {
+  font-weight: var(--font-weight-semibold);
+}
+
+.cell-tag {
+  margin-left: var(--spacing-1);
+  vertical-align: middle;
+}
+
+.cell-sub {
+  color: var(--muted);
+}
+
+.cell-code {
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+}
+
+.cell-warning {
+  color: var(--warning);
+  margin-top: var(--spacing-1);
+}
+
+/* ── 代码块预览 ── */
+.code-preview {
+  white-space: pre-wrap;
+  max-height: 200px;
+  overflow: auto;
+  padding: var(--spacing-2);
+  border-radius: var(--radius-md);
+  background: var(--surface-soft);
+}
+
+/* ── 表单网格辅助 ── */
+.form-align-end {
+  align-self: end;
+}
+
+/* ── Spacing utilities ── */
+.mt-2 { margin-top: var(--spacing-2); }
+.mt-3 { margin-top: var(--spacing-3); }
+.mt-4 { margin-top: var(--spacing-4); }
+.mb-2 { margin-bottom: var(--spacing-2); }
+.mb-3 { margin-bottom: var(--spacing-3); }
+.mb-4 { margin-bottom: var(--spacing-4); }
 
 .settings-nav-list {
   gap: var(--spacing-2);
@@ -1837,6 +1994,30 @@ select {
   border: 1px solid var(--stroke);
   border-radius: var(--radius-lg);
   background: var(--surface-muted);
+}
+
+/* ── Drawer 内表单容器 ── */
+.drawer-form {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-5) var(--spacing-6);
+}
+
+.drawer-form .settings-form-grid {
+  gap: var(--spacing-3);
+}
+
+.drawer-form .field-section-title {
+  margin-top: var(--spacing-5);
+}
+
+.drawer-form .field-section-title:first-child {
+  margin-top: 0;
+}
+
+/* ── Drawer footer 辅助操作与主操作分隔 ── */
+.footer-spacer {
+  flex: 1;
 }
 
 .tool-summary-card strong {

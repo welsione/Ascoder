@@ -5,6 +5,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, Bot, BrainCircuit, CheckCircle2, DatabaseZap, FileCheck2, GitBranch, History, Plus, ShieldCheck, Sparkles, Trash2 } from 'lucide-vue-next'
 import * as api from '../services/selfLearningApi'
 import { useProjectSpaceStore } from '../stores/projectSpace'
+import { formatTime } from '../utils/format'
 import type {
   LearningInsight,
   LearningInsightVerification,
@@ -188,16 +189,6 @@ function verificationStatusType(value: LearningInsightVerificationStatus | null 
   if (value === 'NEEDS_CHANGES' || value === 'INSUFFICIENT_EVIDENCE') return 'warning'
   if (value === 'CONTRADICTED') return 'danger'
   return 'info'
-}
-
-function formatTime(value: string | null) {
-  if (!value) return '未记录'
-  return new Date(value).toLocaleString('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
 }
 
 function compactText(value: string | null | undefined, fallback = '暂无内容') {
@@ -837,7 +828,7 @@ onMounted(loadAll)
               <el-tag size="small" :type="agentRunStatusType(run.status)">{{ agentRunStatusLabel(run.status) }}</el-tag>
               <span>{{ run.createdInsightCount }} 洞察 / {{ run.consumedRawEventCount }} 记录</span>
               <span v-if="run.failedConversationCount">{{ run.failedConversationCount }} 失败</span>
-              <span>{{ formatTime(run.updatedAt) }}</span>
+              <span>{{ formatTime(run.updatedAt, '未记录') }}</span>
             </div>
           </div>
         </div>
@@ -877,12 +868,13 @@ onMounted(loadAll)
     <section class="learning-workbench">
       <el-tabs v-model="activeTab" class="learning-tabs">
         <el-tab-pane label="原始记录" name="raw">
-          <div class="tab-toolbar">
+          <div class="section-heading">
             <div>
-              <h3>Raw Events</h3>
+              <p class="kicker">原始记录</p>
+              <h2>Raw Events</h2>
               <p>只做事实留痕，不直接参与回答召回。历史聊天可手动导入，重复导入会自动跳过。</p>
             </div>
-            <div class="toolbar-actions">
+            <div class="section-actions">
               <el-button type="danger" plain :loading="cleaningLegacy" @click="cleanupLegacyRawEvents">
                 清理旧粒度记录
               </el-button>
@@ -896,22 +888,25 @@ onMounted(loadAll)
             <article v-for="event in rawEvents" :key="event.id" class="event-card">
               <div class="event-head">
                 <el-tag size="small" effect="plain">{{ event.eventType }}</el-tag>
-                <span>{{ formatTime(event.createdAt) }}</span>
+                <span>{{ formatTime(event.createdAt, '未记录') }}</span>
               </div>
               <h4>{{ event.summary || '未提供摘要' }}</h4>
               <p>Agent：{{ event.agentId || 'system' }} · Question #{{ event.questionId || '-' }}</p>
             </article>
-            <el-empty v-if="!rawEvents.length" description="还没有原始记录。开启自学习并完成问答后会自动沉淀。" />
+            <div v-if="!rawEvents.length" class="empty-box compact-empty">
+              <p>还没有原始记录。开启自学习并完成问答后会自动沉淀。</p>
+            </div>
           </div>
         </el-tab-pane>
 
         <el-tab-pane label="待审核洞察" name="insights">
-          <div class="tab-toolbar">
+          <div class="section-heading">
             <div>
-              <h3>Learning Insights</h3>
+              <p class="kicker">待审核洞察</p>
+              <h2>Learning Insights</h2>
               <p>候选洞察需要管理员审核，通过后才会归纳为正式知识。</p>
             </div>
-            <div class="toolbar-actions">
+            <div class="section-actions">
               <el-select v-model="insightStatusFilter" clearable placeholder="状态筛选" @change="loadAll">
                 <el-option v-for="item in insightStatusOptions" :key="item.value" :label="item.label" :value="item.value" />
               </el-select>
@@ -1011,7 +1006,7 @@ onMounted(loadAll)
                   </div>
                   <div>
                     <span>复核时间</span>
-                    <strong>{{ formatTime(verificationResult.verifiedAt) }}</strong>
+                    <strong>{{ formatTime(verificationResult.verifiedAt, '未记录') }}</strong>
                   </div>
                 </div>
                 <div v-if="verificationResult?.suggestedChanges" class="agent-suggestion">
@@ -1150,16 +1145,19 @@ onMounted(loadAll)
               </div>
             </article>
           </div>
-          <el-empty v-else description="暂无候选洞察。" />
+          <div v-else class="empty-box compact-empty">
+            <p>暂无候选洞察。</p>
+          </div>
         </el-tab-pane>
 
         <el-tab-pane label="正式知识" name="knowledge">
-          <div class="tab-toolbar">
+          <div class="section-heading">
             <div>
-              <h3>Knowledge Items</h3>
+              <p class="kicker">正式知识</p>
+              <h2>Knowledge Items</h2>
               <p>只有 active / verified 正式知识会作为回答线索召回。</p>
             </div>
-            <div class="toolbar-actions">
+            <div class="section-actions">
               <el-select v-model="knowledgeStatusFilter" clearable placeholder="状态筛选" @change="loadAll">
                 <el-option v-for="item in knowledgeStatusOptions" :key="item.value" :label="item.label" :value="item.value" />
               </el-select>
@@ -1199,7 +1197,9 @@ onMounted(loadAll)
                 </el-button>
               </div>
             </article>
-            <el-empty v-if="!knowledgeItems.length" description="暂无正式知识。" />
+            <div v-if="!knowledgeItems.length" class="empty-box compact-empty">
+              <p>暂无正式知识。</p>
+            </div>
           </div>
         </el-tab-pane>
       </el-tabs>
@@ -1475,7 +1475,7 @@ onMounted(loadAll)
 
 .metric-card p,
 .policy-copy p,
-.tab-toolbar p,
+.section-heading p,
 .knowledge-card p,
 .event-card p {
   margin: var(--spacing-2) 0 0;
@@ -1593,21 +1593,12 @@ onMounted(loadAll)
   padding: var(--spacing-5);
 }
 
-.tab-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--spacing-4);
+/* section-heading 在 tab-pane 内需要底边距（不在 settings-block grid 中） */
+.section-heading {
   margin-bottom: var(--spacing-4);
 }
 
-.tab-toolbar h3 {
-  margin: 0;
-}
-
-.toolbar-actions {
-  display: flex;
-  align-items: center;
+.section-actions {
   gap: var(--spacing-3);
 }
 
@@ -2165,7 +2156,7 @@ onMounted(loadAll)
     max-height: none;
   }
 
-  .tab-toolbar {
+  .section-heading {
     align-items: flex-start;
     flex-direction: column;
   }
