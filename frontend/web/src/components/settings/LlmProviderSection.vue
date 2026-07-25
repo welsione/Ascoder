@@ -7,11 +7,11 @@ import type { LlmProvider, LlmProviderType, CreateLlmProviderRequest } from '../
 
 const store = useLlmProviderStore()
 
-const showForm = ref(false)
+const drawerVisible = ref(false)
 const editingId = ref<number | null>(null)
 const testingId = ref<number | null>(null)
 
-const form = ref<CreateLlmProviderRequest & { enabled?: boolean }>({
+const initialForm = (): CreateLlmProviderRequest & { enabled?: boolean } => ({
   name: '',
   providerType: 'OPENAI_COMPATIBLE',
   apiKey: '',
@@ -22,6 +22,8 @@ const form = ref<CreateLlmProviderRequest & { enabled?: boolean }>({
   isDefault: false,
   enabled: true,
 })
+
+const form = ref<CreateLlmProviderRequest & { enabled?: boolean }>(initialForm())
 
 const providerTypeOptions: { label: string; value: LlmProviderType }[] = [
   { label: 'OpenAI 兼容', value: 'OPENAI_COMPATIBLE' },
@@ -39,27 +41,12 @@ function maskApiKey(key: string): string {
 
 function openCreate() {
   editingId.value = null
-  form.value = {
-    name: '',
-    providerType: 'OPENAI_COMPATIBLE',
-    apiKey: '',
-    baseUrl: '',
-    modelId: '',
-    maxTokens: undefined,
-    timeoutSeconds: 240,
-    isDefault: false,
-    enabled: true,
-  }
-  showForm.value = true
+  form.value = initialForm()
+  drawerVisible.value = true
 }
 
-/** 新增按钮 toggle：展开时重置为新增态，收起时直接关闭 */
-function toggleCreate() {
-  if (showForm.value) {
-    closeForm()
-  } else {
-    openCreate()
-  }
+function closeDrawer() {
+  drawerVisible.value = false
 }
 
 function openEdit(provider: LlmProvider) {
@@ -75,12 +62,12 @@ function openEdit(provider: LlmProvider) {
     isDefault: provider.isDefault,
     enabled: provider.enabled,
   }
-  showForm.value = true
+  drawerVisible.value = true
 }
 
-function closeForm() {
-  showForm.value = false
+function onDrawerClosed() {
   editingId.value = null
+  form.value = initialForm()
 }
 
 async function handleSubmit() {
@@ -98,7 +85,7 @@ async function handleSubmit() {
     const result = await store.updateProvider(editingId.value, payload as CreateLlmProviderRequest)
     if (result) {
       ElMessage.success('供应商已更新')
-      closeForm()
+      drawerVisible.value = false
     }
   } else {
     if (!payload.apiKey) {
@@ -108,7 +95,7 @@ async function handleSubmit() {
     const result = await store.createProvider(payload as CreateLlmProviderRequest)
     if (result) {
       ElMessage.success('供应商已创建')
-      closeForm()
+      drawerVisible.value = false
     }
   }
 }
@@ -158,15 +145,9 @@ async function handleToggleEnabled(provider: LlmProvider, enabled: boolean) {
         <el-button circle :loading="store.loading" title="刷新" aria-label="刷新" @click="store.fetchProviders()">
           <RefreshCw aria-hidden="true" :size="16" :stroke-width="1.8" />
         </el-button>
-        <el-button
-          type="primary"
-          :plain="showForm"
-          :aria-expanded="showForm"
-          aria-controls="provider-form-panel"
-          @click="toggleCreate"
-        >
+        <el-button type="primary" @click="openCreate">
           <Cpu class="button-icon" :size="16" :stroke-width="1.8" />
-          {{ showForm ? '收起' : '新增供应商' }}
+          新增供应商
         </el-button>
       </div>
     </div>
@@ -229,79 +210,79 @@ async function handleToggleEnabled(provider: LlmProvider, enabled: boolean) {
     <el-alert v-if="store.error" type="error" :title="store.error" show-icon :closable="false" />
   </section>
 
-  <!-- 新增/编辑表单 -->
-  <el-collapse-transition>
-    <section v-if="showForm" id="provider-form-panel" class="surface-panel settings-block">
-      <div class="section-heading">
+  <!-- 新增/编辑供应商抽屉 -->
+  <el-drawer
+    v-model="drawerVisible"
+    :title="editingId ? '编辑供应商' : '新增供应商'"
+    direction="rtl"
+    size="480px"
+    destroy-on-close
+    @closed="onDrawerClosed"
+  >
+    <div class="drawer-form">
+      <p class="field-section-title">基础信息</p>
+      <div class="settings-form-grid">
         <div>
-          <p class="kicker">{{ editingId ? '编辑供应商' : '新增供应商' }}</p>
-          <h2>配置 LLM 供应商连接参数</h2>
+          <label class="field-label">名称</label>
+          <el-input v-model="form.name" placeholder="例如 MiniMax" />
+        </div>
+        <div>
+          <label class="field-label">供应商类型</label>
+          <el-select v-model="form.providerType">
+            <el-option v-for="opt in providerTypeOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+          </el-select>
+        </div>
+        <div>
+          <label class="field-label">启用</label>
+          <div class="switch-wrap"><el-switch v-model="form.enabled" /></div>
+        </div>
+        <div>
+          <label class="field-label">设为默认</label>
+          <div class="switch-wrap"><el-switch v-model="form.isDefault" /></div>
         </div>
       </div>
 
-    <p class="field-section-title">基础信息</p>
-    <div class="settings-form-grid">
-      <div>
-        <label class="field-label">名称</label>
-        <el-input v-model="form.name" placeholder="例如 MiniMax" />
+      <p class="field-section-title">连接参数</p>
+      <div class="settings-form-grid">
+        <div class="span-2">
+          <label class="field-label">Base URL</label>
+          <el-input v-model="form.baseUrl" placeholder="https://api.example.com/v1" />
+        </div>
+        <div>
+          <label class="field-label">模型 ID</label>
+          <el-input v-model="form.modelId" placeholder="gpt-4o" />
+        </div>
+        <div>
+          <label class="field-label">API Key</label>
+          <el-input
+            v-model="form.apiKey"
+            type="password"
+            show-password
+            :placeholder="editingId ? '留空保留原值' : '输入 API Key'"
+          />
+        </div>
       </div>
-      <div>
-        <label class="field-label">供应商类型</label>
-        <el-select v-model="form.providerType">
-          <el-option v-for="opt in providerTypeOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
-        </el-select>
+
+      <p class="field-section-title">高级参数（可选）</p>
+      <div class="settings-form-grid">
+        <div>
+          <label class="field-label">maxTokens</label>
+          <el-input-number v-model="form.maxTokens" :min="1" :max="999999" />
+        </div>
+        <div>
+          <label class="field-label">timeoutSeconds</label>
+          <el-input-number v-model="form.timeoutSeconds" :min="1" :max="3600" />
+        </div>
       </div>
-      <div>
-        <label class="field-label">启用</label>
-        <div class="switch-wrap"><el-switch v-model="form.enabled" /></div>
-      </div>
-      <div>
-        <label class="field-label">设为默认</label>
-        <div class="switch-wrap"><el-switch v-model="form.isDefault" /></div>
-      </div>
+
+      <el-alert v-if="store.error" type="error" :title="store.error" show-icon :closable="false" />
     </div>
 
-    <p class="field-section-title">连接参数</p>
-    <div class="settings-form-grid">
-      <div class="span-2">
-        <label class="field-label">Base URL</label>
-        <el-input v-model="form.baseUrl" placeholder="https://api.example.com/v1" />
-      </div>
-      <div>
-        <label class="field-label">模型 ID</label>
-        <el-input v-model="form.modelId" placeholder="gpt-4o" />
-      </div>
-      <div>
-        <label class="field-label">API Key</label>
-        <el-input
-          v-model="form.apiKey"
-          type="password"
-          show-password
-          :placeholder="editingId ? '留空保留原值' : '输入 API Key'"
-        />
-      </div>
-    </div>
-
-    <p class="field-section-title">高级参数（可选）</p>
-    <div class="settings-form-grid">
-      <div>
-        <label class="field-label">maxTokens</label>
-        <el-input-number v-model="form.maxTokens" :min="1" :max="999999" />
-      </div>
-      <div>
-        <label class="field-label">timeoutSeconds</label>
-        <el-input-number v-model="form.timeoutSeconds" :min="1" :max="3600" />
-      </div>
-    </div>
-
-    <div class="settings-actions">
-      <el-button @click="closeForm">取消</el-button>
+    <template #footer>
+      <el-button @click="closeDrawer">取消</el-button>
       <el-button type="primary" @click="handleSubmit">
         {{ editingId ? '保存' : '创建' }}
       </el-button>
-    </div>
-
-    <el-alert v-if="store.error" type="error" :title="store.error" show-icon :closable="false" />
-    </section>
-  </el-collapse-transition>
+    </template>
+  </el-drawer>
 </template>

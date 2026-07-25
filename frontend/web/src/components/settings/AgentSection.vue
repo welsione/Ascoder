@@ -95,7 +95,7 @@ async function selectRun(run: AgentRunRecord) {
 }
 
 const activeView = ref<'form' | 'runs'>('form')
-const showForm = ref(false)
+const formDrawerVisible = ref(false)
 const editingId = ref<number | null>(null)
 const renderResult = ref<TestRenderResponse | null>(null)
 
@@ -104,17 +104,18 @@ onUnmounted(() => agentStore.unsubscribeStatus())
 function openCreate() {
   agentStore.resetForm()
   editingId.value = null
-  showForm.value = true
   renderResult.value = null
+  formDrawerVisible.value = true
 }
 
-/** 新增按钮 toggle：展开时重置为新增态，收起时直接关闭 */
-function toggleCreate() {
-  if (showForm.value) {
-    showForm.value = false
-  } else {
-    openCreate()
-  }
+function closeFormDrawer() {
+  formDrawerVisible.value = false
+}
+
+function onFormDrawerClosed() {
+  agentStore.resetForm()
+  editingId.value = null
+  renderResult.value = null
 }
 
 function openEdit(config: AgentConfig) {
@@ -143,8 +144,8 @@ function openEdit(config: AgentConfig) {
   agentStore.form.returnTitle = config.returnTitle ?? undefined
   agentStore.form.returnDescription = config.returnDescription ?? undefined
   agentStore.form.sortOrder = config.sortOrder
-  showForm.value = true
   renderResult.value = null
+  formDrawerVisible.value = true
 }
 
 async function handleSubmit() {
@@ -156,7 +157,7 @@ async function handleSubmit() {
       await api.create(agentStore.form)
       ElMessage.success('Agent 已创建')
     }
-    showForm.value = false
+    formDrawerVisible.value = false
     await agentStore.fetch()
   } catch {
     // error 已在 store 中
@@ -239,15 +240,9 @@ const taskKindOptions = [
         <el-button circle :loading="agentStore.loading" title="刷新" aria-label="刷新" @click="agentStore.fetch">
           <RefreshCw aria-hidden="true" :size="16" :stroke-width="1.8" />
         </el-button>
-        <el-button
-          type="primary"
-          :plain="showForm"
-          :aria-expanded="showForm"
-          aria-controls="agent-form-panel"
-          @click="toggleCreate"
-        >
+        <el-button type="primary" @click="openCreate">
           <BotMessageSquare class="button-icon" :size="16" :stroke-width="1.8" />
-          {{ showForm ? '收起' : '新增 Agent' }}
+          新增 Agent
         </el-button>
       </div>
     </div>
@@ -377,16 +372,16 @@ const taskKindOptions = [
     </template>
   </el-drawer>
 
-  <!-- 配置表单 -->
-  <el-collapse-transition>
-    <section v-if="showForm" id="agent-form-panel" class="surface-panel settings-block">
-      <div class="section-heading">
-        <div>
-          <p class="kicker">{{ editingId ? '编辑 Agent' : '新增 Agent' }}</p>
-          <h2>配置 Agent 定义、提示词与装配</h2>
-        </div>
-      </div>
-
+  <!-- 配置表单抽屉 -->
+  <el-drawer
+    v-model="formDrawerVisible"
+    :title="editingId ? '编辑 Agent' : '新增 Agent'"
+    direction="rtl"
+    size="640px"
+    destroy-on-close
+    @closed="onFormDrawerClosed"
+  >
+    <div class="drawer-form">
     <!-- 基础信息 -->
     <p class="field-section-title">基础信息</p>
     <div class="settings-form-grid">
@@ -559,14 +554,14 @@ const taskKindOptions = [
     </div>
     </template>
 
-    <div class="settings-actions">
-      <el-button @click="showForm=false">取消</el-button>
+    <el-alert v-if="agentStore.error" type="error" :title="agentStore.error" show-icon :closable="false" />
+    </div>
+
+    <template #footer>
+      <el-button @click="closeFormDrawer">取消</el-button>
       <el-button type="primary" :loading="agentStore.createLoading" @click="handleSubmit">
         {{ editingId ? '保存' : '创建' }}
       </el-button>
-    </div>
-
-    <el-alert v-if="agentStore.error" type="error" :title="agentStore.error" show-icon :closable="false" />
-    </section>
-  </el-collapse-transition>
+    </template>
+  </el-drawer>
 </template>

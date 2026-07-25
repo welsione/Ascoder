@@ -5,12 +5,21 @@ import { Plus, RefreshCw, ServerCog } from 'lucide-vue-next'
 import { useMcpServerStore } from '../../stores/mcpServer'
 
 const mcpStore = useMcpServerStore()
-const showCreateMcp = ref(false)
+const drawerVisible = ref(false)
+
+function openCreate() {
+  mcpStore.resetForm()
+  drawerVisible.value = true
+}
+
+function closeDrawer() {
+  drawerVisible.value = false
+}
 
 async function createMcp() {
   const created = await mcpStore.create()
   if (created) {
-    showCreateMcp.value = false
+    drawerVisible.value = false
     ElMessage.success('MCP Server 已添加')
   }
 }
@@ -23,15 +32,21 @@ async function createMcp() {
         <p class="kicker">MCP 列表</p>
         <h2>哪些工具能被代理调用，在这里统一看清</h2>
       </div>
-      <el-button
-        circle
-        :loading="mcpStore.loading"
-        title="刷新 MCP"
-        aria-label="刷新 MCP"
-        @click="mcpStore.fetch"
-      >
-        <RefreshCw aria-hidden="true" :size="16" :stroke-width="1.8" />
-      </el-button>
+      <div class="section-actions">
+        <el-button
+          circle
+          :loading="mcpStore.loading"
+          title="刷新 MCP"
+          aria-label="刷新 MCP"
+          @click="mcpStore.fetch"
+        >
+          <RefreshCw aria-hidden="true" :size="16" :stroke-width="1.8" />
+        </el-button>
+        <el-button type="primary" @click="openCreate">
+          <Plus class="button-icon" aria-hidden="true" :size="16" :stroke-width="1.8" />
+          添加 MCP Server
+        </el-button>
+      </div>
     </div>
 
     <el-table v-loading="mcpStore.loading" :data="mcpStore.servers" empty-text="暂无 MCP Server">
@@ -46,103 +61,84 @@ async function createMcp() {
       </el-table-column>
       <el-table-column prop="lastError" label="最近错误" min-width="220" show-overflow-tooltip />
     </el-table>
-  </section>
-
-  <section class="surface-panel settings-block">
-    <div class="section-heading">
-      <div>
-        <p class="kicker">新增 MCP Server</p>
-        <h2>把外部工具能力整理成可配置的问答能力层</h2>
-      </div>
-      <div class="section-actions">
-        <el-button
-          type="primary"
-          :plain="showCreateMcp"
-          :aria-expanded="showCreateMcp"
-          aria-controls="mcp-create-panel"
-          @click="showCreateMcp = !showCreateMcp"
-        >
-          <Plus class="button-icon" aria-hidden="true" :size="16" :stroke-width="1.8" />
-          {{ showCreateMcp ? '收起' : '添加 MCP Server' }}
-        </el-button>
-      </div>
-    </div>
-
-    <el-collapse-transition>
-      <div v-if="showCreateMcp" id="mcp-create-panel" class="mcp-create-panel">
-        <div class="settings-form-grid settings-form-grid-mcp">
-          <div>
-            <label class="field-label">名称</label>
-            <el-input v-model="mcpStore.form.name" placeholder="例如 filesystem" clearable />
-          </div>
-          <div>
-            <label class="field-label">Transport</label>
-            <el-select v-model="mcpStore.form.transport">
-              <el-option label="STDIO" value="STDIO" />
-              <el-option label="SSE" value="SSE" />
-              <el-option label="HTTP" value="HTTP" />
-            </el-select>
-          </div>
-          <div>
-            <label class="field-label">启用</label>
-            <div class="switch-wrap">
-              <el-switch v-model="mcpStore.form.enabled" />
-            </div>
-          </div>
-          <div>
-            <label class="field-label">超时秒数</label>
-            <el-input-number v-model="mcpStore.form.timeoutSeconds" :min="1" :max="300" />
-          </div>
-          <div class="span-4">
-            <label class="field-label">描述</label>
-            <el-input v-model="mcpStore.form.description" type="textarea" :rows="2" />
-          </div>
-          <div class="span-2">
-            <label class="field-label">Command</label>
-            <el-input v-model="mcpStore.form.command" placeholder="STDIO 使用，例如 npx" clearable />
-          </div>
-          <div class="span-2">
-            <label class="field-label">Endpoint URL</label>
-            <el-input v-model="mcpStore.form.endpointUrl" placeholder="HTTP/SSE 使用" clearable />
-          </div>
-          <div class="span-2">
-            <label class="field-label">Arguments JSON</label>
-            <el-input v-model="mcpStore.form.argumentsJson" type="textarea" :rows="2" placeholder='["-y"]' />
-          </div>
-          <div class="span-2">
-            <label class="field-label">Headers JSON</label>
-            <el-input v-model="mcpStore.form.headersJson" type="textarea" :rows="2" placeholder='{"Authorization":"Bearer ..."}' />
-          </div>
-          <div class="span-2">
-            <label class="field-label">Query Params JSON</label>
-            <el-input v-model="mcpStore.form.queryParamsJson" type="textarea" :rows="2" placeholder="{}" />
-          </div>
-          <div class="span-2">
-            <label class="field-label">Enabled Tools JSON</label>
-            <el-input v-model="mcpStore.form.enabledToolsJson" type="textarea" :rows="2" placeholder='["read_file"]' />
-          </div>
-          <div class="span-2">
-            <label class="field-label">Disabled Tools JSON</label>
-            <el-input v-model="mcpStore.form.disabledToolsJson" type="textarea" :rows="2" placeholder='["delete_file"]' />
-          </div>
-        </div>
-
-        <div class="settings-actions">
-          <el-button type="primary" :loading="mcpStore.createLoading" @click="createMcp">
-            <ServerCog class="button-icon" aria-hidden="true" :size="16" :stroke-width="1.8" />
-            添加 MCP Server
-          </el-button>
-        </div>
-      </div>
-    </el-collapse-transition>
 
     <el-alert v-if="mcpStore.error" type="error" :title="mcpStore.error" show-icon :closable="false" />
   </section>
-</template>
 
-<style scoped>
-.mcp-create-panel {
-  display: grid;
-  gap: var(--spacing-4);
-}
-</style>
+  <!-- 新增 MCP Server 抽屉 -->
+  <el-drawer
+    v-model="drawerVisible"
+    title="添加 MCP Server"
+    direction="rtl"
+    size="640px"
+    destroy-on-close
+    @closed="mcpStore.resetForm()"
+  >
+    <div class="drawer-form">
+      <div class="settings-form-grid settings-form-grid-mcp">
+        <div>
+          <label class="field-label">名称</label>
+          <el-input v-model="mcpStore.form.name" placeholder="例如 filesystem" clearable />
+        </div>
+        <div>
+          <label class="field-label">Transport</label>
+          <el-select v-model="mcpStore.form.transport">
+            <el-option label="STDIO" value="STDIO" />
+            <el-option label="SSE" value="SSE" />
+            <el-option label="HTTP" value="HTTP" />
+          </el-select>
+        </div>
+        <div>
+          <label class="field-label">启用</label>
+          <div class="switch-wrap">
+            <el-switch v-model="mcpStore.form.enabled" />
+          </div>
+        </div>
+        <div>
+          <label class="field-label">超时秒数</label>
+          <el-input-number v-model="mcpStore.form.timeoutSeconds" :min="1" :max="300" />
+        </div>
+        <div class="span-4">
+          <label class="field-label">描述</label>
+          <el-input v-model="mcpStore.form.description" type="textarea" :rows="2" />
+        </div>
+        <div class="span-2">
+          <label class="field-label">Command</label>
+          <el-input v-model="mcpStore.form.command" placeholder="STDIO 使用，例如 npx" clearable />
+        </div>
+        <div class="span-2">
+          <label class="field-label">Endpoint URL</label>
+          <el-input v-model="mcpStore.form.endpointUrl" placeholder="HTTP/SSE 使用" clearable />
+        </div>
+        <div class="span-2">
+          <label class="field-label">Arguments JSON</label>
+          <el-input v-model="mcpStore.form.argumentsJson" type="textarea" :rows="2" placeholder='["-y"]' />
+        </div>
+        <div class="span-2">
+          <label class="field-label">Headers JSON</label>
+          <el-input v-model="mcpStore.form.headersJson" type="textarea" :rows="2" placeholder='{"Authorization":"Bearer ..."}' />
+        </div>
+        <div class="span-2">
+          <label class="field-label">Query Params JSON</label>
+          <el-input v-model="mcpStore.form.queryParamsJson" type="textarea" :rows="2" placeholder="{}" />
+        </div>
+        <div class="span-2">
+          <label class="field-label">Enabled Tools JSON</label>
+          <el-input v-model="mcpStore.form.enabledToolsJson" type="textarea" :rows="2" placeholder='["read_file"]' />
+        </div>
+        <div class="span-2">
+          <label class="field-label">Disabled Tools JSON</label>
+          <el-input v-model="mcpStore.form.disabledToolsJson" type="textarea" :rows="2" placeholder='["delete_file"]' />
+        </div>
+      </div>
+    </div>
+
+    <template #footer>
+      <el-button @click="closeDrawer">取消</el-button>
+      <el-button type="primary" :loading="mcpStore.createLoading" @click="createMcp">
+        <ServerCog class="button-icon" aria-hidden="true" :size="16" :stroke-width="1.8" />
+        添加 MCP Server
+      </el-button>
+    </template>
+  </el-drawer>
+</template>

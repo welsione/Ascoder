@@ -301,6 +301,33 @@
   }
 }
 
+/* ── Drawer 抽屉（设置页新增/编辑表单） ── */
+.el-drawer__header {
+  padding: var(--spacing-5) var(--spacing-6);
+  border-bottom: 1px solid var(--stroke);
+  margin-bottom: 0;
+}
+
+.el-drawer__title {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+}
+
+.el-drawer__body {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.el-drawer__footer {
+  padding: var(--spacing-4) var(--spacing-6);
+  border-top: 1px solid var(--stroke);
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-2);
+}
+
 /* ── Reduced motion：退化为非弹簧的简短过渡 ── */
 @media (prefers-reduced-motion: reduce) {
   .el-input__wrapper,

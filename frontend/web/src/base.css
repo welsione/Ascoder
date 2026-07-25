@@ -1977,6 +1977,25 @@ select {
   background: var(--surface-muted);
 }
 
+/* ── Drawer 内表单容器 ── */
+.drawer-form {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-5) var(--spacing-6);
+}
+
+.drawer-form .settings-form-grid {
+  gap: var(--spacing-3);
+}
+
+.drawer-form .field-section-title {
+  margin-top: var(--spacing-5);
+}
+
+.drawer-form .field-section-title:first-child {
+  margin-top: 0;
+}
+
 .tool-summary-card strong {
   display: block;
   margin-top: var(--spacing-1);
