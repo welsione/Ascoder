@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { RefreshCw, Cpu, Plug } from 'lucide-vue-next'
+import { RefreshCw, Cpu, Plug, Pencil, Trash2 } from 'lucide-vue-next'
 import { useLlmProviderStore } from '../../stores/llmProvider'
 import type { LlmProvider, LlmProviderType, CreateLlmProviderRequest } from '../../types/llmProvider'
 
@@ -196,13 +196,25 @@ async function handleToggleEnabled(provider: LlmProvider, enabled: boolean) {
           <el-tag v-if="row.builtin" size="small" type="info">是</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="200" fixed="right">
+      <el-table-column label="操作" width="110" fixed="right">
         <template #default="{ row }">
-          <el-button text size="small" @click="openEdit(row)">编辑</el-button>
-          <el-button text size="small" :loading="testingId === row.id" @click="handleTestConnection(row)">
-            <Plug class="button-icon" :size="14" :stroke-width="1.8" />测试
-          </el-button>
-          <el-button text size="small" :disabled="row.builtin" type="danger" @click="handleDelete(row)">删除</el-button>
+          <div class="table-actions">
+            <el-tooltip content="编辑" placement="top" :show-after="300">
+              <el-button size="small" circle aria-label="编辑" @click="openEdit(row)">
+                <Pencil aria-hidden="true" :size="15" :stroke-width="1.8" />
+              </el-button>
+            </el-tooltip>
+            <el-tooltip content="测试连接" placement="top" :show-after="300">
+              <el-button size="small" circle :loading="testingId === row.id" aria-label="测试连接" @click="handleTestConnection(row)">
+                <Plug aria-hidden="true" :size="15" :stroke-width="1.8" />
+              </el-button>
+            </el-tooltip>
+            <el-tooltip content="删除" placement="top" :show-after="300">
+              <el-button size="small" circle type="danger" plain :disabled="row.builtin" aria-label="删除" @click="handleDelete(row)">
+                <Trash2 aria-hidden="true" :size="15" :stroke-width="1.8" />
+              </el-button>
+            </el-tooltip>
+          </div>
         </template>
       </el-table-column>
     </el-table>

@@ -576,63 +576,66 @@ function handleReset() {
       <el-table-column label="操作" width="232" fixed="right">
         <template #default="{ row }">
           <div class="table-actions">
-            <el-button
-              v-if="row.status === 'READY'"
-              size="small"
-              circle
-              type="primary"
-              title="进入提问"
-              aria-label="进入提问"
-              @click="openSpace(row.id)"
-            >
-              <MessageSquare aria-hidden="true" :size="15" :stroke-width="1.8" />
-            </el-button>
-            <el-button
-              v-if="row.status !== 'READY'"
-              size="small"
-              circle
-              type="primary"
-              :loading="projectSpaceStore.preparingId === row.id || projectSpaceStore.indexingId === row.id"
-              :disabled="row.status === 'PREPARING' || row.status === 'INDEXING'"
-              title="准备并索引"
-              aria-label="准备并索引"
-              @click="prepareAndIndexSpace(row.id)"
-            >
-              <DatabaseZap aria-hidden="true" :size="15" :stroke-width="1.8" />
-            </el-button>
-            <el-button
-              size="small"
-              circle
-              :loading="projectSpaceStore.refreshingId === row.id"
-              :disabled="row.status === 'PREPARING' || row.status === 'INDEXING'"
-              title="刷新状态"
-              aria-label="刷新状态"
-              @click="refreshSpace(row.id)"
-            >
-              <RefreshCw aria-hidden="true" :size="15" :stroke-width="1.8" />
-            </el-button>
-            <el-button
-              size="small"
-              circle
-              title="查看成员"
-              aria-label="查看成员"
-              @click="selectSpace(row.id)"
-            >
-              <Eye aria-hidden="true" :size="15" :stroke-width="1.8" />
-            </el-button>
-            <el-button
-              size="small"
-              circle
-              type="danger"
-              plain
-              :loading="projectSpaceStore.deletingId === row.id"
-              :disabled="row.status === 'PREPARING' || row.status === 'INDEXING'"
-              title="删除空间"
-              aria-label="删除空间"
-              @click="deleteSpace(row.id)"
-            >
-              <Trash2 aria-hidden="true" :size="15" :stroke-width="1.8" />
-            </el-button>
+            <el-tooltip v-if="row.status === 'READY'" content="进入提问" placement="top" :show-after="300">
+              <el-button
+                size="small"
+                circle
+                type="primary"
+                aria-label="进入提问"
+                @click="openSpace(row.id)"
+              >
+                <MessageSquare aria-hidden="true" :size="15" :stroke-width="1.8" />
+              </el-button>
+            </el-tooltip>
+            <el-tooltip v-if="row.status !== 'READY'" content="准备并索引" placement="top" :show-after="300">
+              <el-button
+                size="small"
+                circle
+                type="primary"
+                :loading="projectSpaceStore.preparingId === row.id || projectSpaceStore.indexingId === row.id"
+                :disabled="row.status === 'PREPARING' || row.status === 'INDEXING'"
+                aria-label="准备并索引"
+                @click="prepareAndIndexSpace(row.id)"
+              >
+                <DatabaseZap aria-hidden="true" :size="15" :stroke-width="1.8" />
+              </el-button>
+            </el-tooltip>
+            <el-tooltip content="刷新状态" placement="top" :show-after="300">
+              <el-button
+                size="small"
+                circle
+                :loading="projectSpaceStore.refreshingId === row.id"
+                :disabled="row.status === 'PREPARING' || row.status === 'INDEXING'"
+                aria-label="刷新状态"
+                @click="refreshSpace(row.id)"
+              >
+                <RefreshCw aria-hidden="true" :size="15" :stroke-width="1.8" />
+              </el-button>
+            </el-tooltip>
+            <el-tooltip content="查看成员" placement="top" :show-after="300">
+              <el-button
+                size="small"
+                circle
+                aria-label="查看成员"
+                @click="selectSpace(row.id)"
+              >
+                <Eye aria-hidden="true" :size="15" :stroke-width="1.8" />
+              </el-button>
+            </el-tooltip>
+            <el-tooltip content="删除空间" placement="top" :show-after="300">
+              <el-button
+                size="small"
+                circle
+                type="danger"
+                plain
+                :loading="projectSpaceStore.deletingId === row.id"
+                :disabled="row.status === 'PREPARING' || row.status === 'INDEXING'"
+                aria-label="删除空间"
+                @click="deleteSpace(row.id)"
+              >
+                <Trash2 aria-hidden="true" :size="15" :stroke-width="1.8" />
+              </el-button>
+            </el-tooltip>
           </div>
         </template>
       </el-table-column>

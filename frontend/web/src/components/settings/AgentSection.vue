@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { RefreshCw, BotMessageSquare, Play, Eye, CircleCheck, Clock } from 'lucide-vue-next'
+import { RefreshCw, BotMessageSquare, Pencil, Eye, Activity, Trash2 } from 'lucide-vue-next'
 import { useAgentStore } from '../../stores/agent'
 import { useAgentToolStore } from '../../stores/agentTool'
 import { useSkillStore } from '../../stores/skill'
@@ -300,16 +300,30 @@ const taskKindOptions = [
           <el-tag v-if="row.builtin" size="small" type="info">是</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="200" fixed="right">
+      <el-table-column label="操作" width="140" fixed="right">
         <template #default="{ row }">
-          <el-button text size="small" @click="openEdit(row)">编辑</el-button>
-          <el-button text size="small" @click="openRunsDrawer(row)">
-            <Eye class="button-icon" :size="14" :stroke-width="1.8" />查看
-          </el-button>
-          <el-button text size="small" @click="openLiveDrawer(row)">
-            <CircleCheck class="button-icon" :size="14" :stroke-width="1.8" />实时
-          </el-button>
-          <el-button text size="small" :disabled="row.builtin" @click="handleDelete(row)">删除</el-button>
+          <div class="table-actions">
+            <el-tooltip content="编辑" placement="top" :show-after="300">
+              <el-button size="small" circle aria-label="编辑" @click="openEdit(row)">
+                <Pencil aria-hidden="true" :size="15" :stroke-width="1.8" />
+              </el-button>
+            </el-tooltip>
+            <el-tooltip content="查看详情" placement="top" :show-after="300">
+              <el-button size="small" circle aria-label="查看详情" @click="openRunsDrawer(row)">
+                <Eye aria-hidden="true" :size="15" :stroke-width="1.8" />
+              </el-button>
+            </el-tooltip>
+            <el-tooltip content="实时观测" placement="top" :show-after="300">
+              <el-button size="small" circle aria-label="实时观测" @click="openLiveDrawer(row)">
+                <Activity aria-hidden="true" :size="15" :stroke-width="1.8" />
+              </el-button>
+            </el-tooltip>
+            <el-tooltip content="删除" placement="top" :show-after="300">
+              <el-button size="small" circle type="danger" plain :disabled="row.builtin" aria-label="删除" @click="handleDelete(row)">
+                <Trash2 aria-hidden="true" :size="15" :stroke-width="1.8" />
+              </el-button>
+            </el-tooltip>
+          </div>
         </template>
       </el-table-column>
     </el-table>

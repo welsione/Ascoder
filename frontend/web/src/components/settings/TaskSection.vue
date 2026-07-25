@@ -374,11 +374,6 @@ onUnmounted(() => {
   margin-top: var(--spacing-4);
 }
 
-.table-actions {
-  display: flex;
-  gap: 4px;
-}
-
 :deep(.task-row-running) {
   background: color-mix(in srgb, var(--warning) 6%, transparent);
 }

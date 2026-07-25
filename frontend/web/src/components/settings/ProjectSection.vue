@@ -409,18 +409,22 @@ function handleReset() {
           {{ row.defaultBranch ?? '未记录' }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="120" fixed="right">
+      <el-table-column label="操作" width="60" fixed="right">
         <template #default="{ row }">
-          <el-button
-            size="small"
-            circle
-            type="danger"
-            title="移出仓库"
-            aria-label="移出仓库"
-            @click="removeRepository(row.id)"
-          >
-            <Trash2 aria-hidden="true" :size="15" :stroke-width="1.8" />
-          </el-button>
+          <div class="table-actions">
+            <el-tooltip content="移出仓库" placement="top" :show-after="300">
+              <el-button
+                size="small"
+                circle
+                type="danger"
+                plain
+                aria-label="移出仓库"
+                @click="removeRepository(row.id)"
+              >
+                <Trash2 aria-hidden="true" :size="15" :stroke-width="1.8" />
+              </el-button>
+            </el-tooltip>
+          </div>
         </template>
       </el-table-column>
     </el-table>

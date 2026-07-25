@@ -202,7 +202,6 @@ select {
 .history-item-head,
 .bubble-meta,
 .meta-row,
-.table-actions,
 .settings-actions,
 .composer-actions,
 .composer-toolbar,
@@ -212,6 +211,13 @@ select {
   justify-content: space-between;
   gap: var(--spacing-3);
   flex-wrap: wrap;
+}
+
+/* 表格操作列：紧凑排列 */
+.table-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .section-heading h2,
