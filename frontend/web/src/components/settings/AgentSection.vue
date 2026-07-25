@@ -384,18 +384,18 @@ const taskKindOptions = [
     <div class="drawer-form">
     <!-- 基础信息 -->
     <p class="field-section-title">基础信息</p>
-    <div class="settings-form-grid">
+    <div class="settings-form-grid settings-form-grid-repo">
       <div>
         <label class="field-label">Agent ID</label>
-        <el-input v-model="agentStore.form.agentId" placeholder="code-researcher" :disabled="!!editingId" />
+        <el-input v-model="agentStore.form.agentId" placeholder="code-researcher" :disabled="!!editingId" clearable />
       </div>
       <div>
         <label class="field-label">显示名</label>
-        <el-input v-model="agentStore.form.displayName" placeholder="Code Researcher" />
+        <el-input v-model="agentStore.form.displayName" placeholder="Code Researcher" maxlength="120" clearable show-word-limit />
       </div>
       <div>
         <label class="field-label">角色</label>
-        <el-select v-model="agentStore.form.agentRole">
+        <el-select v-model="agentStore.form.agentRole" placeholder="选择角色">
           <el-option v-for="opt in roleOptions" :key="opt.value" :label="opt.label" :value="opt.value" :disabled="opt.disabled" />
         </el-select>
       </div>
@@ -421,13 +421,13 @@ const taskKindOptions = [
 
     <!-- 提示词 -->
     <p class="field-section-title">提示词</p>
-    <div class="settings-form-grid">
-      <div class="span-4">
+    <div class="settings-form-grid settings-form-grid-repo">
+      <div class="span-2">
         <label class="field-label">系统提示词</label>
-        <el-input v-model="agentStore.form.systemPrompt" type="textarea" :rows="8" placeholder="Agent 角色与行为约束" />
+        <el-input v-model="agentStore.form.systemPrompt" type="textarea" :rows="8" placeholder="定义 Agent 的角色与行为约束" />
       </div>
-      <div class="span-3">
-        <label class="field-label">任务模板（{{}} 模板语法）</label>
+      <div class="span-2">
+        <label class="field-label">任务模板（使用 <code v-pre>{{变量名}}</code> 模板语法）</label>
         <el-input v-model="agentStore.form.taskTemplate" type="textarea" :rows="6" placeholder="SPECIALIST 必填，ORCHESTRATOR 可选" />
       </div>
       <div class="form-align-end">
@@ -444,7 +444,7 @@ const taskKindOptions = [
 
     <!-- 模型参数 -->
     <p class="field-section-title">模型参数（留空用全局默认）</p>
-    <div class="settings-form-grid">
+    <div class="settings-form-grid settings-form-grid-repo">
       <div>
         <label class="field-label">供应商</label>
         <el-select v-model="agentStore.form.llmProviderId" clearable placeholder="默认供应商">
@@ -461,7 +461,8 @@ const taskKindOptions = [
         <label class="field-label">modelId</label>
         <el-input
           v-model="agentStore.form.modelId"
-          :placeholder="agentStore.form.llmProviderId ? (llmProviderStore.enabledProviders.find(p => p.id === agentStore.form.llmProviderId)?.modelId ?? 'MiniMax-M2.7') : 'MiniMax-M2.7'"
+          placeholder="留空用供应商默认"
+          clearable
         />
       </div>
       <div>
@@ -474,7 +475,7 @@ const taskKindOptions = [
           v-model="agentStore.form.maxTokens"
           :min="1"
           :max="999999"
-          :placeholder="agentStore.form.llmProviderId ? String(llmProviderStore.enabledProviders.find(p => p.id === agentStore.form.llmProviderId)?.maxTokens ?? '') : ''"
+          placeholder="留空用供应商默认"
         />
       </div>
       <div>
@@ -483,7 +484,7 @@ const taskKindOptions = [
           v-model="agentStore.form.timeoutSeconds"
           :min="1"
           :max="3600"
-          :placeholder="agentStore.form.llmProviderId ? String(llmProviderStore.enabledProviders.find(p => p.id === agentStore.form.llmProviderId)?.timeoutSeconds ?? '') : ''"
+          placeholder="留空用供应商默认"
         />
       </div>
     </div>
@@ -491,7 +492,7 @@ const taskKindOptions = [
     <!-- 触发条件 -->
     <template v-if="agentStore.form.agentRole !== 'SELF_LEARNING'">
     <p class="field-section-title">触发条件（SPECIALIST）</p>
-    <div class="settings-form-grid">
+    <div class="settings-form-grid settings-form-grid-repo">
       <div class="span-2">
         <label class="field-label">角色关键词</label>
         <el-select v-model="agentStore.form.roleKeys" multiple filterable allow-create collapse-tags placeholder="输入后回车添加，如 tester">
@@ -509,7 +510,7 @@ const taskKindOptions = [
     <!-- 工具装配 -->
     <template v-if="agentStore.form.agentRole !== 'SELF_LEARNING'">
     <p class="field-section-title">工具装配</p>
-    <div class="settings-form-grid">
+    <div class="settings-form-grid settings-form-grid-repo">
       <div class="span-2">
         <label class="field-label">工具组</label>
         <el-select v-model="agentStore.form.toolGroupKeys" multiple collapse-tags placeholder="选择可用工具组">
@@ -534,22 +535,22 @@ const taskKindOptions = [
     <!-- 委派描述 -->
     <template v-if="agentStore.form.agentRole !== 'SELF_LEARNING'">
     <p class="field-section-title">委派描述</p>
-    <div class="settings-form-grid">
+    <div class="settings-form-grid settings-form-grid-repo">
       <div>
         <label class="field-label">委派标题</label>
-        <el-input v-model="agentStore.form.handoffTitle" placeholder="任务委派" />
+        <el-input v-model="agentStore.form.handoffTitle" placeholder="任务委派" clearable />
       </div>
-      <div class="span-3">
+      <div class="span-2">
         <label class="field-label">委派描述</label>
-        <el-input v-model="agentStore.form.handoffDescription" type="textarea" :rows="2" />
+        <el-input v-model="agentStore.form.handoffDescription" type="textarea" :rows="2" placeholder="说明委派给该 Agent 的任务内容" />
       </div>
       <div>
         <label class="field-label">回传标题</label>
-        <el-input v-model="agentStore.form.returnTitle" placeholder="证据回传" />
+        <el-input v-model="agentStore.form.returnTitle" placeholder="证据回传" clearable />
       </div>
-      <div class="span-3">
+      <div class="span-2">
         <label class="field-label">回传描述</label>
-        <el-input v-model="agentStore.form.returnDescription" type="textarea" :rows="2" />
+        <el-input v-model="agentStore.form.returnDescription" type="textarea" :rows="2" placeholder="说明该 Agent 回传证据的格式与要求" />
       </div>
     </div>
     </template>

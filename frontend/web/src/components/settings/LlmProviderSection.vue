@@ -221,14 +221,14 @@ async function handleToggleEnabled(provider: LlmProvider, enabled: boolean) {
   >
     <div class="drawer-form">
       <p class="field-section-title">基础信息</p>
-      <div class="settings-form-grid">
+      <div class="settings-form-grid settings-form-grid-repo">
         <div>
           <label class="field-label">名称</label>
-          <el-input v-model="form.name" placeholder="例如 MiniMax" />
+          <el-input v-model="form.name" placeholder="例如 MiniMax" maxlength="120" clearable show-word-limit />
         </div>
         <div>
           <label class="field-label">供应商类型</label>
-          <el-select v-model="form.providerType">
+          <el-select v-model="form.providerType" placeholder="选择供应商类型">
             <el-option v-for="opt in providerTypeOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
           </el-select>
         </div>
@@ -243,14 +243,14 @@ async function handleToggleEnabled(provider: LlmProvider, enabled: boolean) {
       </div>
 
       <p class="field-section-title">连接参数</p>
-      <div class="settings-form-grid">
+      <div class="settings-form-grid settings-form-grid-repo">
         <div class="span-2">
           <label class="field-label">Base URL</label>
-          <el-input v-model="form.baseUrl" placeholder="https://api.example.com/v1" />
+          <el-input v-model="form.baseUrl" placeholder="https://api.example.com/v1" clearable />
         </div>
         <div>
           <label class="field-label">模型 ID</label>
-          <el-input v-model="form.modelId" placeholder="gpt-4o" />
+          <el-input v-model="form.modelId" placeholder="gpt-4o" maxlength="120" clearable show-word-limit />
         </div>
         <div>
           <label class="field-label">API Key</label>
@@ -264,14 +264,14 @@ async function handleToggleEnabled(provider: LlmProvider, enabled: boolean) {
       </div>
 
       <p class="field-section-title">高级参数（可选）</p>
-      <div class="settings-form-grid">
+      <div class="settings-form-grid settings-form-grid-repo">
         <div>
           <label class="field-label">maxTokens</label>
-          <el-input-number v-model="form.maxTokens" :min="1" :max="999999" />
+          <el-input-number v-model="form.maxTokens" :min="1" :max="999999" placeholder="留空用全局默认" />
         </div>
         <div>
           <label class="field-label">timeoutSeconds</label>
-          <el-input-number v-model="form.timeoutSeconds" :min="1" :max="3600" />
+          <el-input-number v-model="form.timeoutSeconds" :min="1" :max="3600" placeholder="留空用全局默认" />
         </div>
       </div>
 

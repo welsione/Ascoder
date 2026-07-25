@@ -74,10 +74,10 @@ async function createSkill() {
     @closed="skillStore.resetForm()"
   >
     <div class="drawer-form">
-      <div class="settings-form-grid settings-form-grid-skill">
+      <div class="settings-form-grid settings-form-grid-repo">
         <div>
           <label class="field-label">名称</label>
-          <el-input v-model="skillStore.form.name" placeholder="例如 spring_boot_entry" clearable />
+          <el-input v-model="skillStore.form.name" placeholder="例如 spring_boot_entry" maxlength="120" clearable show-word-limit />
         </div>
         <div>
           <label class="field-label">来源</label>
@@ -89,7 +89,7 @@ async function createSkill() {
             <el-switch v-model="skillStore.form.enabled" />
           </div>
         </div>
-        <div class="span-3">
+        <div class="span-2">
           <label class="field-label">触发描述</label>
           <el-input
             v-model="skillStore.form.description"
@@ -98,7 +98,7 @@ async function createSkill() {
             placeholder="说明什么时候应该使用这个 Skill"
           />
         </div>
-        <div class="span-4">
+        <div class="span-2">
           <label class="field-label">Skill 内容</label>
           <el-input v-model="skillStore.form.skillContent" type="textarea" :rows="8" placeholder="# Skill Instructions" />
         </div>

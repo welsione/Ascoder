@@ -55,6 +55,11 @@ function closeRepositoryDrawer() {
   drawerVisible.value = false
 }
 
+function onRepositoryDrawerClosed() {
+  repositoryStore.resetForm()
+  sourceMode.value = 'remote'
+}
+
 async function createRepository() {
   if (sourceMode.value === 'local') {
     repositoryStore.form.remoteUrl = ''
@@ -216,7 +221,7 @@ async function saveCredentials() {
     direction="rtl"
     size="480px"
     destroy-on-close
-    @closed="repositoryStore.resetForm(); sourceMode = 'remote'"
+    @closed="onRepositoryDrawerClosed"
   >
     <div class="drawer-form">
       <div class="source-switch" aria-label="仓库来源">
@@ -232,7 +237,7 @@ async function saveCredentials() {
       <div class="settings-form-grid settings-form-grid-repo repository-form-grid">
         <div>
           <label class="field-label">仓库名称</label>
-          <el-input v-model="repositoryStore.form.name" placeholder="例如 ascoder" maxlength="120" clearable />
+          <el-input v-model="repositoryStore.form.name" placeholder="例如 ascoder" maxlength="120" clearable show-word-limit />
         </div>
         <div>
           <label class="field-label">默认分支</label>
@@ -256,6 +261,7 @@ async function saveCredentials() {
           />
         </div>
         <template v-if="sourceMode === 'remote'">
+          <div class="span-2"><p class="field-section-title">认证信息（可选）</p></div>
           <div>
             <label class="field-label">认证用户名</label>
             <el-input

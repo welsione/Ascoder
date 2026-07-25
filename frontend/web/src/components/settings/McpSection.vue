@@ -75,14 +75,15 @@ async function createMcp() {
     @closed="mcpStore.resetForm()"
   >
     <div class="drawer-form">
-      <div class="settings-form-grid settings-form-grid-mcp">
+      <p class="field-section-title">基础信息</p>
+      <div class="settings-form-grid settings-form-grid-repo">
         <div>
           <label class="field-label">名称</label>
-          <el-input v-model="mcpStore.form.name" placeholder="例如 filesystem" clearable />
+          <el-input v-model="mcpStore.form.name" placeholder="例如 filesystem" maxlength="120" clearable show-word-limit />
         </div>
         <div>
           <label class="field-label">Transport</label>
-          <el-select v-model="mcpStore.form.transport">
+          <el-select v-model="mcpStore.form.transport" placeholder="选择传输方式">
             <el-option label="STDIO" value="STDIO" />
             <el-option label="SSE" value="SSE" />
             <el-option label="HTTP" value="HTTP" />
@@ -98,17 +99,21 @@ async function createMcp() {
           <label class="field-label">超时秒数</label>
           <el-input-number v-model="mcpStore.form.timeoutSeconds" :min="1" :max="300" />
         </div>
-        <div class="span-4">
+        <div class="span-2">
           <label class="field-label">描述</label>
-          <el-input v-model="mcpStore.form.description" type="textarea" :rows="2" />
+          <el-input v-model="mcpStore.form.description" type="textarea" :rows="2" placeholder="说明该 MCP Server 提供的能力" />
         </div>
+      </div>
+
+      <p class="field-section-title">传输配置</p>
+      <div class="settings-form-grid settings-form-grid-repo">
         <div class="span-2">
           <label class="field-label">Command</label>
           <el-input v-model="mcpStore.form.command" placeholder="STDIO 使用，例如 npx" clearable />
         </div>
         <div class="span-2">
           <label class="field-label">Endpoint URL</label>
-          <el-input v-model="mcpStore.form.endpointUrl" placeholder="HTTP/SSE 使用" clearable />
+          <el-input v-model="mcpStore.form.endpointUrl" placeholder="HTTP/SSE 使用，例如 http://localhost:3000/sse" clearable />
         </div>
         <div class="span-2">
           <label class="field-label">Arguments JSON</label>
@@ -122,6 +127,10 @@ async function createMcp() {
           <label class="field-label">Query Params JSON</label>
           <el-input v-model="mcpStore.form.queryParamsJson" type="textarea" :rows="2" placeholder="{}" />
         </div>
+      </div>
+
+      <p class="field-section-title">工具过滤</p>
+      <div class="settings-form-grid settings-form-grid-repo">
         <div class="span-2">
           <label class="field-label">Enabled Tools JSON</label>
           <el-input v-model="mcpStore.form.enabledToolsJson" type="textarea" :rows="2" placeholder='["read_file"]' />
@@ -137,7 +146,7 @@ async function createMcp() {
       <el-button @click="closeDrawer">取消</el-button>
       <el-button type="primary" :loading="mcpStore.createLoading" @click="createMcp">
         <ServerCog class="button-icon" aria-hidden="true" :size="16" :stroke-width="1.8" />
-        添加 MCP Server
+        添加
       </el-button>
     </template>
   </el-drawer>
