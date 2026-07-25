@@ -64,12 +64,27 @@ onMounted(() => {
   restoreDraft()
   restoreRole()
   draftTimer = setInterval(saveDraft, 2000)
+  // 监听欢迎页建议卡片触发的草稿恢复
+  window.addEventListener('ascoder:restore-draft', onRestoreDraft)
 })
 
 onUnmounted(() => {
   saveDraft()
   if (draftTimer) clearInterval(draftTimer)
+  window.removeEventListener('ascoder:restore-draft', onRestoreDraft)
 })
+
+/** 欢迎页点击建议卡片时，将 prompt 写入输入框并聚焦 */
+function onRestoreDraft(e: Event) {
+  const detail = (e as CustomEvent<string>).detail
+  if (typeof detail === 'string') {
+    input.value = detail
+    nextTick(() => {
+      adjustHeight()
+      textareaRef.value?.focus()
+    })
+  }
+}
 
 /** 从 localStorage 恢复用户上次选择的角色 */
 function restoreRole() {
@@ -608,6 +623,27 @@ export default { components: { Loading } }
 .composer-send-btn {
   min-width: 96px !important;
   box-shadow: 0 6px 16px rgba(79, 110, 247, 0.22) !important;
+  transition:
+    background var(--transition-fast),
+    opacity var(--transition-fast),
+    box-shadow var(--transition-normal),
+    transform var(--press-duration) var(--ease-snappy) !important;
+}
+
+/* 空闲态呼吸：暗示"我准备好了" */
+.composer-send-btn:not(.is-disabled):not(.is-loading) {
+  animation: send-breathe 2.8s ease-in-out infinite;
+}
+
+.composer-send-btn:not(.is-disabled):not(.is-loading):hover {
+  box-shadow: 0 10px 24px rgba(79, 110, 247, 0.32) !important;
+  transform: translateY(-1px);
+  animation: none;
+}
+
+@keyframes send-breathe {
+  0%, 100% { box-shadow: 0 6px 16px rgba(79, 110, 247, 0.22); }
+  50% { box-shadow: 0 8px 22px rgba(79, 110, 247, 0.34); }
 }
 
 .composer-send-btn.is-disabled,
@@ -816,6 +852,12 @@ export default { components: { Loading } }
   :global(:root:not([data-theme="light"])) .chat-composer {
     background:
       linear-gradient(180deg, transparent, rgba(15, 15, 18, 0.82) 18%, var(--bg) 100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .composer-send-btn:not(.is-disabled):not(.is-loading) {
+    animation: none;
   }
 }
 

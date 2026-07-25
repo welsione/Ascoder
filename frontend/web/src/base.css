@@ -13,10 +13,12 @@ body {
   min-width: 0;
   min-height: 100vh;
   background:
-    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(79, 110, 247, 0.03), transparent),
+    radial-gradient(ellipse 70% 50% at 50% 0%, rgba(79, 110, 247, 0.07), transparent 60%),
+    radial-gradient(ellipse 50% 40% at 100% 100%, rgba(79, 110, 247, 0.04), transparent 60%),
     var(--bg);
+  background-attachment: fixed;
   color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  font-family: var(--font-sans);
   font-optical-sizing: auto;
   font-feature-settings: "ss01", "cv11";
   -webkit-font-smoothing: antialiased;
@@ -132,7 +134,7 @@ select {
   border: 1px solid var(--stroke);
   border-radius: var(--radius-lg);
   background: var(--surface);
-  box-shadow: var(--shadow-soft);
+  box-shadow: var(--shadow-soft), var(--highlight-edge);
 }
 
 /* ──────────────────────────────────
@@ -574,7 +576,7 @@ select {
   background: var(--primary-soft);
   padding: 0.1em 0.4em;
   color: var(--chat-accent);
-  font-family: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 0.88em;
   overflow-wrap: anywhere;
   word-break: break-word;
@@ -919,7 +921,8 @@ select {
   grid-template-rows: minmax(0, 1fr);
   min-height: 100vh;
   background:
-    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(79, 110, 247, 0.03), transparent),
+    radial-gradient(ellipse 70% 50% at 50% 0%, rgba(79, 110, 247, 0.06), transparent 60%),
+    radial-gradient(ellipse 50% 40% at 100% 100%, rgba(79, 110, 247, 0.035), transparent 60%),
     var(--bg);
 }
 
@@ -1793,7 +1796,7 @@ select {
 }
 
 .field-meta code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-mono);
 }
 
 /* 字段错误：带滑入动画，反馈出现在"交互中"而非提交后 */
@@ -1923,6 +1926,32 @@ select {
   width: 100%;
   cursor: pointer;
   color: var(--text);
+  position: relative;
+  overflow: hidden;
+}
+
+/* 选中态左侧 accent 色条：Apple 风格的空间锚点 */
+.settings-nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: var(--spacing-2);
+  bottom: var(--spacing-2);
+  width: 3px;
+  border-radius: var(--radius-full);
+  background: var(--chat-accent);
+  animation: nav-indicator-in 220ms var(--ease-spring);
+}
+
+@keyframes nav-indicator-in {
+  from {
+    transform: scaleY(0);
+    opacity: 0;
+  }
+  to {
+    transform: scaleY(1);
+    opacity: 1;
+  }
 }
 
 .settings-nav-item span {
@@ -2274,8 +2303,10 @@ select {
 
 [data-theme="dark"] body {
   background:
-    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(107, 138, 247, 0.04), transparent),
+    radial-gradient(ellipse 70% 50% at 50% 0%, rgba(107, 138, 247, 0.08), transparent 60%),
+    radial-gradient(ellipse 50% 40% at 100% 100%, rgba(107, 138, 247, 0.045), transparent 60%),
     var(--bg);
+  background-attachment: fixed;
 }
 
 body {
@@ -2361,6 +2392,10 @@ body {
 
   .message-bubble {
     animation: none !important;
+  }
+
+  .settings-nav-item.active::before {
+    animation: none;
   }
 }
 

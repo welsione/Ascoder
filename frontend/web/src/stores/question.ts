@@ -84,6 +84,12 @@ export const useQuestionStore = defineStore('question', () => {
     })
   )
 
+  /** 最近提问（按创建时间倒序，用于欢迎页快捷入口） */
+  const recentQuestions = computed(() =>
+    [...questions.value]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  )
+
   interface ConversationGroup {
     conversationId: number
     title: string
@@ -643,6 +649,7 @@ export const useQuestionStore = defineStore('question', () => {
     activeQuestion,
     activeConversationQuestions,
     conversationHistory,
+    recentQuestions,
     conversationGroups,
     currentSpaceConversationGroups,
     streamStatesByQuestionId,

@@ -217,17 +217,17 @@ defineExpose({ scrollToBottom })
       </div>
     </div>
 
-    <!-- 新消息未读提示 -->
+    <!-- 滚动到底部 / 新消息提示 -->
     <Transition name="fade">
       <button
-        v-if="isUserScrolling && questionStore.activeStreaming"
+        v-if="isUserScrolling"
         class="new-message-hint"
         type="button"
-        title="查看新消息"
-        aria-label="查看新消息"
+        :title="questionStore.activeStreaming ? '查看新消息' : '滚动到底部'"
+        :aria-label="questionStore.activeStreaming ? '查看新消息' : '滚动到底部'"
         @click="onNewMessageClick"
       >
-        <span>新消息</span>
+        <span v-if="questionStore.activeStreaming">新消息</span>
         <ArrowDown class="hint-arrow" aria-hidden="true" :size="14" :stroke-width="1.8" />
       </button>
     </Transition>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import SettingsSidebar from '../components/settings/SettingsSidebar.vue'
 import RepositorySection from '../components/settings/RepositorySection.vue'
@@ -12,6 +12,7 @@ import GeneralSection from '../components/settings/GeneralSection.vue'
 import type { Section } from '../types/settings'
 
 const route = useRoute()
+const mainRef = ref<HTMLElement | null>(null)
 
 function normalizeSection(value: string | undefined): Section {
   if (value === 'repository' || value === 'repositories') return 'repositories'
@@ -53,12 +54,28 @@ const sectionMeta = computed(() => {
   }
   return { title: 'MCP 管理', description: '配置代理可调用的外部工具服务，扩展问答时的执行能力。' }
 })
+
+/** 切换 section 时触发 stagger 入场动画 */
+watch(section, () => {
+  nextTick(() => {
+    if (!mainRef.value) return
+    const panels = mainRef.value.querySelectorAll('.surface-panel, .settings-block')
+    panels.forEach((panel, i) => {
+      const el = panel as HTMLElement
+      el.classList.remove('settings-stagger-in')
+      // 强制重排以重启动画
+      void el.offsetWidth
+      el.style.setProperty('--stagger-delay', `${i * 60}ms`)
+      el.classList.add('settings-stagger-in')
+    })
+  })
+}, { immediate: true })
 </script>
 
 <template>
   <section class="settings-drawer-layout">
     <SettingsSidebar />
-    <section class="settings-drawer-main">
+    <section ref="mainRef" class="settings-drawer-main" :key="section">
       <header class="settings-drawer-header">
         <div>
           <p class="kicker">{{ sectionMeta.title }}</p>
@@ -87,3 +104,26 @@ const sectionMeta = computed(() => {
     </section>
   </section>
 </template>
+
+<style scoped>
+.settings-stagger-in {
+  animation: settings-stagger 0.4s var(--ease-spring) var(--stagger-delay, 0ms) both;
+}
+
+@keyframes settings-stagger {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-stagger-in {
+    animation: none;
+  }
+}
+</style>
