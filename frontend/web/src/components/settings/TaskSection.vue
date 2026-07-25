@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { CircleX, RefreshCw, RotateCcw, Trash2 } from 'lucide-vue-next'
 import { useAsyncTaskStore } from '../../stores/asyncTask'
+import { formatTime } from '../../utils/format'
 import type { TaskKind, TaskStatus } from '../../types/asyncTask'
 
 const store = useAsyncTaskStore()
@@ -59,17 +60,6 @@ function onFilterKindChange() {
 
 function onFilterStatusChange() {
   store.setFilterStatus(filterStatus.value)
-}
-
-function formatTime(value?: string | null) {
-  if (!value) return '--'
-  try {
-    const date = new Date(value)
-    const pad = (n: number) => String(n).padStart(2, '0')
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
-  } catch {
-    return value
-  }
 }
 
 function formatDuration(startedAt?: string | null, finishedAt?: string | null) {

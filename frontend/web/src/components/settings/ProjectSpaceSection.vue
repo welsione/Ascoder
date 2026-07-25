@@ -17,6 +17,7 @@ import { useProjectSpaceStore } from '../../stores/projectSpace'
 import { useRepositoryStore } from '../../stores/repository'
 import { useDraftAutoSave } from '../../composables/useDraftAutoSave'
 import { useChangeHistory } from '../../composables/useChangeHistory'
+import { formatTime } from '../../utils/format'
 import type { RepositoryBranch } from '../../types/repository'
 
 const props = withDefaults(defineProps<{
@@ -96,17 +97,6 @@ const filteredSpaces = computed(() => {
       projectSpaceStore.statusLabel(space.status).includes(q)
   )
 })
-
-function formatTime(iso?: string | null): string {
-  if (!iso) return '未索引'
-  try {
-    const d = new Date(iso)
-    const pad = (n: number) => String(n).padStart(2, '0')
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
-  } catch {
-    return iso
-  }
-}
 
 function suggestedCopyName(name: string) {
   const base = `${name}-copy`
@@ -570,7 +560,7 @@ function handleReset() {
       </el-table-column>
       <el-table-column prop="lastIndexedAt" label="最近索引" min-width="170">
         <template #default="{ row }">
-          {{ formatTime(row.lastIndexedAt) }}
+          {{ formatTime(row.lastIndexedAt, '未索引') }}
         </template>
       </el-table-column>
       <el-table-column label="操作" width="232" fixed="right">

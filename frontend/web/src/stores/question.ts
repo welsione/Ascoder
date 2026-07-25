@@ -3,6 +3,7 @@ import { computed, reactive, ref } from 'vue'
 import * as api from '../services/questionApi'
 import type { LogUploadRecord, StreamEvent } from '../services/questionApi'
 import type { QuestionRecord } from '../types/question'
+import { formatTime } from '../utils/format'
 import {
   notifyAnswerCompleted,
   requestNotificationPermission,
@@ -611,7 +612,7 @@ export const useQuestionStore = defineStore('question', () => {
     const lines: string[] = []
     lines.push(`# ${convQuestions[0]?.conversationTitle || '对话记录'}`)
     lines.push('')
-    lines.push(`导出时间：${new Date().toLocaleString('zh-CN')}`)
+    lines.push(`导出时间：${formatTime(new Date().toISOString())}`)
     lines.push('')
 
     convQuestions.forEach((q, i) => {

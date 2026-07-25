@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { GitBranch, KeyRound, Plus, RefreshCw } from 'lucide-vue-next'
 import { useRepositoryStore } from '../../stores/repository'
+import { formatTime } from '../../utils/format'
 import type { CodeRepository } from '../../types/repository'
 
 const repositoryStore = useRepositoryStore()
@@ -32,17 +33,6 @@ function displayLocation(repository: CodeRepository) {
   if (!value) return '未配置路径'
   const parts = value.split('/').filter(Boolean)
   return parts.length >= 2 ? parts.slice(-2).join('/') : value
-}
-
-function formatTime(value?: string | null) {
-  if (!value) return '未同步'
-  try {
-    const date = new Date(value)
-    const pad = (n: number) => String(n).padStart(2, '0')
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
-  } catch {
-    return value
-  }
 }
 
 function openCreateRepository() {
@@ -167,7 +157,7 @@ async function saveCredentials() {
       </el-table-column>
       <el-table-column prop="lastPulledAt" label="最近同步" min-width="150">
         <template #default="{ row }">
-          {{ formatTime(row.lastPulledAt) }}
+          {{ formatTime(row.lastPulledAt, '未同步') }}
         </template>
       </el-table-column>
       <el-table-column label="操作" width="168" fixed="right">

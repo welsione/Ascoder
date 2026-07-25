@@ -8,6 +8,7 @@ import { useSkillStore } from '../../stores/skill'
 import { useMcpServerStore } from '../../stores/mcpServer'
 import { useLlmProviderStore } from '../../stores/llmProvider'
 import * as api from '../../services/agentApi'
+import { formatTime } from '../../utils/format'
 import type { AgentConfig, AgentRuntimeStatus, AgentRunRecord, TestRenderResponse } from '../../types/agent'
 import AgentEventList from './AgentEventList.vue'
 
@@ -59,13 +60,6 @@ onMounted(() => {
 function runningSeconds(startedAt: string | null | undefined): number {
   if (!startedAt) return 0
   return Math.max(0, Math.floor((now.value - new Date(startedAt).getTime()) / 1000))
-}
-
-function formatTime(iso: string | null | undefined): string {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return '—'
-  return d.toLocaleString('zh-CN', { hour12: false })
 }
 
 async function openRunsDrawer(config: AgentConfig) {
@@ -287,7 +281,7 @@ const taskKindOptions = [
       </el-table-column>
       <el-table-column label="最近运行" width="170">
         <template #default="{ row }">
-          {{ formatTime(agentStore.lastRunAt[row.agentId]) }}
+          {{ formatTime(agentStore.lastRunAt[row.agentId], '—') }}
         </template>
       </el-table-column>
       <el-table-column label="启用" width="80">

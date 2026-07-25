@@ -5,6 +5,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, Bot, BrainCircuit, CheckCircle2, DatabaseZap, FileCheck2, GitBranch, History, Plus, ShieldCheck, Sparkles, Trash2 } from 'lucide-vue-next'
 import * as api from '../services/selfLearningApi'
 import { useProjectSpaceStore } from '../stores/projectSpace'
+import { formatTime } from '../utils/format'
 import type {
   LearningInsight,
   LearningInsightVerification,
@@ -188,16 +189,6 @@ function verificationStatusType(value: LearningInsightVerificationStatus | null 
   if (value === 'NEEDS_CHANGES' || value === 'INSUFFICIENT_EVIDENCE') return 'warning'
   if (value === 'CONTRADICTED') return 'danger'
   return 'info'
-}
-
-function formatTime(value: string | null) {
-  if (!value) return '未记录'
-  return new Date(value).toLocaleString('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
 }
 
 function compactText(value: string | null | undefined, fallback = '暂无内容') {
@@ -837,7 +828,7 @@ onMounted(loadAll)
               <el-tag size="small" :type="agentRunStatusType(run.status)">{{ agentRunStatusLabel(run.status) }}</el-tag>
               <span>{{ run.createdInsightCount }} 洞察 / {{ run.consumedRawEventCount }} 记录</span>
               <span v-if="run.failedConversationCount">{{ run.failedConversationCount }} 失败</span>
-              <span>{{ formatTime(run.updatedAt) }}</span>
+              <span>{{ formatTime(run.updatedAt, '未记录') }}</span>
             </div>
           </div>
         </div>
@@ -897,7 +888,7 @@ onMounted(loadAll)
             <article v-for="event in rawEvents" :key="event.id" class="event-card">
               <div class="event-head">
                 <el-tag size="small" effect="plain">{{ event.eventType }}</el-tag>
-                <span>{{ formatTime(event.createdAt) }}</span>
+                <span>{{ formatTime(event.createdAt, '未记录') }}</span>
               </div>
               <h4>{{ event.summary || '未提供摘要' }}</h4>
               <p>Agent：{{ event.agentId || 'system' }} · Question #{{ event.questionId || '-' }}</p>
@@ -1015,7 +1006,7 @@ onMounted(loadAll)
                   </div>
                   <div>
                     <span>复核时间</span>
-                    <strong>{{ formatTime(verificationResult.verifiedAt) }}</strong>
+                    <strong>{{ formatTime(verificationResult.verifiedAt, '未记录') }}</strong>
                   </div>
                 </div>
                 <div v-if="verificationResult?.suggestedChanges" class="agent-suggestion">
