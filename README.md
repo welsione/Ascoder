@@ -1,6 +1,6 @@
 # Ascoder
 
-团队代码理解平台 — 对代码仓库进行结构化问答、索引与分析。
+团队代码理解平台 - 对代码仓库进行结构化问答、索引与分析。
 
 ## 快速开始
 
@@ -28,8 +28,9 @@ docker compose up -d
 
 ## 文档
 
-- [部署指南](DEPLOY.md) — Docker Compose 配置、私有仓库访问、Windows + WSL2 部署
-- [CLAUDE.md](CLAUDE.md) — 模块边界、代码规范、目录约定
+- [部署指南](DEPLOY.md) - Docker Compose 配置、私有仓库访问、Windows + WSL2 部署
+- [局域网部署](DEPLOY-LAN.md) - GitHub Actions + GHCR + cron/计划任务自动更新（含 Windows PowerShell 脚本）
+- [CLAUDE.md](CLAUDE.md) - 模块边界、代码规范、目录约定
 
 ## 技术栈
 

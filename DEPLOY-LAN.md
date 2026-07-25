@@ -29,8 +29,10 @@
 │   ├─ .env                    │  ← 生产配置（不入库）
 │   ├─ data/                   │  ← 持久化（仓库 / 索引）
 │   └─ scripts/server/         │
-│       ├─ deploy.sh           │  ← cron 调用
-│       └─ install.sh          │  ← 一次性安装
+│       ├─ deploy.sh           │  ← cron 调用（Linux）
+│       ├─ deploy.ps1          │  ← 计划任务调用（Windows）
+│       ├─ install.sh          │  ← 一次性安装（Linux）
+│       └─ install.ps1         │  ← 一次性安装（Windows）
 └──────────────────────────────┘
 ```
 
@@ -46,6 +48,103 @@
 | 出网能力 | 能访问 `github.com` 与 `ghcr.io` |
 
 > MySQL 也可以容器化，但当前 `docker-compose.prod.yml` 沿用 `host.docker.internal` 模式，与开发环境一致。若需容器化 MySQL，自行追加一个 mysql 服务即可。
+
+## Windows 服务器部署
+
+Windows 上使用 PowerShell 脚本（`install.ps1` / `deploy.ps1`）替代 bash 版本，用**计划任务**替代 cron。架构与 Linux 版完全一致：GitHub Actions 推镜像到 GHCR，服务器定时拉取镜像与 compose 文件后重启容器。
+
+### 前置条件（Windows）
+
+| 依赖 | 说明 |
+| --- | --- |
+| Docker Desktop for Windows | 启用 WSL2 后端（默认）；确保 C 盘已共享给 Docker（Settings -> Resources -> File sharing） |
+| Git for Windows | 提供 `git` 与可选的 `openssl` |
+| MySQL 8 | 跑在宿主机上，监听 `0.0.0.0:3306`（容器通过 `host.docker.internal:3306` 连接） |
+| PowerShell 5.1+ | Windows 10/11 自带；执行策略需允许本地脚本 |
+| 出网能力 | 能访问 `github.com` 与 `ghcr.io` |
+
+> **路径要求**：部署目录不要含空格或中文（如 `C:\ascoder`），避免 `.env` 路径解析与 Docker bind mount 异常。`.env` 中的路径一律用正斜杠（`C:/Users/you/repos`）。
+
+### 一次性安装
+
+以管理员身份打开 PowerShell：
+
+```powershell
+# 下载安装脚本（或直接 clone 仓库后执行）
+mkdir C:\ascoder -Force
+cd C:\ascoder
+Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/welsione/Ascoder/master/scripts/server/install.ps1' -OutFile install.ps1
+
+# 执行安装（默认部署到 C:\ascoder，每 5 分钟拉取一次）
+powershell -ExecutionPolicy Bypass -File install.ps1
+```
+
+自定义部署目录与间隔：
+
+```powershell
+$env:ASCODER_HOME = 'D:\ascoder'
+$env:CRON_INTERVAL_MIN = '2'
+powershell -ExecutionPolicy Bypass -File install.ps1
+```
+
+脚本会：
+
+1. 检查 `git` / `docker` / `docker compose`；
+2. 浅克隆仓库到 `C:\ascoder`（仅用于同步 compose 与脚本，源码在镜像里）；
+3. 从 `.env.example` 生成 `.env`，自动生成 `ASCODER_ENCRYPTION_KEY`（用 openssl 或 .NET 兜底）；
+4. 注册 Windows 计划任务 `AscoderAutoDeploy`，每 5 分钟跑 `scripts\server\deploy.ps1`。
+
+### 配置 .env
+
+```powershell
+notepad C:\ascoder\.env
+```
+
+与 Linux 版配置项完全一致：`MYSQL_PASSWORD`、`MYSQL_USER`、模型 Key 等。
+
+### 计划任务管理
+
+```powershell
+# 查看任务状态
+Get-ScheduledTask -TaskName AscoderAutoDeploy
+
+# 立即触发一次（不等间隔）
+Start-ScheduledTask -TaskName AscoderAutoDeploy
+
+# 停止自动更新（如需锁定版本）
+Disable-ScheduledTask -TaskName AscoderAutoDeploy
+
+# 恢复自动更新
+Enable-ScheduledTask -TaskName AscoderAutoDeploy
+
+# 查看最近运行结果
+Get-ScheduledTaskInfo -TaskName AscoderAutoDeploy
+
+# 删除任务
+Unregister-ScheduledTask -TaskName AscoderAutoDeploy -Confirm:$false
+```
+
+> 计划任务以当前登录用户身份运行（`LogonType Interactive`），需要用户保持登录。如需无人值守，可改用 SYSTEM 账户注册，但 Docker Desktop 需配置为 Windows 服务模式。
+
+### 立即触发更新（不等计划任务）
+
+```powershell
+powershell -ExecutionPolicy Bypass -File C:\ascoder\scripts\server\deploy.ps1
+```
+
+日志写入 `C:\ascoder\deploy.log`。
+
+### Windows 特有注意事项
+
+| 场景 | 症状 / 解决 |
+| --- | --- |
+| PowerShell 执行策略阻止脚本 | `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`；或单次绕过：`powershell -ExecutionPolicy Bypass -File ...` |
+| 企业域账户锁死执行策略 | 只能用 `-ExecutionPolicy Bypass` 单次覆盖 |
+| 计划任务未触发 | 确认用户已登录（Interactive 模式）；或改用 `schtasks /query /tn AscoderAutoDeploy` 排查 |
+| `host.docker.internal` 连不上 MySQL | Docker Desktop 默认支持；若被防火墙拦截，检查 Windows Defender 防火墙是否放行 3306 端口 |
+| bind mount 权限不足 | Docker Desktop -> Settings -> Resources -> File sharing 确认 C 盘已共享 |
+| 路径含空格导致 `.env` 截断 | 始终把项目放在无空格路径（如 `C:\ascoder`） |
+| 符号链接创建失败 | 项目空间 worktree 链接在 Windows 上用 junction（`mklink /J`），无需管理员权限；如失败检查目录是否被占用 |
 
 ## 一次性安装
 
@@ -178,6 +277,8 @@ echo "<your-PAT>" | docker login ghcr.io -u <github-username> --password-stdin
 | backend 容器反复重启 | 多半是 MySQL 连不上：检查宿主机 MySQL 是否监听 `0.0.0.0:3306`、`MYSQL_PASSWORD` 是否正确、用户是否允许从 `host.docker.internal` 连接 |
 | 前端能打开但接口 502 | backend 未通过 healthcheck；`docker compose logs backend` 看异常 |
 | cron 没生效 | `crontab -l` 确认有 `ascoder-auto-deploy` 行；`systemctl status cron`（或 crond）确认服务在跑 |
+| Windows 计划任务没生效 | `Get-ScheduledTask -TaskName AscoderAutoDeploy` 确认状态为 Ready；`Get-ScheduledTaskInfo` 看上次运行结果；确认注册时的用户已登录（Interactive 模式） |
+| Windows `deploy.ps1` 报执行策略错误 | 用 `powershell -ExecutionPolicy Bypass -File deploy.ps1` 运行；或 `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` |
 | `git checkout` 覆盖了本地改动 | `deploy.sh` 只 checkout `docker-compose.prod.yml` / `.env.example` / `scripts/`，`.env` 与 `data/` 不会被覆盖。若需自定义 compose，用 override：`docker compose -f docker-compose.prod.yml -f docker-compose.override.yml up -d`，并在 `deploy.sh` 里追加 `-f` |
 | 镜像没更新 | 确认 GitHub Actions 构建成功（仓库 → Actions 标签页）；GHCR 有缓存，首次构建较慢 |
 
