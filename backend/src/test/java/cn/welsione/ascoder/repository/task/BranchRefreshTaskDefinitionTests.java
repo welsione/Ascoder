@@ -9,7 +9,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -47,7 +46,7 @@ class BranchRefreshTaskDefinitionTests {
 
     @Test
     void executeCallsRefresh() throws Exception {
-        Map<String, String> context = Map.of("repositoryId", "42");
+        BranchRefreshContext context = new BranchRefreshContext(42L);
 
         definition.execute(context, progress);
 
@@ -56,7 +55,7 @@ class BranchRefreshTaskDefinitionTests {
 
     @Test
     void executeUpdatesProgressTo100() throws Exception {
-        Map<String, String> context = Map.of("repositoryId", "42");
+        BranchRefreshContext context = new BranchRefreshContext(42L);
 
         definition.execute(context, progress);
 
@@ -65,10 +64,10 @@ class BranchRefreshTaskDefinitionTests {
 
     @Test
     void serializeAndDeserializeContextRoundTrip() {
-        Map<String, String> context = Map.of("repositoryId", "42");
+        BranchRefreshContext context = new BranchRefreshContext(42L);
 
         String json = definition.serializeContext(context);
-        Map<String, String> deserialized = definition.deserializeContext(json);
+        BranchRefreshContext deserialized = definition.deserializeContext(json);
 
         assertEquals(context, deserialized);
     }

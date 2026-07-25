@@ -21,7 +21,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -130,7 +129,7 @@ class ProjectSpacePrepareTaskDefinitionTests {
         when(branchWorkspaceService.prepare(eq(10L), any(CreateBranchWorkspaceRequest.class), eq("abc123")))
                 .thenReturn(workspace);
 
-        Map<String, String> context = Map.of("projectSpaceId", "1");
+        ProjectSpacePrepareContext context = new ProjectSpacePrepareContext(1L);
 
         definition.execute(context, progress);
 
@@ -169,7 +168,7 @@ class ProjectSpacePrepareTaskDefinitionTests {
         when(memberJpaRepository.findByProjectSpace_IdOrderByCreatedAtAsc(1L))
                 .thenReturn(List.of());
 
-        Map<String, String> context = Map.of("projectSpaceId", "1");
+        ProjectSpacePrepareContext context = new ProjectSpacePrepareContext(1L);
 
         definition.execute(context, progress);
 
@@ -204,7 +203,7 @@ class ProjectSpacePrepareTaskDefinitionTests {
         when(branchWorkspaceService.prepare(eq(10L), any(CreateBranchWorkspaceRequest.class), eq("abc123")))
                 .thenThrow(new RuntimeException("git fetch 失败"));
 
-        Map<String, String> context = Map.of("projectSpaceId", "1");
+        ProjectSpacePrepareContext context = new ProjectSpacePrepareContext(1L);
 
         RuntimeException ex = assertThrows(RuntimeException.class,
                 () -> definition.execute(context, progress));
@@ -223,10 +222,10 @@ class ProjectSpacePrepareTaskDefinitionTests {
 
     @Test
     void serializeAndDeserializeContextRoundTrip() {
-        Map<String, String> context = Map.of("projectSpaceId", "1");
+        ProjectSpacePrepareContext context = new ProjectSpacePrepareContext(1L);
 
         String json = definition.serializeContext(context);
-        Map<String, String> deserialized = definition.deserializeContext(json);
+        ProjectSpacePrepareContext deserialized = definition.deserializeContext(json);
 
         assertEquals(context, deserialized);
     }

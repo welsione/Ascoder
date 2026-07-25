@@ -1,9 +1,12 @@
 package cn.welsione.ascoder.repository;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
+
 /**
  * Git 同步操作类型，用于 {@link cn.welsione.ascoder.repository.task.GitFetchTaskDefinition} 上下文中的 operation 字段。
  *
- * <p>序列化为字符串存入任务上下文（{@code Map<String, String>}），由
+ * <p>序列化为字符串存入任务上下文，由
  * {@link cn.welsione.ascoder.repository.task.GitFetchTaskDefinition#execute} 读取后决定执行 fetch 还是 pull。</p>
  */
 public enum GitSyncOperation {
@@ -21,6 +24,7 @@ public enum GitSyncOperation {
     }
 
     /** 返回存入任务上下文的字符串编码。 */
+    @JsonValue
     public String code() {
         return code;
     }
@@ -32,6 +36,7 @@ public enum GitSyncOperation {
      * @return 对应的枚举值；code 为 null 时返回 {@link #FETCH}（向后兼容旧任务）
      * @throws IllegalArgumentException code 不是 fetch/pull 之一
      */
+    @JsonCreator
     public static GitSyncOperation fromCode(String code) {
         if (code == null) {
             return FETCH;

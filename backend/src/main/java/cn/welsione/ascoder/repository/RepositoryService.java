@@ -8,8 +8,12 @@ import cn.welsione.ascoder.common.exception.ValidationException;
 import cn.welsione.ascoder.common.task.TaskEngine;
 import cn.welsione.ascoder.common.task.TaskKind;
 import cn.welsione.ascoder.common.task.TaskSubmitRequest;
+import cn.welsione.ascoder.codegraph.task.CodeGraphIndexContext;
 import cn.welsione.ascoder.repository.git.GitCredentialStore;
 import cn.welsione.ascoder.repository.git.GitRepositoryService;
+import cn.welsione.ascoder.repository.task.BranchRefreshContext;
+import cn.welsione.ascoder.repository.task.GitCloneContext;
+import cn.welsione.ascoder.repository.task.GitFetchContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -17,9 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.file.Path;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * 仓库服务，处理代码仓库的 CRUD 和 CodeGraph 索引操作。
@@ -92,14 +94,15 @@ public class RepositoryService {
             CodeRepository saved = repository.saveAndFlush(entity);
 
             if (remoteRepository) {
-                Map<String, String> context = new LinkedHashMap<>();
-                context.put("remoteUrl", request.getRemoteUrl().trim());
-                context.put("targetPath", normalizedPath.toString());
-                context.put("branchName", trimToNull(request.getDefaultBranch()));
-                context.put("repositoryId", saved.getId().toString());
-                context.put("authUsername", trimToNull(request.getAuthUsername()));
-                context.put("authPassword", trimToNull(request.getAuthPassword()));
-                TaskSubmitRequest<Map<String, String>> taskRequest = new TaskSubmitRequest<>();
+                GitCloneContext context = new GitCloneContext(
+                        request.getRemoteUrl().trim(),
+                        normalizedPath.toString(),
+                        trimToNull(request.getDefaultBranch()),
+                        saved.getId(),
+                        trimToNull(request.getAuthUsername()),
+                        trimToNull(request.getAuthPassword())
+                );
+                TaskSubmitRequest<GitCloneContext> taskRequest = new TaskSubmitRequest<>();
                 taskRequest.setKind(TaskKind.GIT_CLONE);
                 taskRequest.setContext(context);
                 taskRequest.setBusinessId(saved.getId());
@@ -126,10 +129,11 @@ public class RepositoryService {
         entity.indexing();
         repository.saveAndFlush(entity);
 
-        Map<String, String> context = new LinkedHashMap<>();
-        context.put("repositoryPath", entity.resolveLocalPath(repoRoot.toString()));
-        context.put("repositoryId", id.toString());
-        TaskSubmitRequest<Map<String, String>> request = new TaskSubmitRequest<>();
+        CodeGraphIndexContext context = new CodeGraphIndexContext(
+                entity.resolveLocalPath(repoRoot.toString()),
+                null, false, null, id
+        );
+        TaskSubmitRequest<CodeGraphIndexContext> request = new TaskSubmitRequest<>();
         request.setKind(TaskKind.CODEGRAPH_INDEX);
         request.setContext(context);
         request.setBusinessId(id);
@@ -151,14 +155,13 @@ public class RepositoryService {
         entity.syncing();
         repository.saveAndFlush(entity);
 
-        Map<String, String> context = new LinkedHashMap<>();
-        context.put("repositoryPath", entity.resolveLocalPath(repoRoot.toString()));
-        context.put("repositoryId", id.toString());
-        context.put("operation", GitSyncOperation.FETCH.code());
-        context.put("authUsername", entity.getAuthUsername());
-        context.put("authPassword", entity.getAuthPassword());
-        context.put("remoteUrl", entity.getRemoteUrl());
-        TaskSubmitRequest<Map<String, String>> fetchRequest = new TaskSubmitRequest<>();
+        GitFetchContext context = new GitFetchContext(
+                entity.resolveLocalPath(repoRoot.toString()),
+                id, GitSyncOperation.FETCH,
+                entity.getAuthUsername(), entity.getAuthPassword(), entity.getRemoteUrl(),
+                null
+        );
+        TaskSubmitRequest<GitFetchContext> fetchRequest = new TaskSubmitRequest<>();
         fetchRequest.setKind(TaskKind.GIT_FETCH);
         fetchRequest.setContext(context);
         fetchRequest.setBusinessId(id);
@@ -175,14 +178,13 @@ public class RepositoryService {
         entity.syncing();
         repository.saveAndFlush(entity);
 
-        Map<String, String> context = new LinkedHashMap<>();
-        context.put("repositoryPath", entity.resolveLocalPath(repoRoot.toString()));
-        context.put("repositoryId", id.toString());
-        context.put("operation", GitSyncOperation.PULL.code());
-        context.put("authUsername", entity.getAuthUsername());
-        context.put("authPassword", entity.getAuthPassword());
-        context.put("remoteUrl", entity.getRemoteUrl());
-        TaskSubmitRequest<Map<String, String>> pullRequest = new TaskSubmitRequest<>();
+        GitFetchContext context = new GitFetchContext(
+                entity.resolveLocalPath(repoRoot.toString()),
+                id, GitSyncOperation.PULL,
+                entity.getAuthUsername(), entity.getAuthPassword(), entity.getRemoteUrl(),
+                null
+        );
+        TaskSubmitRequest<GitFetchContext> pullRequest = new TaskSubmitRequest<>();
         pullRequest.setKind(TaskKind.GIT_FETCH);
         pullRequest.setContext(context);
         pullRequest.setBusinessId(id);
@@ -202,6 +204,7 @@ public class RepositoryService {
      * 提交分支刷新异步任务。
      *
      * <p>提交 BRANCH_REFRESH 任务后立即返回，不等待 fetch + 分支发现完成。
+     * 凭据在提交前已写入 credential store，任务执行时直接读取。
      * 用户可通过 GET /{id}/branches 查询最新分支列表。</p>
      */
     @Transactional
@@ -209,12 +212,8 @@ public class RepositoryService {
         CodeRepository entity = getEntity(id);
         upsertCredentials(entity);
 
-        Map<String, String> context = new LinkedHashMap<>();
-        context.put("repositoryId", id.toString());
-        context.put("authUsername", entity.getAuthUsername());
-        context.put("authPassword", entity.getAuthPassword());
-        context.put("remoteUrl", entity.getRemoteUrl());
-        TaskSubmitRequest<Map<String, String>> request = new TaskSubmitRequest<>();
+        BranchRefreshContext context = new BranchRefreshContext(id);
+        TaskSubmitRequest<BranchRefreshContext> request = new TaskSubmitRequest<>();
         request.setKind(TaskKind.BRANCH_REFRESH);
         request.setContext(context);
         request.setBusinessId(id);

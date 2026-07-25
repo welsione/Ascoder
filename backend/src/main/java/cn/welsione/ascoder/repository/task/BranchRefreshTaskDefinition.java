@@ -6,25 +6,21 @@ import cn.welsione.ascoder.common.task.TaskProgress;
 import cn.welsione.ascoder.repository.CodeRepositoryJpaRepository;
 import cn.welsione.ascoder.repository.RepositoryBranchService;
 import cn.welsione.ascoder.repository.git.GitProgressMapper;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.util.Map;
-
 /**
  * 分支刷新异步任务定义，负责刷新指定仓库的分支列表。
  *
- * <p>上下文仅包含 repositoryId 字段。</p>
+ * <p>上下文为 {@link BranchRefreshContext}，仅携带 repositoryId。
+ * 凭据在任务提交前已写入 credential store，任务执行时直接读取。</p>
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class BranchRefreshTaskDefinition implements TaskDefinition<Map<String, String>> {
-
-    private static final TypeReference<Map<String, String>> CONTEXT_TYPE = new TypeReference<>() {};
+public class BranchRefreshTaskDefinition implements TaskDefinition<BranchRefreshContext> {
 
     private final RepositoryBranchService repositoryBranchService;
     private final CodeRepositoryJpaRepository codeRepositoryJpaRepository;
@@ -48,8 +44,8 @@ public class BranchRefreshTaskDefinition implements TaskDefinition<Map<String, S
     }
 
     @Override
-    public void execute(Map<String, String> context, TaskProgress progress) throws Exception {
-        Long repositoryId = Long.valueOf(context.get("repositoryId"));
+    public void execute(BranchRefreshContext context, TaskProgress progress) throws Exception {
+        Long repositoryId = context.getRepositoryId();
 
         log.info("开始刷新分支，repositoryId={}", repositoryId);
 
@@ -61,7 +57,7 @@ public class BranchRefreshTaskDefinition implements TaskDefinition<Map<String, S
     }
 
     @Override
-    public String serializeContext(Map<String, String> context) {
+    public String serializeContext(BranchRefreshContext context) {
         try {
             return objectMapper.writeValueAsString(context);
         } catch (Exception e) {
@@ -70,9 +66,9 @@ public class BranchRefreshTaskDefinition implements TaskDefinition<Map<String, S
     }
 
     @Override
-    public Map<String, String> deserializeContext(String json) {
+    public BranchRefreshContext deserializeContext(String json) {
         try {
-            return objectMapper.readValue(json, CONTEXT_TYPE);
+            return objectMapper.readValue(json, BranchRefreshContext.class);
         } catch (Exception e) {
             throw new IllegalStateException("反序列化分支刷新任务上下文失败", e);
         }

@@ -10,7 +10,6 @@ import cn.welsione.ascoder.repository.RepositoryBranchService;
 import cn.welsione.ascoder.repository.git.GitCredentialStore;
 import cn.welsione.ascoder.repository.git.GitProgressMapper;
 import cn.welsione.ascoder.repository.git.GitRepositoryService;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,20 +18,16 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.file.Path;
 import java.util.Date;
-import java.util.Map;
 
 /**
  * Git clone 异步任务定义，负责克隆远程仓库并刷新分支信息。
  *
- * <p>上下文包含 remoteUrl、targetPath、branchName、repositoryId 四个字段，
- * 通过 Jackson ObjectMapper 序列化/反序列化为 Map。</p>
+ * <p>上下文为 {@link GitCloneContext}，通过 Jackson ObjectMapper 序列化/反序列化。</p>
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class GitCloneTaskDefinition implements TaskDefinition<Map<String, String>> {
-
-    private static final TypeReference<Map<String, String>> CONTEXT_TYPE = new TypeReference<>() {};
+public class GitCloneTaskDefinition implements TaskDefinition<GitCloneContext> {
 
     private final GitRepositoryService gitRepositoryService;
     private final GitCredentialStore gitCredentialStore;
@@ -59,18 +54,18 @@ public class GitCloneTaskDefinition implements TaskDefinition<Map<String, String
     }
 
     @Override
-    public void execute(Map<String, String> context, TaskProgress progress) throws Exception {
-        String remoteUrl = context.get("remoteUrl");
-        String targetPath = context.get("targetPath");
-        String branchName = context.get("branchName");
-        Long repositoryId = Long.valueOf(context.get("repositoryId"));
+    public void execute(GitCloneContext context, TaskProgress progress) throws Exception {
+        String remoteUrl = context.getRemoteUrl();
+        String targetPath = context.getTargetPath();
+        String branchName = context.getBranchName();
+        Long repositoryId = context.getRepositoryId();
 
         log.info("开始克隆仓库，remoteUrl={}，targetPath={}，branchName={}，repositoryId={}",
                 remoteUrl, targetPath, branchName, repositoryId);
 
         // 写入凭据
-        String authUsername = context.get("authUsername");
-        String authPassword = context.get("authPassword");
+        String authUsername = context.getAuthUsername();
+        String authPassword = context.getAuthPassword();
         if (authUsername != null && !authUsername.isBlank()
                 && authPassword != null && !authPassword.isBlank()) {
             gitCredentialStore.upsert(remoteUrl, authUsername, authPassword);
@@ -112,7 +107,7 @@ public class GitCloneTaskDefinition implements TaskDefinition<Map<String, String
     }
 
     @Override
-    public String serializeContext(Map<String, String> context) {
+    public String serializeContext(GitCloneContext context) {
         try {
             return objectMapper.writeValueAsString(context);
         } catch (Exception e) {
@@ -121,9 +116,9 @@ public class GitCloneTaskDefinition implements TaskDefinition<Map<String, String
     }
 
     @Override
-    public Map<String, String> deserializeContext(String json) {
+    public GitCloneContext deserializeContext(String json) {
         try {
-            return objectMapper.readValue(json, CONTEXT_TYPE);
+            return objectMapper.readValue(json, GitCloneContext.class);
         } catch (Exception e) {
             throw new IllegalStateException("反序列化 Git clone 任务上下文失败", e);
         }

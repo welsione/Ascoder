@@ -11,7 +11,6 @@ import cn.welsione.ascoder.repository.git.GitCredentialStore;
 import cn.welsione.ascoder.repository.git.GitProgressMapper;
 import cn.welsione.ascoder.repository.git.GitRepositoryService;
 import cn.welsione.ascoder.repository.projectspace.ProjectSpaceFetchCompletedEvent;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,20 +20,16 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.file.Path;
 import java.util.Date;
-import java.util.Map;
 
 /**
  * Git fetch/pull 异步任务定义，负责同步远程仓库并刷新分支信息。
  *
- * <p>上下文包含 repositoryPath、repositoryId、operation 等字段，
- * operation 取值见 {@link GitSyncOperation}。</p>
+ * <p>上下文为 {@link GitFetchContext}，operation 字段决定执行 fetch 还是 pull。</p>
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class GitFetchTaskDefinition implements TaskDefinition<Map<String, String>> {
-
-    private static final TypeReference<Map<String, String>> CONTEXT_TYPE = new TypeReference<>() {};
+public class GitFetchTaskDefinition implements TaskDefinition<GitFetchContext> {
 
     private static final long DEFAULT_TIMEOUT_MS = 30 * 60 * 1000L; // 30 分钟
 
@@ -68,21 +63,21 @@ public class GitFetchTaskDefinition implements TaskDefinition<Map<String, String
     }
 
     @Override
-    public void execute(Map<String, String> context, TaskProgress progress) throws Exception {
-        String repositoryPath = context.get("repositoryPath");
-        Long repositoryId = Long.valueOf(context.get("repositoryId"));
-        GitSyncOperation operation = GitSyncOperation.fromCode(context.get("operation"));
+    public void execute(GitFetchContext context, TaskProgress progress) throws Exception {
+        String repositoryPath = context.getRepositoryPath();
+        Long repositoryId = context.getRepositoryId();
+        // 向后兼容：旧任务上下文可能不含 operation 字段，默认为 FETCH
+        GitSyncOperation operation = context.getOperation() != null
+                ? context.getOperation() : GitSyncOperation.FETCH;
 
         log.info("开始同步仓库，repositoryId={}，operation={}，path={}", repositoryId, operation, repositoryPath);
 
         // 写入凭据
-        String authUsername = context.get("authUsername");
-        String authPassword = context.get("authPassword");
-        if (authUsername != null && !authUsername.isBlank()
-                && authPassword != null && !authPassword.isBlank()) {
-            String remoteUrl = context.get("remoteUrl");
+        if (context.getAuthUsername() != null && !context.getAuthUsername().isBlank()
+                && context.getAuthPassword() != null && !context.getAuthPassword().isBlank()) {
+            String remoteUrl = context.getRemoteUrl();
             if (remoteUrl != null && !remoteUrl.isBlank()) {
-                gitCredentialStore.upsert(remoteUrl, authUsername, authPassword);
+                gitCredentialStore.upsert(remoteUrl, context.getAuthUsername(), context.getAuthPassword());
             }
         }
 
@@ -127,22 +122,17 @@ public class GitFetchTaskDefinition implements TaskDefinition<Map<String, String
     /**
      * 若由项目空间拉取触发（上下文含 projectSpaceId），fetch 完成后发布事件通知项目空间刷新。
      */
-    private void publishFetchCompletedIfNeeded(Map<String, String> context) {
-        String projectSpaceIdStr = context.get("projectSpaceId");
-        if (projectSpaceIdStr == null || projectSpaceIdStr.isBlank()) {
+    private void publishFetchCompletedIfNeeded(GitFetchContext context) {
+        Long projectSpaceId = context.getProjectSpaceId();
+        if (projectSpaceId == null) {
             return;
         }
-        try {
-            Long projectSpaceId = Long.valueOf(projectSpaceIdStr);
-            eventPublisher.publishEvent(new ProjectSpaceFetchCompletedEvent(projectSpaceId));
-            log.info("已发布项目空间 fetch 完成事件，projectSpaceId={}", projectSpaceId);
-        } catch (NumberFormatException ex) {
-            log.warn("projectSpaceId 格式无效：{}", projectSpaceIdStr);
-        }
+        eventPublisher.publishEvent(new ProjectSpaceFetchCompletedEvent(projectSpaceId));
+        log.info("已发布项目空间 fetch 完成事件，projectSpaceId={}", projectSpaceId);
     }
 
     @Override
-    public String serializeContext(Map<String, String> context) {
+    public String serializeContext(GitFetchContext context) {
         try {
             return objectMapper.writeValueAsString(context);
         } catch (Exception e) {
@@ -151,9 +141,9 @@ public class GitFetchTaskDefinition implements TaskDefinition<Map<String, String
     }
 
     @Override
-    public Map<String, String> deserializeContext(String json) {
+    public GitFetchContext deserializeContext(String json) {
         try {
-            return objectMapper.readValue(json, CONTEXT_TYPE);
+            return objectMapper.readValue(json, GitFetchContext.class);
         } catch (Exception e) {
             throw new IllegalStateException("反序列化 Git fetch 任务上下文失败", e);
         }

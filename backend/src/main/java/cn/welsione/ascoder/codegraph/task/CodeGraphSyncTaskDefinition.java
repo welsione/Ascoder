@@ -8,7 +8,6 @@ import cn.welsione.ascoder.common.task.TaskKind;
 import cn.welsione.ascoder.common.task.TaskProgress;
 import cn.welsione.ascoder.repository.projectspace.ProjectSpace;
 import cn.welsione.ascoder.repository.projectspace.ProjectSpaceJpaRepository;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,20 +16,18 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.file.Path;
 import java.util.Date;
-import java.util.Map;
 
 /**
  * CodeGraph 增量同步异步任务定义，负责执行代码图增量同步并同步进度到任务引擎。
  *
- * <p>上下文包含 repositoryPath、projectSpaceId 两个字段。
+ * <p>上下文为 {@link CodeGraphSyncContext}，携带 repositoryPath 和 projectSpaceId。
  * 进度通过后台线程从 IndexProgressTracker 定期同步到 TaskProgress。</p>
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class CodeGraphSyncTaskDefinition implements TaskDefinition<Map<String, String>> {
+public class CodeGraphSyncTaskDefinition implements TaskDefinition<CodeGraphSyncContext> {
 
-    private static final TypeReference<Map<String, String>> CONTEXT_TYPE = new TypeReference<>() {};
     private static final long PROGRESS_SYNC_INTERVAL_MS = 1000;
 
     private final CodeGraphClient codeGraphClient;
@@ -57,9 +54,9 @@ public class CodeGraphSyncTaskDefinition implements TaskDefinition<Map<String, S
     }
 
     @Override
-    public void execute(Map<String, String> context, TaskProgress progress) throws Exception {
-        String repositoryPath = context.get("repositoryPath");
-        Long projectSpaceId = Long.valueOf(context.get("projectSpaceId"));
+    public void execute(CodeGraphSyncContext context, TaskProgress progress) throws Exception {
+        String repositoryPath = context.getRepositoryPath();
+        Long projectSpaceId = context.getProjectSpaceId();
 
         log.info("开始 CodeGraph 增量同步任务，projectSpaceId={}，path={}", projectSpaceId, repositoryPath);
 
@@ -131,7 +128,7 @@ public class CodeGraphSyncTaskDefinition implements TaskDefinition<Map<String, S
     }
 
     @Override
-    public String serializeContext(Map<String, String> context) {
+    public String serializeContext(CodeGraphSyncContext context) {
         try {
             return objectMapper.writeValueAsString(context);
         } catch (Exception e) {
@@ -140,9 +137,9 @@ public class CodeGraphSyncTaskDefinition implements TaskDefinition<Map<String, S
     }
 
     @Override
-    public Map<String, String> deserializeContext(String json) {
+    public CodeGraphSyncContext deserializeContext(String json) {
         try {
-            return objectMapper.readValue(json, CONTEXT_TYPE);
+            return objectMapper.readValue(json, CodeGraphSyncContext.class);
         } catch (Exception e) {
             throw new IllegalStateException("反序列化 CodeGraph 同步任务上下文失败", e);
         }
