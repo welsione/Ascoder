@@ -558,7 +558,7 @@ function handleReset() {
           </div>
         </template>
       </el-table-column>
-      <el-table-column prop="lastIndexedAt" label="最近索引" min-width="170">
+      <el-table-column label="最近索引" min-width="170">
         <template #default="{ row }">
           {{ formatTime(row.lastIndexedAt, '未索引') }}
         </template>

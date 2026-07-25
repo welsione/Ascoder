@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Plus, RefreshCw, WandSparkles } from 'lucide-vue-next'
 import { useSkillStore } from '../../stores/skill'
+import { formatTime } from '../../utils/format'
 
 const skillStore = useSkillStore()
 const drawerVisible = ref(false)
@@ -58,7 +59,11 @@ async function createSkill() {
           <el-switch :model-value="row.enabled" @change="skillStore.toggleEnabled(row.id, $event)" />
         </template>
       </el-table-column>
-      <el-table-column prop="updatedAt" label="更新时间" min-width="180" />
+      <el-table-column label="更新时间" min-width="180">
+        <template #default="{ row }">
+          {{ formatTime(row.updatedAt) }}
+        </template>
+      </el-table-column>
     </el-table>
 
     <el-alert v-if="skillStore.error" type="error" :title="skillStore.error" show-icon :closable="false" />

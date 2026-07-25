@@ -155,7 +155,7 @@ async function saveCredentials() {
           {{ repositoryBranchCount(row.id) ?? '未加载' }}
         </template>
       </el-table-column>
-      <el-table-column prop="lastPulledAt" label="最近同步" min-width="150">
+      <el-table-column label="最近同步" min-width="150">
         <template #default="{ row }">
           {{ formatTime(row.lastPulledAt, '未同步') }}
         </template>

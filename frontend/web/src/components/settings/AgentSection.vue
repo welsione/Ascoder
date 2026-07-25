@@ -339,7 +339,11 @@ const taskKindOptions = [
         <el-table-column prop="id" label="ID" width="70" />
         <el-table-column prop="status" label="状态" width="100" />
         <el-table-column prop="questionId" label="问题ID" width="90" />
-        <el-table-column prop="startedAt" label="开始" />
+        <el-table-column label="开始" min-width="170">
+          <template #default="{ row }">
+            {{ formatTime(row.startedAt) }}
+          </template>
+        </el-table-column>
         <el-table-column prop="durationMs" label="耗时(ms)" width="100" />
       </el-table>
       <div v-if="selectedRunId" class="mt-3">
