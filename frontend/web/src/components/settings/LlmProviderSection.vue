@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { RefreshCw, Cpu, Plug } from 'lucide-vue-next'
 import { useLlmProviderStore } from '../../stores/llmProvider'
 import type { LlmProvider, LlmProviderType, CreateLlmProviderRequest } from '../../types/llmProvider'
@@ -118,7 +118,12 @@ async function handleDelete(provider: LlmProvider) {
     ElMessage.warning('内置供应商不可删除')
     return
   }
-  await store.deleteProvider(provider.id)
+  try {
+    await ElMessageBox.confirm(`确认删除供应商「${provider.name}」？`, '删除确认', { type: 'warning' })
+    await store.deleteProvider(provider.id)
+  } catch {
+    // 用户取消
+  }
 }
 
 async function handleTestConnection(provider: LlmProvider) {
@@ -150,8 +155,8 @@ async function handleToggleEnabled(provider: LlmProvider, enabled: boolean) {
         <h2>管理 LLM 供应商配置与连接状态</h2>
       </div>
       <div class="section-actions">
-        <el-button circle :loading="store.loading" title="刷新" @click="store.fetchProviders()">
-          <RefreshCw :size="16" :stroke-width="1.8" />
+        <el-button circle :loading="store.loading" title="刷新" aria-label="刷新" @click="store.fetchProviders()">
+          <RefreshCw aria-hidden="true" :size="16" :stroke-width="1.8" />
         </el-button>
         <el-button
           type="primary"
@@ -216,16 +221,7 @@ async function handleToggleEnabled(provider: LlmProvider, enabled: boolean) {
           <el-button text size="small" :loading="testingId === row.id" @click="handleTestConnection(row)">
             <Plug class="button-icon" :size="14" :stroke-width="1.8" />测试
           </el-button>
-          <el-popconfirm
-            title="确认删除此供应商？"
-            confirm-button-text="删除"
-            cancel-button-text="取消"
-            @confirm="handleDelete(row)"
-          >
-            <template #reference>
-              <el-button text size="small" :disabled="row.builtin" type="danger">删除</el-button>
-            </template>
-          </el-popconfirm>
+          <el-button text size="small" :disabled="row.builtin" type="danger" @click="handleDelete(row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>

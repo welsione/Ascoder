@@ -92,8 +92,8 @@ function isDirty(s: RuntimeSetting): boolean {
         <h2>运行时调参与默认值管理</h2>
       </div>
       <div class="section-actions">
-        <el-button circle :loading="store.loading" title="刷新" @click="store.fetchAll">
-          <RefreshCw :size="16" :stroke-width="1.8" />
+        <el-button circle :loading="store.loading" title="刷新" aria-label="刷新" @click="store.fetchAll">
+          <RefreshCw aria-hidden="true" :size="16" :stroke-width="1.8" />
         </el-button>
       </div>
     </div>

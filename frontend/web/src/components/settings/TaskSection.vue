@@ -194,8 +194,8 @@ onUnmounted(() => {
           <Trash2 :size="16" :stroke-width="1.8" />
           清理僵尸任务
         </el-button>
-        <el-button circle :loading="store.loading" title="刷新" @click="store.refresh">
-          <RefreshCw :size="16" :stroke-width="1.8" />
+        <el-button circle :loading="store.loading" title="刷新" aria-label="刷新" @click="store.refresh">
+          <RefreshCw aria-hidden="true" :size="16" :stroke-width="1.8" />
         </el-button>
       </div>
     </div>

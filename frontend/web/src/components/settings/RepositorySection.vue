@@ -136,7 +136,7 @@ async function saveCredentials() {
       </el-table-column>
       <el-table-column label="状态" width="112">
         <template #default="{ row }">
-          <el-tag :type="repositoryStore.statusType(row.status)">{{ row.status }}</el-tag>
+          <el-tag size="small" :type="repositoryStore.statusType(row.status)">{{ row.status }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column label="分支" width="104">

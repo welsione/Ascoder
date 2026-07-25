@@ -236,8 +236,8 @@ const taskKindOptions = [
         <h2>管理 Agent 定义、提示词与装配配置</h2>
       </div>
       <div class="section-actions">
-        <el-button circle :loading="agentStore.loading" title="刷新" @click="agentStore.fetch">
-          <RefreshCw :size="16" :stroke-width="1.8" />
+        <el-button circle :loading="agentStore.loading" title="刷新" aria-label="刷新" @click="agentStore.fetch">
+          <RefreshCw aria-hidden="true" :size="16" :stroke-width="1.8" />
         </el-button>
         <el-button
           type="primary"

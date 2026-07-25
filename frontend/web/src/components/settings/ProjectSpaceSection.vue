@@ -406,7 +406,7 @@ function handleReset() {
         <span>{{ isDeriveMode ? '来源项目' : '基于当前项目' }}</span>
         <strong>{{ selectedProject.name }}</strong>
       </div>
-      <el-tag type="info">{{ projectSpaceStore.form.memberBranches.length }} 个仓库参与分析</el-tag>
+      <el-tag type="info" size="small">{{ projectSpaceStore.form.memberBranches.length }} 个仓库参与分析</el-tag>
     </div>
 
     <template v-if="selectedProject">
@@ -561,7 +561,7 @@ function handleReset() {
       <el-table-column v-if="!projectId" prop="project" label="项目" min-width="140" />
       <el-table-column label="状态" width="130">
         <template #default="{ row }">
-          <el-tag :type="projectSpaceStore.statusType(row.status)">{{ projectSpaceStore.statusLabel(row.status) }}</el-tag>
+          <el-tag size="small" :type="projectSpaceStore.statusType(row.status)">{{ projectSpaceStore.statusLabel(row.status) }}</el-tag>
           <div v-if="projectSpaceStore.indexingId === row.id && projectSpaceStore.indexProgress">
             <el-progress :percentage="projectSpaceStore.indexProgress.percent" :stroke-width="4" />
             <span class="index-progress-mini">{{ projectSpaceStore.indexProgress.message }}</span>
