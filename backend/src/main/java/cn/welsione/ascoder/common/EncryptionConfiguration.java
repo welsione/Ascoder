@@ -16,7 +16,7 @@ import java.util.Set;
  * 默认开发密钥，仅用于本地启动与单元测试；生产环境必须显式配置密钥。</p>
  */
 @Configuration
-public class SecurityConfiguration {
+public class EncryptionConfiguration {
 
     private static final Set<String> DEV_PROFILES = new HashSet<>(Arrays.asList("local", "dev", "default", "dev-local", "dev-docker"));
 
