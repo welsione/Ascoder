@@ -14,15 +14,15 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class GitCloneContext {
     /** 远程仓库 URL。 */
-    String remoteUrl;
+    private String remoteUrl;
     /** 本地目标路径。 */
-    String targetPath;
+    private String targetPath;
     /** 克隆的分支名（可选，为空时使用默认分支）。 */
-    String branchName;
+    private String branchName;
     /** 仓库 ID。 */
-    Long repositoryId;
+    private Long repositoryId;
     /** 认证用户名（可选）。 */
-    String authUsername;
+    private String authUsername;
     /** 认证密码（可选）。 */
-    String authPassword;
+    private String authPassword;
 }

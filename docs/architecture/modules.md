@@ -289,6 +289,7 @@ analysis
   -> common
 
 codegraph
+  -> repository
   -> common
 
 repository
@@ -298,7 +299,7 @@ runtime
   -> common
 ```
 
-阶段性允许 `repository -> codegraph.task` 用于项目空间索引编排；跨聚合操作通过领域事件解耦。
+`repository` 模块通过 `CodeGraphTaskPort` 端口接口（定义在 repository，实现在 codegraph）提交索引/同步任务并查询进度，不直接依赖 codegraph 的任务上下文与进度跟踪器实现，消除循环依赖；跨聚合操作通过领域事件解耦。
 
 ## 重构优先级
 
