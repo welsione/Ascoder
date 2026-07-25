@@ -334,7 +334,7 @@ const taskKindOptions = [
         <el-table-column prop="startedAt" label="开始" />
         <el-table-column prop="durationMs" label="耗时(ms)" width="100" />
       </el-table>
-      <div v-if="selectedRunId" style="margin-top:12px;">
+      <div v-if="selectedRunId" class="mt-3">
         <h4>单条详情</h4>
         <pre class="code-preview">
 {{ ((agentStore.runs.find(r => r.id === selectedRunId)?.inputSummary) || '') + '\n---\n' + ((agentStore.runs.find(r => r.id === selectedRunId)?.outputSummary) || '') }}
@@ -351,7 +351,7 @@ const taskKindOptions = [
       </div>
     </template>
     <template v-else-if="drawerAgent && drawerMode === 'live'">
-      <el-alert type="info" :closable="false" style="margin-bottom:8px;">
+      <el-alert type="info" :closable="false" class="mb-2">
         SSE 状态流已订阅：<code>/api/agents/{{ drawerAgent.agentId }}/status</code>
       </el-alert>
       <p>当前状态：<el-tag :type="statusBadge(agentStore.runtimeStatuses[drawerAgent.agentId] || 'IDLE').type">
@@ -434,7 +434,7 @@ const taskKindOptions = [
         <el-button @click="handleTestRender">渲染预览</el-button>
       </div>
     </div>
-    <el-alert v-if="renderResult" type="info" :closable="false" style="margin-top:8px;">
+    <el-alert v-if="renderResult" type="info" :closable="false" class="mt-2">
       <template #title>渲染预览</template>
       <pre class="code-preview">{{ renderResult.renderedText }}</pre>
       <p v-if="renderResult.warnings.length" class="cell-warning">

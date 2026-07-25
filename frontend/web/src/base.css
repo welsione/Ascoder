@@ -1910,6 +1910,14 @@ select {
   align-self: end;
 }
 
+/* ── Spacing utilities ── */
+.mt-2 { margin-top: var(--spacing-2); }
+.mt-3 { margin-top: var(--spacing-3); }
+.mt-4 { margin-top: var(--spacing-4); }
+.mb-2 { margin-bottom: var(--spacing-2); }
+.mb-3 { margin-bottom: var(--spacing-3); }
+.mb-4 { margin-bottom: var(--spacing-4); }
+
 .settings-nav-list {
   gap: var(--spacing-2);
 }
