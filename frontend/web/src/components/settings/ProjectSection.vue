@@ -420,10 +420,6 @@ import type { ProjectRepositoryMember } from '../../types/project'
 </script>
 
 <style scoped>
-.config-search-bar {
-  margin-bottom: var(--spacing-4);
-}
-
 .config-section {
   border-radius: var(--radius-xl);
   transition:

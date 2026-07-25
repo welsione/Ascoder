@@ -759,10 +759,6 @@ function handleReset() {
   justify-content: space-between;
 }
 
-.config-search-bar {
-  margin-bottom: var(--spacing-4);
-}
-
 .index-progress-mini {
   font-size: 11px;
   color: var(--muted);

@@ -1852,6 +1852,11 @@ select {
   flex-wrap: wrap;
 }
 
+/* 搜索栏：列表上方的筛选输入 */
+.config-search-bar {
+  margin-bottom: var(--spacing-4);
+}
+
 /* ── 表格单元格文本 ── */
 .cell-name {
   font-weight: var(--font-weight-semibold);
