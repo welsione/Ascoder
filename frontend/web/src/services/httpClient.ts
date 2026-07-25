@@ -4,6 +4,8 @@
  * <p>提供默认 30s 超时和外部 AbortSignal 取消能力，避免请求挂死导致 UI 卡死。</p>
  */
 
+import { ApiError, type ApiErrorBody } from './apiError'
+
 export const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? ''
 
 const DEFAULT_TIMEOUT_MS = 30_000
@@ -31,8 +33,14 @@ export interface RequestOptions extends RequestInit {
 
 async function parseResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
-    const detail = await response.text()
-    throw new Error(detail || `HTTP ${response.status}`)
+    const text = await response.text()
+    let body: ApiErrorBody | null = null
+    try {
+      body = text ? (JSON.parse(text) as ApiErrorBody) : null
+    } catch {
+      // 非 JSON 响应（如网关返回的 HTML），用原始文本兜底
+    }
+    throw new ApiError(response.status, body, text || `HTTP ${response.status}`)
   }
   if (response.status === 204) {
     return undefined as T
@@ -90,13 +98,18 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     const response = await fetch(`${apiBaseUrl}${path}`, { ...init, signal: controller.signal })
     return await parseResponse<T>(response)
   } catch (error) {
+    if (error instanceof ApiError) {
+      // 后端结构化错误，已携带干净 message，直接抛出
+      throw error
+    }
     if (error instanceof DOMException && error.name === 'AbortError') {
       if (isTimedOut()) {
         throw new HttpTimeoutError(`请求超时(${timeoutMs}ms): ${path}`)
       }
       throw new HttpAbortError(`请求已取消: ${path}`)
     }
-    throw error
+    // 网络错误（服务器不可达、DNS 失败等），fetch 抛出 TypeError，消息对用户不友好
+    throw new Error('网络连接失败，请检查网络后重试')
   } finally {
     cleanup()
   }
