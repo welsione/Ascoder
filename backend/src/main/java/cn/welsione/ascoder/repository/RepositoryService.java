@@ -8,7 +8,6 @@ import cn.welsione.ascoder.common.exception.ValidationException;
 import cn.welsione.ascoder.common.task.TaskEngine;
 import cn.welsione.ascoder.common.task.TaskKind;
 import cn.welsione.ascoder.common.task.TaskSubmitRequest;
-import cn.welsione.ascoder.codegraph.task.CodeGraphIndexContext;
 import cn.welsione.ascoder.repository.git.GitCredentialStore;
 import cn.welsione.ascoder.repository.git.GitRepositoryService;
 import cn.welsione.ascoder.repository.task.BranchRefreshContext;
@@ -35,6 +34,7 @@ public class RepositoryService {
     private final GitRepositoryService gitRepositoryService;
     private final GitCredentialStore gitCredentialStore;
     private final TaskEngine taskEngine;
+    private final CodeGraphTaskPort codeGraphTaskPort;
 
     private final Path repoRoot;
 
@@ -44,6 +44,7 @@ public class RepositoryService {
             GitRepositoryService gitRepositoryService,
             GitCredentialStore gitCredentialStore,
             TaskEngine taskEngine,
+            CodeGraphTaskPort codeGraphTaskPort,
             @Value("${ascoder.repo-root}") String repoRoot
     ) {
         this.repository = repository;
@@ -51,6 +52,7 @@ public class RepositoryService {
         this.gitRepositoryService = gitRepositoryService;
         this.gitCredentialStore = gitCredentialStore;
         this.taskEngine = taskEngine;
+        this.codeGraphTaskPort = codeGraphTaskPort;
         this.repoRoot = pathValidator.normalizeRepoRoot(repoRoot);
     }
 
@@ -129,15 +131,9 @@ public class RepositoryService {
         entity.indexing();
         repository.saveAndFlush(entity);
 
-        CodeGraphIndexContext context = new CodeGraphIndexContext(
-                entity.resolveLocalPath(repoRoot.toString()),
-                null, false, null, id
+        codeGraphTaskPort.submitRepositoryIndex(
+                Path.of(entity.resolveLocalPath(repoRoot.toString())), id
         );
-        TaskSubmitRequest<CodeGraphIndexContext> request = new TaskSubmitRequest<>();
-        request.setKind(TaskKind.CODEGRAPH_INDEX);
-        request.setContext(context);
-        request.setBusinessId(id);
-        taskEngine.submit(request);
         log.info("已提交 CodeGraph 索引异步任务，repositoryId={}", id);
 
         return entity;

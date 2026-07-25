@@ -16,17 +16,17 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class GitFetchContext {
     /** 仓库本地路径。 */
-    String repositoryPath;
+    private String repositoryPath;
     /** 仓库 ID。 */
-    Long repositoryId;
+    private Long repositoryId;
     /** 同步操作类型。 */
-    GitSyncOperation operation;
+    private GitSyncOperation operation;
     /** 认证用户名（可选）。 */
-    String authUsername;
+    private String authUsername;
     /** 认证密码（可选）。 */
-    String authPassword;
+    private String authPassword;
     /** 远程仓库 URL（可选）。 */
-    String remoteUrl;
+    private String remoteUrl;
     /** 项目空间 ID（可选，非空表示由项目空间拉取触发）。 */
-    Long projectSpaceId;
+    private Long projectSpaceId;
 }

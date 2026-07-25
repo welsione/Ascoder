@@ -14,7 +14,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class CodeGraphSyncContext {
     /** 项目空间路径。 */
-    String repositoryPath;
+    private String repositoryPath;
     /** 项目空间 ID。 */
-    Long projectSpaceId;
+    private Long projectSpaceId;
 }

@@ -14,5 +14,5 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class ProjectSpacePrepareContext {
     /** 项目空间 ID。 */
-    Long projectSpaceId;
+    private Long projectSpaceId;
 }

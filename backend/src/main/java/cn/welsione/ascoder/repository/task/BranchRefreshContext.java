@@ -15,5 +15,5 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class BranchRefreshContext {
     /** 仓库 ID。 */
-    Long repositoryId;
+    private Long repositoryId;
 }

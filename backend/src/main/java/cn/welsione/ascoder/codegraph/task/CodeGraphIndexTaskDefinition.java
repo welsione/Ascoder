@@ -29,7 +29,6 @@ import java.util.Date;
  *   <li>项目空间级索引：{@code projectSpaceId} 非空，索引完成后更新 ProjectSpace 状态</li>
  *   <li>仓库级索引：{@code repositoryId} 非空，索引完成后更新 CodeRepository 状态</li>
  * </ul>
- *
  * <p>若 {@link CodeGraphIndexContext#isReindex()} 为 true，先删除旧 .codegraph 目录再执行全量索引。
  * 进度通过后台线程从 IndexProgressTracker 定期同步到 TaskProgress。</p>
  */
@@ -75,7 +74,7 @@ public class CodeGraphIndexTaskDefinition implements TaskDefinition<CodeGraphInd
     public void execute(CodeGraphIndexContext context, TaskProgress progress) throws Exception {
         String repositoryPath = context.getRepositoryPath();
         String codegraphIndexPath = context.getCodegraphIndexPath();
-        boolean isReindex = context.isReindex();
+        boolean reindex = context.isReindex();
 
         // 判断索引场景：projectSpaceId 或 repositoryId
         Long projectSpaceId = context.getProjectSpaceId();
@@ -84,9 +83,9 @@ public class CodeGraphIndexTaskDefinition implements TaskDefinition<CodeGraphInd
 
         if (isProjectSpaceIndex) {
             executeProjectSpaceIndex(repositoryPath, codegraphIndexPath,
-                    projectSpaceId, isReindex, progress);
+                    projectSpaceId, reindex, progress);
         } else if (repositoryId != null) {
-            executeRepositoryIndex(repositoryPath, repositoryId, isReindex, progress);
+            executeRepositoryIndex(repositoryPath, repositoryId, reindex, progress);
         } else {
             throw new IllegalStateException("任务上下文必须包含 projectSpaceId 或 repositoryId");
         }
@@ -97,12 +96,12 @@ public class CodeGraphIndexTaskDefinition implements TaskDefinition<CodeGraphInd
      */
     private void executeProjectSpaceIndex(String repositoryPath,
                                           String codegraphIndexPath, Long projectSpaceId,
-                                          boolean isReindex, TaskProgress progress) throws Exception {
-        log.info("开始 CodeGraph 索引任务，projectSpaceId={}，isReindex={}，path={}",
-                projectSpaceId, isReindex, repositoryPath);
+                                          boolean reindex, TaskProgress progress) throws Exception {
+        log.info("开始 CodeGraph 索引任务，projectSpaceId={}，reindex={}，path={}",
+                projectSpaceId, reindex, repositoryPath);
 
         // 重新索引时先删除旧索引目录
-        if (isReindex) {
+        if (reindex) {
             log.info("删除旧索引目录，path={}", codegraphIndexPath);
             FileUtil.deleteDirectoryIfExists(Path.of(codegraphIndexPath));
         }
@@ -150,12 +149,12 @@ public class CodeGraphIndexTaskDefinition implements TaskDefinition<CodeGraphInd
      * 仓库级索引，索引完成后更新 CodeRepository 状态。
      */
     private void executeRepositoryIndex(String repositoryPath, Long repositoryId,
-                                        boolean isReindex, TaskProgress progress) throws Exception {
-        log.info("开始 CodeGraph 仓库索引任务，repositoryId={}，isReindex={}，path={}",
-                repositoryId, isReindex, repositoryPath);
+                                        boolean reindex, TaskProgress progress) throws Exception {
+        log.info("开始 CodeGraph 仓库索引任务，repositoryId={}，reindex={}，path={}",
+                repositoryId, reindex, repositoryPath);
 
         // 重新索引时先删除旧索引目录
-        if (isReindex) {
+        if (reindex) {
             Path indexPath = Path.of(repositoryPath).resolve(".codegraph");
             log.info("删除旧索引目录，path={}", indexPath);
             FileUtil.deleteDirectoryIfExists(indexPath);
