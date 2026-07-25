@@ -1693,12 +1693,20 @@ onMounted(loadAll)
   color: inherit;
   text-align: left;
   cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    transform var(--press-duration) var(--ease-snappy);
 }
 
 .review-list-item:hover,
 .review-list-item.active {
   border-color: rgba(79, 110, 247, 0.22);
   background: rgba(79, 110, 247, 0.08);
+}
+
+.review-list-item:not(.is-disabled):active {
+  transform: scale(var(--press-scale));
 }
 
 .review-list-title,

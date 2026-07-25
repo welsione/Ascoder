@@ -5,7 +5,6 @@
 .el-button {
   border-radius: var(--radius-full);
   font-weight: var(--font-weight-semibold);
-  letter-spacing: var(--tracking-wide);
   transition:
     background var(--transition-fast),
     border-color var(--transition-fast),
@@ -31,6 +30,12 @@
 /* ── Button 按压反馈（Apple pointer-down 响应） ── */
 .el-button:not(.is-text):not(.is-link):not(.is-disabled):not(.is-loading):active {
   transform: scale(var(--press-scale));
+}
+
+/* text/link 按钮用透明度反馈（无背景可缩放） */
+.el-button.is-text:not(.is-disabled):not(.is-loading):active,
+.el-button.is-link:not(.is-disabled):not(.is-loading):active {
+  opacity: 0.7;
 }
 
 .el-button--primary:not(.is-text):not(.is-link) {
@@ -65,6 +70,10 @@
   color: var(--danger);
 }
 
+.el-button--danger:not(.is-text):not(.is-link):not(.is-disabled):not(.is-loading):active {
+  transform: scale(var(--press-scale));
+}
+
 .el-button--danger.is-plain:not(.is-text):not(.is-link) {
   border-color: rgba(220, 38, 38, 0.24);
   background: #fff;
@@ -80,6 +89,23 @@
   transform: none;
 }
 
+/* ── 圆形图标按钮 hover 反馈 ── */
+/* 操作列 circle 按钮默认无背景，hover 时加背景色让用户感知可点击 */
+.el-button.is-circle:not(.is-text):not(.is-link):not(.is-disabled):not(.is-loading):hover {
+  background: var(--primary-soft);
+  border-color: var(--stroke-strong);
+}
+
+.el-button.is-circle.el-button--danger:not(.is-text):not(.is-link):not(.is-disabled):not(.is-loading):hover {
+  background: #fef2f2;
+  border-color: var(--danger);
+}
+
+.el-button.is-circle.el-button--primary:not(.is-text):not(.is-link):not(.is-disabled):not(.is-loading):hover {
+  background: var(--chat-accent-soft);
+  border-color: var(--chat-accent);
+}
+
 /* ── Tag 圆角 ── */
 .el-tag,
 .message-head .el-tag,
@@ -87,7 +113,6 @@
   border-radius: var(--radius-full);
   font-weight: var(--font-weight-medium);
   font-size: var(--font-size-xs);
-  letter-spacing: var(--tracking-wide);
 }
 
 /* ── 输入控件 ── */
@@ -191,6 +216,11 @@
   color: var(--subtle);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
+}
+
+/* Apple 连续反馈：行 hover 背景色平滑过渡 */
+.el-table__row {
+  transition: background-color var(--transition-fast);
 }
 
 .el-table .cell {
@@ -302,6 +332,11 @@
 }
 
 /* ── Drawer 抽屉（设置页新增/编辑表单） ── */
+/* Apple 风格：弹簧缓动替代 Element Plus 默认 ease，空间一致性（从右进从右出） */
+.el-drawer {
+  transition: transform 350ms var(--ease-spring), opacity 200ms var(--ease-snappy);
+}
+
 .el-drawer__header {
   padding: var(--spacing-5) var(--spacing-6);
   border-bottom: 1px solid var(--stroke);
@@ -340,6 +375,10 @@
 
   .el-switch__button {
     transition: transform 200ms ease;
+  }
+
+  .el-drawer {
+    transition: opacity 200ms ease;
   }
 
   .field-error {

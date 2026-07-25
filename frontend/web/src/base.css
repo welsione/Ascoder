@@ -442,17 +442,6 @@ select {
   /* 入场动画由 motion-v 弹簧驱动（见 Thread.vue），保证可中断 */
 }
 
-@keyframes messageFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 .message-bubble:hover {
   box-shadow: var(--shadow-soft);
 }
@@ -2232,7 +2221,7 @@ select {
     width: 280px;
     height: 100vh;
     transform: translateX(-100%);
-    transition: transform 0.35s var(--ease-spring);
+    transition: transform 350ms var(--ease-spring);
     border-right: 1px solid var(--stroke);
   }
 
@@ -2312,15 +2301,44 @@ body {
    ────────────────────────────────── */
 
 @media (prefers-reduced-motion: reduce) {
+  /* 禁用动画和长距离 transition，但保留按压反馈等短距离 transition */
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+    /* 只禁用位移/缩放类 transition，保留颜色/背景/边框/透明度的短过渡 */
+    transition-duration: 0.01ms !important;
   }
 
+  /* 恢复按压反馈和颜色类 transition（Apple：reduced motion 仍需即时反馈） */
+  :where(.primary-action,
+         .suggestion-card,
+         .project-entry-card,
+         .add-project-card,
+         .space-card,
+         .settings-nav-item,
+         .ghost-button,
+         .back-space-button,
+         .sidebar-export-button,
+         .new-message-hint,
+         .load-more-button,
+         .project-card-enter,
+         .space-console-row,
+         .card-delete,
+         .card-caret,
+         .conversation-card,
+         .project-home-settings),
+  .el-button,
+  .el-table__row,
+  .history-item,
+  .settings-nav-item,
+  .ghost-button {
+    transition-duration: 120ms !important;
+  }
+
+  /* 按压缩放改为无（reduced motion 不做位移变换） */
   :where(.primary-action,
          .suggestion-card,
          .project-entry-card,

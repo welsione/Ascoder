@@ -968,7 +968,12 @@ async function deleteSpace() {
   transition:
     background var(--transition-fast),
     color var(--transition-fast),
-    box-shadow var(--transition-fast);
+    box-shadow var(--transition-fast),
+    transform var(--press-duration) var(--ease-snappy);
+}
+
+.selected-space-tabs button:active {
+  transform: scale(var(--press-scale));
 }
 
 .selected-space-tabs button.is-active {
