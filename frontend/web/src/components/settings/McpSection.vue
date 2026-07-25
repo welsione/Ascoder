@@ -39,7 +39,7 @@ async function createMcp() {
       <el-table-column prop="transport" label="Transport" width="110" />
       <el-table-column prop="command" label="Command" min-width="160" show-overflow-tooltip />
       <el-table-column prop="endpointUrl" label="Endpoint" min-width="220" show-overflow-tooltip />
-      <el-table-column label="启用" width="120">
+      <el-table-column label="启用" width="80">
         <template #default="{ row }">
           <el-switch :model-value="row.enabled" @change="mcpStore.toggleEnabled(row.id, $event)" />
         </template>

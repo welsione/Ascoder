@@ -38,7 +38,7 @@ async function createSkill() {
       <el-table-column prop="name" label="名称" min-width="160" />
       <el-table-column prop="description" label="描述" min-width="260" show-overflow-tooltip />
       <el-table-column prop="source" label="来源" width="120" />
-      <el-table-column label="启用" width="120">
+      <el-table-column label="启用" width="80">
         <template #default="{ row }">
           <el-switch :model-value="row.enabled" @change="skillStore.toggleEnabled(row.id, $event)" />
         </template>
