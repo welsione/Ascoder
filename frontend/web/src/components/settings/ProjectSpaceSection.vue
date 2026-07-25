@@ -698,11 +698,6 @@ function handleReset() {
   color: var(--muted);
 }
 
-.config-field {
-  display: grid;
-  gap: var(--spacing-1);
-}
-
 .member-commit-history {
   padding: var(--spacing-3) var(--spacing-4);
   background: var(--surface-soft);
@@ -821,13 +816,6 @@ function handleReset() {
 
 .existing-space-panel .el-table {
   border-top: 1px solid var(--stroke);
-}
-
-.config-section {
-  border-radius: var(--radius-xl);
-  transition:
-    border-color var(--transition-normal),
-    box-shadow var(--transition-normal);
 }
 
 @media (max-width: 900px) {

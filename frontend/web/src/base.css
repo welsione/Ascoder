@@ -1857,6 +1857,20 @@ select {
   margin-bottom: var(--spacing-4);
 }
 
+/* 配置区面板：圆角 + 过渡（配置流程页的 section） */
+.config-section {
+  border-radius: var(--radius-xl);
+  transition:
+    border-color var(--transition-normal),
+    box-shadow var(--transition-normal);
+}
+
+/* 配置字段：label + 控件的纵向栈 */
+.config-field {
+  display: grid;
+  gap: var(--spacing-1);
+}
+
 /* ── 表格单元格文本 ── */
 .cell-name {
   font-weight: var(--font-weight-semibold);

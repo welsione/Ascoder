@@ -420,22 +420,10 @@ import type { ProjectRepositoryMember } from '../../types/project'
 </script>
 
 <style scoped>
-.config-section {
-  border-radius: var(--radius-xl);
-  transition:
-    border-color var(--transition-normal),
-    box-shadow var(--transition-normal);
-}
-
 .config-form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--spacing-3);
-}
-
-.config-field {
-  display: grid;
-  gap: var(--spacing-1);
 }
 
 .config-field.inline-field {
