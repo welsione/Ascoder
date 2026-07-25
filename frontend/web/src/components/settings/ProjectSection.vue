@@ -74,6 +74,20 @@ async function handleCreateProject() {
   }
 }
 
+function openCreateProject() {
+  showCreateProject.value = true
+}
+
+function closeCreateDrawer() {
+  showCreateProject.value = false
+}
+
+function onDrawerClosed() {
+  projectStore.form.name = ''
+  projectStore.form.description = ''
+  clearDraft()
+}
+
 async function selectProject(projectId: number | null) {
   if (projectId) {
     await projectStore.fetchMembers(projectId)
@@ -172,14 +186,9 @@ function handleReset() {
         <h2>选择一个业务项目作为分析范围</h2>
       </div>
       <div class="section-actions">
-        <el-button
-          type="primary"
-          :aria-expanded="showCreateProject"
-          aria-controls="project-create-panel"
-          @click="showCreateProject = !showCreateProject"
-        >
+        <el-button type="primary" @click="openCreateProject">
           <Plus aria-hidden="true" :size="16" :stroke-width="1.8" />
-          {{ showCreateProject ? '收起' : '新建项目' }}
+          新建项目
         </el-button>
         <el-button
           circle
@@ -227,68 +236,72 @@ function handleReset() {
       </div>
     </div>
 
-    <!-- 新建项目面板 -->
-    <el-collapse-transition>
-      <div v-if="showCreateProject" id="project-create-panel" class="project-create-panel">
-        <div class="subsection-heading">
-          <strong>新建项目</strong>
-          <span>用于归类仓库</span>
-        </div>
-        <div class="config-form-grid">
-          <div class="config-field">
-            <label class="field-label">
-              项目名称 <span class="required-star">*</span>
-            </label>
-            <el-input
-              v-model="projectStore.form.name"
-              placeholder="例如 qys-skill"
-              maxlength="120"
-              clearable
-              show-word-limit
-              :class="{ 'is-error': nameError }"
-            />
-            <p v-if="nameError" class="field-error">{{ nameError }}</p>
-          </div>
-          <div class="config-field">
-            <label class="field-label">描述</label>
-            <el-input
-              v-model="projectStore.form.description"
-              placeholder="可选，用于说明项目边界"
-              clearable
-            />
-          </div>
-        </div>
-        <div class="settings-actions">
-          <el-button title="重置表单" aria-label="重置表单" @click="handleReset">
-            <RotateCcw class="button-icon" aria-hidden="true" :size="16" :stroke-width="1.8" />
-            重置
-          </el-button>
-          <el-button
-            type="primary"
-            :loading="projectStore.loading"
-            :disabled="!isFormValid"
-            @click="handleCreateProject"
-          >
-            <Save class="button-icon" aria-hidden="true" :size="16" :stroke-width="1.8" />
-            创建项目
-          </el-button>
-          <el-button
-            v-if="hasDraft"
-            type="info"
-            text
-            title="恢复草稿"
-            aria-label="恢复草稿"
-            @click="restoreFromDraft"
-          >
-            <Undo2 class="button-icon" aria-hidden="true" :size="16" :stroke-width="1.8" />
-            恢复草稿
-          </el-button>
-        </div>
-      </div>
-    </el-collapse-transition>
-
     <el-alert v-if="projectStore.error" type="error" :title="projectStore.error" show-icon :closable="false" />
   </section>
+
+  <!-- 新建项目抽屉 -->
+  <el-drawer
+    v-model="showCreateProject"
+    title="新建项目"
+    direction="rtl"
+    size="480px"
+    destroy-on-close
+    @closed="onDrawerClosed"
+  >
+    <div class="drawer-form">
+      <div class="config-form-grid">
+        <div class="config-field">
+          <label class="field-label">
+            项目名称 <span class="required-star">*</span>
+          </label>
+          <el-input
+            v-model="projectStore.form.name"
+            placeholder="例如 qys-skill"
+            maxlength="120"
+            clearable
+            show-word-limit
+            :class="{ 'is-error': nameError }"
+          />
+          <p v-if="nameError" class="field-error">{{ nameError }}</p>
+        </div>
+        <div class="config-field">
+          <label class="field-label">描述</label>
+          <el-input
+            v-model="projectStore.form.description"
+            placeholder="可选，用于说明项目边界"
+            clearable
+          />
+        </div>
+      </div>
+    </div>
+
+    <template #footer>
+      <el-button title="重置表单" aria-label="重置表单" @click="handleReset">
+        <RotateCcw class="button-icon" aria-hidden="true" :size="16" :stroke-width="1.8" />
+        重置
+      </el-button>
+      <el-button
+        v-if="hasDraft"
+        type="info"
+        text
+        title="恢复草稿"
+        aria-label="恢复草稿"
+        @click="restoreFromDraft"
+      >
+        <Undo2 class="button-icon" aria-hidden="true" :size="16" :stroke-width="1.8" />
+        恢复草稿
+      </el-button>
+      <el-button
+        type="primary"
+        :loading="projectStore.loading"
+        :disabled="!isFormValid"
+        @click="handleCreateProject"
+      >
+        <Save class="button-icon" aria-hidden="true" :size="16" :stroke-width="1.8" />
+        创建项目
+      </el-button>
+    </template>
+  </el-drawer>
 
   <!-- 仓库配置：权限与成员 -->
   <section v-if="selectedProject" class="surface-panel settings-block config-section">
@@ -430,8 +443,7 @@ import type { ProjectRepositoryMember } from '../../types/project'
   padding-bottom: 2px;
 }
 
-.project-picker-panel,
-.project-create-panel {
+.project-picker-panel {
   border: 1px solid var(--stroke);
   border-radius: var(--radius-lg);
   padding: var(--spacing-4);
