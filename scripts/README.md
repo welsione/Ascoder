@@ -13,6 +13,38 @@ Docker Compose 一键验证脚本。检查镜像构建、服务启动、数据�
 bash scripts/verify-docker.sh
 ```
 
+### `server/` - 局域网部署脚本
+
+一次性安装 + 定时自动更新，适用于服务器在局域网、只能主动从 GitHub 拉取的场景。
+详见 [DEPLOY-LAN.md](../DEPLOY-LAN.md)。
+
+| 脚本 | 平台 | 用途 |
+| --- | --- | --- |
+| `server/install.sh` | Linux / macOS | 检查依赖、克隆仓库、生成 .env、安装 cron |
+| `server/deploy.sh` | Linux / macOS | cron 定时调用：拉取镜像 + 重启容器 |
+| `server/install.ps1` | Windows | 检查依赖、克隆仓库、生成 .env、注册计划任务 |
+| `server/deploy.ps1` | Windows | 计划任务调用：拉取镜像 + 重启容器 |
+
+```bash
+# Linux / macOS
+bash scripts/server/install.sh
+
+# Windows PowerShell
+powershell -ExecutionPolicy Bypass -File scripts/server/install.ps1
+```
+
+### `dev.sh` - 测试环境管理
+
+本地开发一键脚本，管理 dev-local / dev-docker 两种模式的容器启停。
+
+```bash
+bash scripts/dev.sh dev-local up    # 启动测试数据库
+bash scripts/dev.sh dev-local down  # 停止
+bash scripts/dev.sh dev-docker up   # 全容器开发
+```
+
+详见 [DEVELOPMENT.md](../DEVELOPMENT.md)。
+
 ## Git 代理（解决容器内 GnuTLS 不兼容）
 
 Docker 容器内的 Git 与部分 TLS 服务器握手失败时使用下面的代理。
