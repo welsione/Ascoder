@@ -1746,12 +1746,97 @@ select {
 .span-3 { grid-column: span 3; }
 .span-4 { grid-column: span 4; }
 
+/* ──────────────────────────────────
+   表单字段系统
+   统一 label / 输入控件 / 描述 / 错误的间距与聚焦联动，
+   消除各 Section 组件内重复的 scoped 样式。
+   ────────────────────────────────── */
+
+/* 字段容器：接管 label ↔ input ↔ hint 的间距，并驱动聚焦联动 */
+.field {
+  display: grid;
+  gap: var(--spacing-1);
+  min-width: 0;
+}
+
 .field-label {
   display: block;
   margin-bottom: var(--spacing-1);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
   color: var(--subtle);
+  letter-spacing: var(--tracking-wide);
+  transition: color var(--transition-fast);
+}
+
+/* .field 容器内由 grid gap 接管间距，避免双重间距 */
+.field > .field-label {
+  margin-bottom: 0;
+}
+
+/* 聚焦时 label 微妙变 accent 色（Apple 连续反馈：交互中而非交互后）
+   覆盖 .field 容器、settings-form-grid 字段、config-form-grid 字段 */
+.field:focus-within .field-label,
+.settings-form-grid > div:focus-within .field-label,
+.config-form-grid > div:focus-within .field-label {
+  color: var(--chat-accent);
+}
+
+/* 必填标记 */
+.required-star {
+  margin-left: 2px;
+  color: var(--danger);
+  font-weight: var(--font-weight-bold);
+}
+
+/* 字段描述 */
+.field-desc {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+  line-height: var(--line-height-normal);
+}
+
+/* 字段元信息（类型 / 当前值 / 默认值等） */
+.field-meta {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+  line-height: var(--line-height-normal);
+}
+
+.field-meta code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* 字段错误：带滑入动画，反馈出现在"交互中"而非提交后 */
+.field-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-normal);
+  animation: field-error-in var(--transition-normal) var(--ease-spring);
+}
+
+@keyframes field-error-in {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 字段分区标题（全局化，消除组件重复） */
+.field-section-title {
+  margin: var(--spacing-5) 0 var(--spacing-2);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
 }
 
 .settings-block {

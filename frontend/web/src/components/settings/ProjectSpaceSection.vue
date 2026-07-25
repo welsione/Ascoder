@@ -703,14 +703,9 @@ function handleReset() {
   gap: var(--spacing-1);
 }
 
-.required-star {
-  color: var(--danger, #dc2626);
-  font-weight: 700;
-}
-
 .member-commit-history {
   padding: var(--spacing-3) var(--spacing-4);
-  background: var(--surface-muted);
+  background: var(--surface-soft);
 }
 
 .member-commit-history strong {
@@ -730,13 +725,6 @@ function handleReset() {
   display: grid;
   grid-template-columns: 72px minmax(160px, 1fr);
   gap: var(--spacing-2);
-}
-
-.field-error {
-  margin: 2px 0 0;
-  color: var(--danger, #dc2626);
-  font-size: 12px;
-  line-height: 1.4;
 }
 
 .branch-option {

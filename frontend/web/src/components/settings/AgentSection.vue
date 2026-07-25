@@ -556,14 +556,3 @@ const taskKindOptions = [
     <el-alert v-if="agentStore.error" type="error" :title="agentStore.error" show-icon :closable="false" />
   </section>
 </template>
-
-<style scoped>
-.field-section-title {
-  font-size: var(--font-size-sm);
-  font-weight: 600;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin: var(--spacing-5) 0 var(--spacing-2);
-}
-</style>

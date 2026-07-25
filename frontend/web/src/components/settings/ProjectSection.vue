@@ -453,18 +453,6 @@ import type { ProjectRepositoryMember } from '../../types/project'
   padding-bottom: 2px;
 }
 
-.required-star {
-  color: var(--danger, #dc2626);
-  font-weight: 700;
-}
-
-.field-error {
-  margin: 2px 0 0;
-  color: var(--danger, #dc2626);
-  font-size: 12px;
-  line-height: 1.4;
-}
-
 .project-picker-panel,
 .project-create-panel {
   border: 1px solid var(--stroke);
