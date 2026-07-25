@@ -178,7 +178,7 @@ async function handleToggleEnabled(provider: LlmProvider, enabled: boolean) {
     <el-table v-loading="store.loading" :data="store.providers" empty-text="暂无 LLM 供应商">
       <el-table-column label="名称" min-width="140">
         <template #default="{ row }">
-          <span style="font-weight:600;">{{ row.name }}</span>
+          <span class="cell-name">{{ row.name }}</span>
           <el-tag v-if="row.isDefault" size="small" type="success" style="margin-left:6px;">默认</el-tag>
         </template>
       </el-table-column>
@@ -192,7 +192,7 @@ async function handleToggleEnabled(provider: LlmProvider, enabled: boolean) {
       <el-table-column prop="modelId" label="模型" min-width="160" show-overflow-tooltip />
       <el-table-column label="API Key" width="160">
         <template #default="{ row }">
-          <code style="font-size:var(--font-size-xs);color:var(--muted);">{{ maskApiKey(row.apiKey) }}</code>
+          <code class="cell-code">{{ maskApiKey(row.apiKey) }}</code>
         </template>
       </el-table-column>
       <el-table-column label="默认" width="80">

@@ -1852,6 +1852,40 @@ select {
   flex-wrap: wrap;
 }
 
+/* ── 表格单元格文本 ── */
+.cell-name {
+  font-weight: var(--font-weight-semibold);
+}
+
+.cell-sub {
+  color: var(--muted);
+}
+
+.cell-code {
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+}
+
+.cell-warning {
+  color: var(--warning);
+  margin-top: var(--spacing-1);
+}
+
+/* ── 代码块预览 ── */
+.code-preview {
+  white-space: pre-wrap;
+  max-height: 200px;
+  overflow: auto;
+  padding: var(--spacing-2);
+  border-radius: var(--radius-md);
+  background: var(--surface-soft);
+}
+
+/* ── 表单网格辅助 ── */
+.form-align-end {
+  align-self: end;
+}
+
 .settings-nav-list {
   gap: var(--spacing-2);
 }

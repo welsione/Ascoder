@@ -264,8 +264,8 @@ const taskKindOptions = [
     <el-table v-loading="agentStore.loading" :data="agentStore.items" empty-text="暂无 Agent">
       <el-table-column label="名称" min-width="160">
         <template #default="{ row }">
-          <span style="font-weight:600;">{{ row.displayName }}</span>
-          <br><small style="color:var(--muted);">{{ row.agentId }}</small>
+          <span class="cell-name">{{ row.displayName }}</span>
+          <br><small class="cell-sub">{{ row.agentId }}</small>
         </template>
       </el-table-column>
       <el-table-column label="角色" width="140">
@@ -341,7 +341,7 @@ const taskKindOptions = [
       </el-table>
       <div v-if="selectedRunId" style="margin-top:12px;">
         <h4>单条详情</h4>
-        <pre style="background:var(--surface-soft);padding:8px;border-radius:6px;white-space:pre-wrap;max-height:200px;overflow:auto;">
+        <pre class="code-preview">
 {{ ((agentStore.runs.find(r => r.id === selectedRunId)?.inputSummary) || '') + '\n---\n' + ((agentStore.runs.find(r => r.id === selectedRunId)?.outputSummary) || '') }}
         </pre>
         <template v-if="agentStore.runs.find(r => r.id === selectedRunId)?.questionId">
@@ -373,7 +373,7 @@ const taskKindOptions = [
         <p class="field-section-title">实时事件流</p>
         <AgentEventList :question-id="agentStore.runtimeQuestionIds[drawerAgent.agentId]!" :auto-poll="true" />
       </template>
-      <p v-else style="color:var(--muted);">当前空闲</p>
+      <p v-else class="cell-sub">当前空闲</p>
     </template>
   </el-drawer>
 
@@ -435,14 +435,14 @@ const taskKindOptions = [
         <label class="field-label">任务模板（{{}} 模板语法）</label>
         <el-input v-model="agentStore.form.taskTemplate" type="textarea" :rows="6" placeholder="SPECIALIST 必填，ORCHESTRATOR 可选" />
       </div>
-      <div style="align-self:end;">
+      <div class="form-align-end">
         <el-button @click="handleTestRender">渲染预览</el-button>
       </div>
     </div>
     <el-alert v-if="renderResult" type="info" :closable="false" style="margin-top:8px;">
       <template #title>渲染预览</template>
-      <pre style="white-space:pre-wrap;max-height:200px;overflow:auto;">{{ renderResult.renderedText }}</pre>
-      <p v-if="renderResult.warnings.length" style="color:var(--warning);margin-top:4px;">
+      <pre class="code-preview">{{ renderResult.renderedText }}</pre>
+      <p v-if="renderResult.warnings.length" class="cell-warning">
         ⚠️ {{ renderResult.warnings.join('; ') }}
       </p>
     </el-alert>
