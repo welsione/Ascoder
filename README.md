@@ -39,15 +39,15 @@ docker compose up -d --build
 
 | 文档 | 内容 |
 | --- | --- |
-| [开发指南](DEVELOPMENT.md) | 本地环境搭建、dev profile、测试约定、IDE 配置 |
-| [部署指南](DEPLOY.md) | Docker Compose 配置、私有仓库访问、Windows + WSL2 部署 |
-| [局域网部署](DEPLOY-LAN.md) | GitHub Actions + GHCR + cron/计划任务自动更新（含 Windows PowerShell 脚本） |
+| [开发指南](docs/development.md) | 本地环境搭建、dev profile、测试约定、IDE 配置 |
+| [部署指南](docs/deployment.md) | Docker Compose 配置、私有仓库访问、Windows + WSL2 部署 |
+| [局域网部署](docs/deployment-lan.md) | GitHub Actions + GHCR + cron/计划任务自动更新（含 Windows PowerShell 脚本） |
 | [模块边界](docs/architecture/modules.md) | 逻辑模块划分、包结构、依赖方向 |
 | [项目规范](CLAUDE.md) | 编码规范、命名规则、分层架构、设计原则 |
 
 ## 本地开发
 
-详见 [开发指南](DEVELOPMENT.md)，快速开始：
+详见 [开发指南](docs/development.md)，快速开始：
 
 ```bash
 # 1. 启动测试数据库

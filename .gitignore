@@ -31,8 +31,8 @@ start-local.sh
 .codegraph/
 data/
 
-# Project docs (local-only, not tracked)
-docs/
+# Project docs (superpowers 为本地工作目录，其余 docs/ 已纳入版本控制)
+docs/superpowers/
 
 # Claude Code
 CLAUDE_ZH.md
@@ -47,7 +47,6 @@ CLAUDE_ZH.md
 .record/
 .report/
 .superpowers/
-AGENTS.md
 jprompt
 backend/.mvn/
 backend/src/main/resources/application-local.yml

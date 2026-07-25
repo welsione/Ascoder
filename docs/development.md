@@ -132,7 +132,7 @@ npm run test:watch    # 监听模式
 
 ## 代码规范
 
-详见 [CLAUDE.md](CLAUDE.md)，核心要点：
+详见 [CLAUDE.md](../CLAUDE.md)，核心要点：
 
 - **后端**：Java 17，禁止 `record`，优先 Lombok `@Data` / `@Value`，Service 只抛领域异常，跨聚合用领域事件解耦
 - **前端**：Vue 3 + TypeScript，禁止 `any`，组件 PascalCase，Store 按业务域拆分

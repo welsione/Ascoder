@@ -16,7 +16,7 @@ bash scripts/verify-docker.sh
 ### `server/` - 局域网部署脚本
 
 一次性安装 + 定时自动更新，适用于服务器在局域网、只能主动从 GitHub 拉取的场景。
-详见 [DEPLOY-LAN.md](../DEPLOY-LAN.md)。
+详见 [DEPLOY-LAN.md](../docs/deployment-lan.md)。
 
 | 脚本 | 平台 | 用途 |
 | --- | --- | --- |
@@ -43,7 +43,7 @@ bash scripts/dev.sh dev-local down  # 停止
 bash scripts/dev.sh dev-docker up   # 全容器开发
 ```
 
-详见 [DEVELOPMENT.md](../DEVELOPMENT.md)。
+详见 [DEVELOPMENT.md](../docs/development.md)。
 
 ## Git 代理（解决容器内 GnuTLS 不兼容）
 
