@@ -300,7 +300,7 @@ const taskKindOptions = [
           <el-tag v-if="row.builtin" size="small" type="info">是</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="140" fixed="right">
+      <el-table-column label="操作" width="160" fixed="right">
         <template #default="{ row }">
           <div class="table-actions">
             <el-tooltip content="编辑" placement="top" :show-after="300">
