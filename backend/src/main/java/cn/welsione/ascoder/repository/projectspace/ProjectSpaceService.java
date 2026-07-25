@@ -2,9 +2,6 @@ package cn.welsione.ascoder.repository.projectspace;
 
 import cn.welsione.ascoder.repository.workspace.BranchWorkspace;
 import cn.welsione.ascoder.repository.workspace.BranchWorkspaceService;
-import cn.welsione.ascoder.codegraph.infrastructure.cli.IndexProgressTracker;
-import cn.welsione.ascoder.codegraph.task.CodeGraphIndexContext;
-import cn.welsione.ascoder.codegraph.task.CodeGraphSyncContext;
 import cn.welsione.ascoder.common.FileUtil;
 import cn.welsione.ascoder.common.exception.DuplicateException;
 import cn.welsione.ascoder.common.exception.InvalidStateException;
@@ -13,6 +10,7 @@ import cn.welsione.ascoder.common.task.TaskEngine;
 import cn.welsione.ascoder.common.task.TaskKind;
 import cn.welsione.ascoder.common.task.TaskSubmitRequest;
 import cn.welsione.ascoder.question.application.QuestionRunningGuard;
+import cn.welsione.ascoder.repository.CodeGraphTaskPort;
 import cn.welsione.ascoder.repository.CodeRepository;
 import cn.welsione.ascoder.repository.GitSyncOperation;
 import cn.welsione.ascoder.repository.RepositoryBranch;
@@ -63,7 +61,7 @@ public class ProjectSpaceService {
     private final RepositoryBranchService repositoryBranchService;
     private final GitRepositoryService gitRepositoryService;
     private final GitCredentialStore gitCredentialStore;
-    private final IndexProgressTracker indexProgressTracker;
+    private final CodeGraphTaskPort codeGraphTaskPort;
     private final ApplicationEventPublisher eventPublisher;
     private final TransactionTemplate transactionTemplate;
     private final QuestionRunningGuard questionRunningGuard;
@@ -148,14 +146,15 @@ public class ProjectSpaceService {
         ProjectSpaceIndexSnapshot snapshot = beginIndex(id, false);
         boolean previouslyIndexed = snapshot.isPreviouslyIndexed();
 
-        TaskKind kind = previouslyIndexed ? TaskKind.CODEGRAPH_SYNC : TaskKind.CODEGRAPH_INDEX;
-        TaskSubmitRequest<?> request = previouslyIndexed
-                ? buildSyncRequest(id, snapshot)
-                : buildIndexRequest(id, snapshot, false);
-        request.setBusinessId(id);
-        taskEngine.submit(request);
-        log.info("已提交 CodeGraph {} 异步任务，projectSpaceId={}",
-                previouslyIndexed ? "增量同步" : "全量索引", id);
+        if (previouslyIndexed) {
+            codeGraphTaskPort.submitProjectSpaceSync(snapshot.getRootPath(), id);
+            log.info("已提交 CodeGraph 增量同步异步任务，projectSpaceId={}", id);
+        } else {
+            codeGraphTaskPort.submitProjectSpaceIndex(
+                    snapshot.getRootPath(), snapshot.getCodegraphIndexPath(), id, false
+            );
+            log.info("已提交 CodeGraph 全量索引异步任务，projectSpaceId={}", id);
+        }
 
         return transactionTemplate.execute(status -> getEntity(id));
     }
@@ -170,33 +169,12 @@ public class ProjectSpaceService {
     public ProjectSpace reindex(Long id) {
         ProjectSpaceIndexSnapshot snapshot = beginIndex(id, true);
 
-        TaskSubmitRequest<CodeGraphIndexContext> request = buildIndexRequest(id, snapshot, true);
-        request.setBusinessId(id);
-        taskEngine.submit(request);
+        codeGraphTaskPort.submitProjectSpaceIndex(
+                snapshot.getRootPath(), snapshot.getCodegraphIndexPath(), id, true
+        );
         log.info("已提交 CodeGraph 重新索引异步任务，projectSpaceId={}", id);
 
         return transactionTemplate.execute(status -> getEntity(id));
-    }
-
-    private TaskSubmitRequest<CodeGraphSyncContext> buildSyncRequest(Long id, ProjectSpaceIndexSnapshot snapshot) {
-        CodeGraphSyncContext context = new CodeGraphSyncContext(snapshot.getRootPath().toString(), id);
-        TaskSubmitRequest<CodeGraphSyncContext> request = new TaskSubmitRequest<>();
-        request.setKind(TaskKind.CODEGRAPH_SYNC);
-        request.setContext(context);
-        return request;
-    }
-
-    private TaskSubmitRequest<CodeGraphIndexContext> buildIndexRequest(
-            Long id, ProjectSpaceIndexSnapshot snapshot, boolean isReindex) {
-        CodeGraphIndexContext context = new CodeGraphIndexContext(
-                snapshot.getRootPath().toString(),
-                snapshot.getCodegraphIndexPath().toString(),
-                isReindex, id, null
-        );
-        TaskSubmitRequest<CodeGraphIndexContext> request = new TaskSubmitRequest<>();
-        request.setKind(TaskKind.CODEGRAPH_INDEX);
-        request.setContext(context);
-        return request;
     }
 
     @Transactional
@@ -395,7 +373,7 @@ public class ProjectSpaceService {
 
             space.indexing();
             repository.saveAndFlush(space);
-            indexProgressTracker.start(id);
+            codeGraphTaskPort.startProgress(id);
             boolean previouslyIndexed = space.getLastIndexedAt() != null;
             return new ProjectSpaceIndexSnapshot(
                     space.getId(),
@@ -460,20 +438,20 @@ public class ProjectSpaceService {
     @EventListener
     public void onFetchCompleted(ProjectSpaceFetchCompletedEvent event) {
         Long projectSpaceId = event.getProjectSpaceId();
-        ScheduledFuture<?> existing = pendingRefreshBySpace.get(projectSpaceId);
-        if (existing != null) {
-            existing.cancel(false);
-        }
-        ScheduledFuture<?> future = fetchRefreshScheduler.schedule(() -> {
-            pendingRefreshBySpace.remove(projectSpaceId);
-            try {
-                refreshInTransaction(projectSpaceId);
-                log.info("fetch 完成后刷新项目空间，projectSpaceId={}", projectSpaceId);
-            } catch (Exception ex) {
-                log.warn("fetch 完成后刷新项目空间失败，projectSpaceId={}：{}", projectSpaceId, ex.getMessage());
+        pendingRefreshBySpace.compute(projectSpaceId, (id, existing) -> {
+            if (existing != null) {
+                existing.cancel(false);
             }
-        }, FETCH_COMPLETED_DEBOUNCE_MS, TimeUnit.MILLISECONDS);
-        pendingRefreshBySpace.put(projectSpaceId, future);
+            return fetchRefreshScheduler.schedule(() -> {
+                pendingRefreshBySpace.remove(projectSpaceId);
+                try {
+                    refreshInTransaction(projectSpaceId);
+                    log.info("fetch 完成后刷新项目空间，projectSpaceId={}", projectSpaceId);
+                } catch (Exception ex) {
+                    log.warn("fetch 完成后刷新项目空间失败，projectSpaceId={}：{}", projectSpaceId, ex.getMessage());
+                }
+            }, FETCH_COMPLETED_DEBOUNCE_MS, TimeUnit.MILLISECONDS);
+        });
     }
 
     @PreDestroy

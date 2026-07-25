@@ -15,13 +15,13 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class CodeGraphIndexContext {
     /** 仓库或项目空间路径。 */
-    String repositoryPath;
+    private String repositoryPath;
     /** CodeGraph 索引目录路径（可选，项目空间级索引使用）。 */
-    String codegraphIndexPath;
+    private String codegraphIndexPath;
     /** 是否重新索引（先删除旧索引再全量重建）。 */
-    boolean isReindex;
+    private boolean reindex;
     /** 项目空间 ID（可选，非空时执行项目空间级索引）。 */
-    Long projectSpaceId;
+    private Long projectSpaceId;
     /** 仓库 ID（可选，非空时执行仓库级索引）。 */
-    Long repositoryId;
+    private Long repositoryId;
 }

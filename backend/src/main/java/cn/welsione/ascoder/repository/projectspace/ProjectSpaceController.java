@@ -1,6 +1,6 @@
 package cn.welsione.ascoder.repository.projectspace;
 
-import cn.welsione.ascoder.codegraph.infrastructure.cli.IndexProgressTracker;
+import cn.welsione.ascoder.repository.CodeGraphTaskPort;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -25,7 +25,7 @@ import java.util.Map;
 public class ProjectSpaceController {
 
     private final ProjectSpaceService projectSpaceService;
-    private final IndexProgressTracker indexProgressTracker;
+    private final CodeGraphTaskPort codeGraphTaskPort;
 
     @GetMapping
     public List<ProjectSpaceResponse> list() {
@@ -81,7 +81,7 @@ public class ProjectSpaceController {
 
     @GetMapping("/{id}/index-progress")
     public Map<String, Object> indexProgress(@PathVariable Long id) {
-        IndexProgressTracker.IndexProgress progress = indexProgressTracker.get(id);
+        CodeGraphTaskPort.IndexProgress progress = codeGraphTaskPort.getProgress(id);
         return Map.of(
                 "percent", progress.getPercent(),
                 "message", progress.getMessage(),

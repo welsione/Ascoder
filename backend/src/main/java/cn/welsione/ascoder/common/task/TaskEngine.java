@@ -145,13 +145,7 @@ public class TaskEngine implements SmartInitializingSingleton {
 
         // 提交线程池
         try {
-            java.util.concurrent.atomic.AtomicBoolean cancelledFlag = new java.util.concurrent.atomic.AtomicBoolean(false);
-            TaskProgressImpl progress = new TaskProgressImpl(taskId, progressPublisher, cancelledFlag);
-            @SuppressWarnings("unchecked")
-            TaskDefinition<Object> def = (TaskDefinition<Object>) (TaskDefinition<?>) definition;
-            Future<?> future = executorRegistry.getExecutor(kind).submit(() -> executeTask(taskId, def, progress, cancelledFlag));
-            // 记录运行时上下文（含 Future 引用，用于取消）
-            runningTasks.put(taskId, new RunningTaskContext(future, def, request.getContext(), progress));
+            doSubmit(taskId, kind, definition, request.getContext());
         } catch (RejectedExecutionException e) {
             // 队列满，标记失败
             task.fail("任务队列已满");
@@ -314,11 +308,7 @@ public class TaskEngine implements SmartInitializingSingleton {
         }
 
         try {
-            java.util.concurrent.atomic.AtomicBoolean cancelledFlag = new java.util.concurrent.atomic.AtomicBoolean(false);
-            TaskProgressImpl progress = new TaskProgressImpl(retryTaskId, progressPublisher, cancelledFlag);
-            Future<?> future = executorRegistry.getExecutor(retryTaskKind)
-                    .submit(() -> executeTask(retryTaskId, definition, progress, cancelledFlag));
-            runningTasks.put(retryTaskId, new RunningTaskContext(future, definition, null, progress));
+            doSubmit(retryTaskId, retryTaskKind, definition, null);
         } catch (RejectedExecutionException e) {
             task.fail("任务队列已满");
             taskRepository.save(task);
@@ -327,6 +317,23 @@ public class TaskEngine implements SmartInitializingSingleton {
 
         log.info("重试任务：taskId={}，kind={}，retryCount={}", retryTaskId, retryTaskKind, task.getRetryCount());
         return new TaskHandleImpl(task);
+    }
+
+    /**
+     * 将任务提交到线程池并记录运行时上下文。
+     *
+     * <p>抽取自 {@link #submit(TaskSubmitRequest)} 和 {@link #retry(Long)}，
+     * 消除两者在构造 TaskProgressImpl、提交线程池、记录 RunningTaskContext 上的重复代码。</p>
+     *
+     * @throws RejectedExecutionException 线程池队列已满
+     */
+    @SuppressWarnings("unchecked")
+    private <C> void doSubmit(Long taskId, TaskKind kind, TaskDefinition<C> definition, C context) {
+        java.util.concurrent.atomic.AtomicBoolean cancelledFlag = new java.util.concurrent.atomic.AtomicBoolean(false);
+        TaskProgressImpl progress = new TaskProgressImpl(taskId, progressPublisher, cancelledFlag);
+        TaskDefinition<Object> def = (TaskDefinition<Object>) (TaskDefinition<?>) definition;
+        Future<?> future = executorRegistry.getExecutor(kind).submit(() -> executeTask(taskId, def, progress, cancelledFlag));
+        runningTasks.put(taskId, new RunningTaskContext(future, def, context, progress));
     }
 
     /**
@@ -439,14 +446,25 @@ public class TaskEngine implements SmartInitializingSingleton {
             markCancelled(taskId);
             log.info("任务已取消：taskId={}，kind={}", taskId, kind);
 
-        } catch (Throwable e) {
-            // 捕获 Throwable 而非 Exception，确保 OOM/StackOverflow 等 Error 也能更新状态
+        } catch (Exception e) {
             String errorMsg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
             if (e.getCause() != null && e.getCause().getMessage() != null) {
                 errorMsg += "（" + e.getCause().getMessage() + "）";
             }
             markFailed(taskId, errorMsg);
             log.error("任务执行失败：taskId={}，kind={}，错误={}", taskId, kind, errorMsg, e);
+
+        } catch (Error e) {
+            // OOM / StackOverflow 等 Error：尝试更新状态，但 DB 写入可能失败。
+            // 独立 try-catch 包裹 markFailed，失败时仅记录日志，依赖 ensureTerminal 兜底。
+            String errorMsg = e.getClass().getSimpleName() + ": " + e.getMessage();
+            try {
+                markFailed(taskId, errorMsg);
+            } catch (Exception dbEx) {
+                log.error("Error 场景下 markFailed 失败，由 ensureTerminal 兜底：taskId={}，kind={}",
+                        taskId, kind, dbEx);
+            }
+            log.error("任务遭遇 Error：taskId={}，kind={}，错误={}", taskId, kind, errorMsg, e);
         } finally {
             if (watchdog != null) {
                 watchdog.cancel(false);

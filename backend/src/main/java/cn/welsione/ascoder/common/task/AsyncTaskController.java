@@ -24,7 +24,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AsyncTaskController {
 
-    private static final long DEFAULT_STALE_THRESHOLD_MS = 24 * 60 * 60 * 1000L;
+    private static final long MS_PER_HOUR = 60 * 60 * 1000L;
 
     private final TaskEngine taskEngine;
 
@@ -92,6 +92,6 @@ public class AsyncTaskController {
     @PostMapping("/cleanup")
     public int cleanupStaleTasks(
             @RequestParam(required = false, defaultValue = "24") int staleThresholdHours) {
-        return taskEngine.cleanupStaleTasks(staleThresholdHours * DEFAULT_STALE_THRESHOLD_MS / 24);
+        return taskEngine.cleanupStaleTasks(staleThresholdHours * MS_PER_HOUR);
     }
 }
