@@ -450,8 +450,8 @@ function handleReset() {
       <h3 class="config-group-title">仓库分支</h3>
       <p class="config-group-desc">{{ selectedProjectMemberText }}</p>
       <el-table class="workspace-table" :data="projectSpaceStore.form.memberBranches" empty-text="选择项目后自动生成仓库分支" max-height="360">
-        <el-table-column prop="repositoryName" label="仓库" min-width="140" />
-        <el-table-column label="目录别名" min-width="140">
+        <el-table-column prop="repositoryName" label="仓库" min-width="140" show-overflow-tooltip />
+        <el-table-column label="目录别名" min-width="140" show-overflow-tooltip>
           <template #default="{ row }">
             <span>{{ row.alias }}</span>
           </template>
@@ -535,11 +535,11 @@ function handleReset() {
 
   <!-- 已有空间管理 -->
   <section v-if="!isDeriveMode" class="surface-panel settings-block existing-space-panel config-section">
-    <div class="existing-space-header" @click="showExistingSpaces = !showExistingSpaces">
-      <span>
-        <span class="kicker">已有分析空间</span>
-        <strong>查看已创建空间和维护操作</strong>
-      </span>
+    <div class="section-heading existing-space-header" @click="showExistingSpaces = !showExistingSpaces">
+      <div>
+        <p class="kicker">已有分析空间</p>
+        <h2>查看已创建空间和维护操作</h2>
+      </div>
       <span class="existing-space-count">{{ filteredSpaces.length }} 个空间</span>
     </div>
 
@@ -557,8 +557,8 @@ function handleReset() {
     </div>
 
     <el-table v-loading="projectSpaceStore.loading" :data="filteredSpaces" empty-text="暂无项目空间" max-height="400">
-      <el-table-column prop="name" label="空间" min-width="160" />
-      <el-table-column v-if="!projectId" prop="project" label="项目" min-width="140" />
+      <el-table-column prop="name" label="空间" min-width="160" show-overflow-tooltip />
+      <el-table-column v-if="!projectId" prop="project" label="项目" min-width="140" show-overflow-tooltip />
       <el-table-column label="状态" width="130">
         <template #default="{ row }">
           <el-tag size="small" :type="projectSpaceStore.statusType(row.status)">{{ projectSpaceStore.statusLabel(row.status) }}</el-tag>
@@ -665,9 +665,9 @@ function handleReset() {
           </div>
         </template>
       </el-table-column>
-      <el-table-column prop="repositoryName" label="仓库" min-width="140" />
-      <el-table-column prop="alias" label="目录别名" min-width="140" />
-      <el-table-column prop="branchName" label="真实分支" min-width="160" />
+      <el-table-column prop="repositoryName" label="仓库" min-width="140" show-overflow-tooltip />
+      <el-table-column prop="alias" label="目录别名" min-width="140" show-overflow-tooltip />
+      <el-table-column prop="branchName" label="真实分支" min-width="160" show-overflow-tooltip />
       <el-table-column prop="commitMessage" label="当前 Commit Message" min-width="220">
         <template #default="{ row }">
           <el-tooltip v-if="row.commitMessage" :content="row.commitSha ?? ''" placement="top">
@@ -794,18 +794,7 @@ function handleReset() {
 }
 
 .existing-space-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--spacing-4);
-  padding: var(--spacing-5);
   cursor: pointer;
-}
-
-.existing-space-header strong {
-  display: block;
-  margin-top: 4px;
-  font-size: var(--font-size-xl);
 }
 
 .existing-space-count {

@@ -879,7 +879,8 @@ onMounted(loadAll)
         <el-tab-pane label="原始记录" name="raw">
           <div class="section-heading">
             <div>
-              <h3>Raw Events</h3>
+              <p class="kicker">原始记录</p>
+              <h2>Raw Events</h2>
               <p>只做事实留痕，不直接参与回答召回。历史聊天可手动导入，重复导入会自动跳过。</p>
             </div>
             <div class="section-actions">
@@ -901,14 +902,17 @@ onMounted(loadAll)
               <h4>{{ event.summary || '未提供摘要' }}</h4>
               <p>Agent：{{ event.agentId || 'system' }} · Question #{{ event.questionId || '-' }}</p>
             </article>
-            <el-empty v-if="!rawEvents.length" description="还没有原始记录。开启自学习并完成问答后会自动沉淀。" />
+            <div v-if="!rawEvents.length" class="empty-box compact-empty">
+              <p>还没有原始记录。开启自学习并完成问答后会自动沉淀。</p>
+            </div>
           </div>
         </el-tab-pane>
 
         <el-tab-pane label="待审核洞察" name="insights">
           <div class="section-heading">
             <div>
-              <h3>Learning Insights</h3>
+              <p class="kicker">待审核洞察</p>
+              <h2>Learning Insights</h2>
               <p>候选洞察需要管理员审核，通过后才会归纳为正式知识。</p>
             </div>
             <div class="section-actions">
@@ -1150,13 +1154,16 @@ onMounted(loadAll)
               </div>
             </article>
           </div>
-          <el-empty v-else description="暂无候选洞察。" />
+          <div v-else class="empty-box compact-empty">
+            <p>暂无候选洞察。</p>
+          </div>
         </el-tab-pane>
 
         <el-tab-pane label="正式知识" name="knowledge">
           <div class="section-heading">
             <div>
-              <h3>Knowledge Items</h3>
+              <p class="kicker">正式知识</p>
+              <h2>Knowledge Items</h2>
               <p>只有 active / verified 正式知识会作为回答线索召回。</p>
             </div>
             <div class="section-actions">
@@ -1199,7 +1206,9 @@ onMounted(loadAll)
                 </el-button>
               </div>
             </article>
-            <el-empty v-if="!knowledgeItems.length" description="暂无正式知识。" />
+            <div v-if="!knowledgeItems.length" class="empty-box compact-empty">
+              <p>暂无正式知识。</p>
+            </div>
           </div>
         </el-tab-pane>
       </el-tabs>
@@ -1596,10 +1605,6 @@ onMounted(loadAll)
 /* section-heading 在 tab-pane 内需要底边距（不在 settings-block grid 中） */
 .section-heading {
   margin-bottom: var(--spacing-4);
-}
-
-.section-heading h3 {
-  margin: 0;
 }
 
 .section-actions {

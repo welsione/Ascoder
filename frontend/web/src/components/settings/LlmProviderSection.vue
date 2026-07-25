@@ -165,7 +165,7 @@ async function handleToggleEnabled(provider: LlmProvider, enabled: boolean) {
       <el-table-column label="名称" min-width="140">
         <template #default="{ row }">
           <span class="cell-name">{{ row.name }}</span>
-          <el-tag v-if="row.isDefault" size="small" type="success" style="margin-left:6px;">默认</el-tag>
+          <el-tag v-if="row.isDefault" size="small" type="success" class="cell-tag">默认</el-tag>
         </template>
       </el-table-column>
       <el-table-column label="类型" width="160">

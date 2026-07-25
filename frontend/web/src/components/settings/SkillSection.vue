@@ -50,7 +50,7 @@ async function createSkill() {
     </div>
 
     <el-table v-loading="skillStore.loading" :data="skillStore.skills" empty-text="暂无 Skill">
-      <el-table-column prop="name" label="名称" min-width="160" />
+      <el-table-column prop="name" label="名称" min-width="160" show-overflow-tooltip />
       <el-table-column prop="description" label="描述" min-width="260" show-overflow-tooltip />
       <el-table-column prop="source" label="来源" width="120" />
       <el-table-column label="启用" width="80">

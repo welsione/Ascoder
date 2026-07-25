@@ -173,14 +173,13 @@ function handleReset() {
       </div>
       <div class="section-actions">
         <el-button
-          circle
-          :title="showCreateProject ? '收起新建项目' : '新建项目'"
-          :aria-label="showCreateProject ? '收起新建项目' : '新建项目'"
+          type="primary"
           :aria-expanded="showCreateProject"
           aria-controls="project-create-panel"
           @click="showCreateProject = !showCreateProject"
         >
           <Plus aria-hidden="true" :size="16" :stroke-width="1.8" />
+          {{ showCreateProject ? '收起' : '新建项目' }}
         </el-button>
         <el-button
           circle
@@ -386,13 +385,13 @@ function handleReset() {
       @selection-change="(rows: ProjectRepositoryMember[]) => selectedMemberIds = rows.map(r => r.id)"
     >
       <el-table-column type="selection" width="45" />
-      <el-table-column label="仓库" min-width="140">
+      <el-table-column label="仓库" min-width="140" show-overflow-tooltip>
         <template #default="{ row }">
           {{ row.repositoryName ?? row.repository }}
         </template>
       </el-table-column>
-      <el-table-column prop="alias" label="目录别名" min-width="140" />
-      <el-table-column label="默认分支" min-width="120">
+      <el-table-column prop="alias" label="目录别名" min-width="140" show-overflow-tooltip />
+      <el-table-column label="默认分支" min-width="120" show-overflow-tooltip>
         <template #default="{ row }">
           {{ row.defaultBranch ?? '未记录' }}
         </template>

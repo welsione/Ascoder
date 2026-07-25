@@ -734,8 +734,8 @@ async function deleteSpace() {
                 </div>
               </template>
             </el-table-column>
-            <el-table-column prop="repositoryName" label="仓库" min-width="140" />
-            <el-table-column prop="alias" label="目录别名" min-width="120" />
+            <el-table-column prop="repositoryName" label="仓库" min-width="140" show-overflow-tooltip />
+            <el-table-column prop="alias" label="目录别名" min-width="120" show-overflow-tooltip />
             <el-table-column prop="branchName" label="真实分支" min-width="170">
               <template #default="{ row }">
                 <div class="branch-cell">

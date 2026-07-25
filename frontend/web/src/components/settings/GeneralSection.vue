@@ -110,7 +110,7 @@ function isDirty(s: RuntimeSetting): boolean {
     <div v-for="cat in categoryMeta" :key="cat.key" class="settings-category-block">
       <div class="settings-category-header">
         <div>
-          <h3 class="settings-category-title">{{ cat.title }}</h3>
+          <p class="field-section-title">{{ cat.title }}</p>
           <p class="settings-category-desc">{{ cat.description }}</p>
           <p v-if="cat.restartHint" class="settings-category-hint">
             <SlidersHorizontal :size="12" :stroke-width="1.8" />
@@ -137,10 +137,9 @@ function isDirty(s: RuntimeSetting): boolean {
           <p class="field-desc">{{ s.description }}</p>
 
           <!-- BOOLEAN：switch -->
-          <el-switch
-            v-if="s.valueType === 'BOOLEAN'"
-            v-model="draft[s.key]"
-          />
+          <div v-if="s.valueType === 'BOOLEAN'" class="switch-wrap">
+            <el-switch v-model="draft[s.key]" />
+          </div>
           <!-- INT / LONG / DOUBLE：number -->
           <el-input-number
             v-else-if="s.valueType === 'INT' || s.valueType === 'LONG' || s.valueType === 'DOUBLE'"
@@ -198,11 +197,6 @@ function isDirty(s: RuntimeSetting): boolean {
   justify-content: space-between;
   gap: var(--spacing-4);
   margin-bottom: var(--spacing-4);
-}
-.settings-category-title {
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-semibold);
-  margin: 0 0 var(--spacing-1);
 }
 .settings-category-desc {
   margin: 0;

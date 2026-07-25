@@ -50,7 +50,7 @@ async function createMcp() {
     </div>
 
     <el-table v-loading="mcpStore.loading" :data="mcpStore.servers" empty-text="暂无 MCP Server">
-      <el-table-column prop="name" label="名称" min-width="150" />
+      <el-table-column prop="name" label="名称" min-width="150" show-overflow-tooltip />
       <el-table-column prop="transport" label="Transport" width="110" />
       <el-table-column prop="command" label="Command" min-width="160" show-overflow-tooltip />
       <el-table-column prop="endpointUrl" label="Endpoint" min-width="220" show-overflow-tooltip />

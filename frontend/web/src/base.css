@@ -1876,6 +1876,11 @@ select {
   font-weight: var(--font-weight-semibold);
 }
 
+.cell-tag {
+  margin-left: var(--spacing-1);
+  vertical-align: middle;
+}
+
 .cell-sub {
   color: var(--muted);
 }
