@@ -13,15 +13,6 @@
       <div class="brand-content">
         <img src="../../images/logo.svg" alt="Ascoder" class="brand-logo" />
         <p class="brand-tagline">代码智能分析平台</p>
-        <p class="brand-copy">对代码仓库进行结构化问答、索引与分析，<br/>让代码理解触手可及。</p>
-        <div class="brand-divider"></div>
-        <div class="brand-features">
-          <div class="feature-item" v-for="(feat, i) in features" :key="i"
-            :style="{ animationDelay: `${0.5 + i * 0.1}s` }">
-            <span class="feature-icon">{{ feat.icon }}</span>
-            <span class="feature-text">{{ feat.text }}</span>
-          </div>
-        </div>
       </div>
       <!-- 底部渐变装饰线 -->
       <div class="brand-deco-line"></div>
@@ -45,12 +36,6 @@ const symbols = [
   '{ }', '< />', '//', '=>', 'fn', '::', '[]', '&&', '||', '??',
   '0x', '++', '===', '!=', '<<', '>>', '...', 'as', 'if', '++',
   '/*', '*/', '()', '&&', '||', '=>', '::', '[]', '{}', '<>',
-]
-
-const features = [
-  { icon: '⌘', text: '结构化代码问答' },
-  { icon: '◈', text: '智能索引与符号查询' },
-  { icon: '⟐', text: '代码证据精准提取' },
 ]
 
 function particleStyle(index: number) {
@@ -219,81 +204,6 @@ function particleStyle(index: number) {
   font-weight: var(--font-weight-medium);
 }
 
-.brand-copy {
-  margin: 0;
-  max-width: 32ch;
-  font-size: var(--font-size-sm);
-  color: rgba(148, 163, 194, 0.4);
-  line-height: var(--line-height-relaxed);
-  text-align: center;
-}
-
-.brand-divider {
-  width: 48px;
-  height: 2px;
-  border-radius: var(--radius-full);
-  background: linear-gradient(90deg, rgba(99, 102, 241, 0.4), rgba(168, 85, 247, 0.4));
-  margin: var(--spacing-2) 0;
-}
-
-.brand-features {
-  display: grid;
-  gap: var(--spacing-3);
-  margin-top: var(--spacing-3);
-  width: 100%;
-  max-width: 260px;
-}
-
-.feature-item {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-3);
-  padding: var(--spacing-3) var(--spacing-4);
-  border: 1px solid rgba(148, 163, 194, 0.06);
-  border-radius: var(--radius-lg);
-  background: rgba(148, 163, 194, 0.02);
-  color: rgba(148, 163, 194, 0.55);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  animation: feature-slide-in 500ms var(--ease-spring) both;
-  transition:
-    border-color var(--transition-normal),
-    background var(--transition-normal);
-}
-
-.feature-item:hover {
-  border-color: rgba(148, 163, 194, 0.12);
-  background: rgba(148, 163, 194, 0.05);
-}
-
-@keyframes feature-slide-in {
-  from {
-    opacity: 0;
-    transform: translateX(-12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-.feature-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-md);
-  background: rgba(148, 163, 194, 0.05);
-  color: rgba(148, 163, 194, 0.45);
-  font-size: 14px;
-  flex-shrink: 0;
-}
-
-.feature-text {
-  line-height: var(--line-height-normal);
-}
-
 /* 底部渐变装饰线：呼应 logo 的蓝→紫→粉渐变 */
 .brand-deco-line {
   position: absolute;
@@ -393,16 +303,11 @@ function particleStyle(index: number) {
 @media (prefers-reduced-motion: reduce) {
   .code-particle,
   .brand-content,
-  .feature-item,
   .auth-form-wrapper,
   .brand-logo,
   .brand-deco-line,
   .brand-glow {
     animation: none !important;
-  }
-
-  .feature-item {
-    opacity: 1;
   }
 
   .brand-content,
