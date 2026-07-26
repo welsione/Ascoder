@@ -67,6 +67,15 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.FORBIDDEN, ex.getErrorCode(), ex.getMessage());
     }
 
+    /**
+     * Spring Security @PreAuthorize 权限不足时抛出，映射到 403。
+     */
+    @ExceptionHandler(org.springframework.security.authorization.AuthorizationDeniedException.class)
+    public ResponseEntity<Map<String, Object>> handleAuthorizationDenied(
+            org.springframework.security.authorization.AuthorizationDeniedException ex) {
+        return buildResponse(HttpStatus.FORBIDDEN, "ACCESS_DENIED", "权限不足");
+    }
+
     @ExceptionHandler(TaskQueueFullException.class)
     public ResponseEntity<Map<String, Object>> handleTaskQueueFull(TaskQueueFullException ex) {
         return buildResponse(HttpStatus.TOO_MANY_REQUESTS, ex.getErrorCode(), ex.getMessage());
