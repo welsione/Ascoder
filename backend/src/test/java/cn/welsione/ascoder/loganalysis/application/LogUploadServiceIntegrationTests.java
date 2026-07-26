@@ -4,6 +4,7 @@ import cn.welsione.ascoder.AbstractIntegrationTest;
 import cn.welsione.ascoder.IntegrationTestDataFactory;
 import cn.welsione.ascoder.common.exception.ResourceNotFoundException;
 import cn.welsione.ascoder.common.exception.ValidationException;
+import cn.welsione.ascoder.common.security.SecurityTestHelper;
 import cn.welsione.ascoder.loganalysis.domain.LogFile;
 import cn.welsione.ascoder.loganalysis.domain.LogFileParseStatus;
 import cn.welsione.ascoder.loganalysis.domain.LogUpload;
@@ -55,11 +56,13 @@ class LogUploadServiceIntegrationTests extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        SecurityTestHelper.setupAdmin();
         ReflectionTestUtils.setField(service, "storageRoot", tempDir.toString());
     }
 
     @AfterEach
     void tearDown() {
+        SecurityTestHelper.clear();
         logFileRepository.deleteAll();
         uploadRepository.deleteAll();
     }

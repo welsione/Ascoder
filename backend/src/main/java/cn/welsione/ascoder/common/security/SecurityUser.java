@@ -39,6 +39,23 @@ public class SecurityUser implements UserDetails {
     }
 
     /**
+     * 测试用工厂方法，直接构建 SecurityUser。
+     *
+     * @param userId      用户 ID
+     * @param username    用户名
+     * @param roles       角色编码集合
+     * @param permissions 权限编码集合
+     * @return 已构建的 SecurityUser
+     */
+    public static SecurityUser of(Long userId, String username, Set<String> roles, Set<String> permissions) {
+        List<GrantedAuthority> authorities = java.util.stream.Stream.concat(
+                roles.stream().map(r -> new SimpleGrantedAuthority(ROLE_PREFIX + r)),
+                permissions.stream().map(SimpleGrantedAuthority::new)
+        ).collect(Collectors.toList());
+        return new SecurityUser(userId, username, roles, permissions, authorities);
+    }
+
+    /**
      * 从 JWT Access Token Claims 构建 SecurityUser。
      */
     @SuppressWarnings("unchecked")

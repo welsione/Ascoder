@@ -10,4 +10,6 @@ public interface ProjectJpaRepository extends JpaRepository<Project, Long> {
     List<Project> findAllByOrderByCreatedAtDesc();
 
     boolean existsByName(String name);
+
+    List<Project> findByUserIdOrUserIdIsNull(Long userId);
 }

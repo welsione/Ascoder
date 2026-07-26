@@ -36,6 +36,11 @@ public class AsyncTask {
 
     private Long businessId;
 
+    /**
+     * 归属用户 ID。NULL 表示系统级公共资源，所有用户可见；管理员可看所有。
+     */
+    private Long userId;
+
     @Column(columnDefinition = "mediumtext")
     private String contextJson;
 

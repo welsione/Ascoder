@@ -2,6 +2,7 @@ package cn.welsione.ascoder.question.application;
 
 import cn.welsione.ascoder.common.exception.InvalidStateException;
 import cn.welsione.ascoder.common.exception.ResourceNotFoundException;
+import cn.welsione.ascoder.common.security.AuthenticatedUser;
 import cn.welsione.ascoder.question.domain.Conversation;
 import cn.welsione.ascoder.question.domain.Question;
 import cn.welsione.ascoder.question.domain.QuestionStatus;
@@ -29,6 +30,18 @@ public class ConversationService {
     private final QuestionJpaRepository questionRepository;
     private final QueryPlanJpaRepository queryPlanRepository;
     private final EntityManager entityManager;
+
+    /**
+     * 查询当前用户可见的会话列表（含公共资源）。
+     */
+    @Transactional(readOnly = true)
+    public List<Conversation> list() {
+        AuthenticatedUser current = AuthenticatedUser.current();
+        if (current.isAdmin()) {
+            return conversationRepository.findAll();
+        }
+        return conversationRepository.findByUserIdOrUserIdIsNull(current.getUserId());
+    }
 
     /**
      * 删除会话及其关联的所有问题和查询规划。

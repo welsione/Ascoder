@@ -5,6 +5,7 @@ import cn.welsione.ascoder.MockExternalDependencies;
 import cn.welsione.ascoder.codegraph.port.CodeGraphClient;
 import cn.welsione.ascoder.codegraph.port.CodeGraphToolResult;
 import cn.welsione.ascoder.common.exception.DuplicateException;
+import cn.welsione.ascoder.common.security.SecurityTestHelper;
 import cn.welsione.ascoder.common.task.AsyncTask;
 import cn.welsione.ascoder.common.task.AsyncTaskJpaRepository;
 import cn.welsione.ascoder.common.task.TaskEngine;
@@ -70,6 +71,7 @@ class RepositoryServiceIntegrationTests extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() throws IOException {
+        SecurityTestHelper.setupAdmin();
         Mockito.reset(gitRepositoryService, codeGraphClient);
         repoRoot = Path.of("./data/repos").toAbsolutePath().normalize();
         Files.createDirectories(repoRoot);
@@ -77,6 +79,7 @@ class RepositoryServiceIntegrationTests extends AbstractIntegrationTest {
 
     @AfterEach
     void cleanup() throws InterruptedException {
+        SecurityTestHelper.clear();
         // 1. 取消并等待所有未完成任务终态
         List<AsyncTask> running = taskRepository.findByStatusIn(
                 List.of(TaskStatus.QUEUED, TaskStatus.RUNNING));

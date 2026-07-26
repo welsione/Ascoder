@@ -32,4 +32,16 @@ public interface AsyncTaskJpaRepository extends JpaRepository<AsyncTask, Long> {
 
     /** 按状态分页查询。 */
     Page<AsyncTask> findByStatusIn(List<TaskStatus> statuses, Pageable pageable);
+
+    /** 按用户 ID 分页查询（含公共资源）。 */
+    Page<AsyncTask> findByUserIdOrUserIdIsNull(Long userId, Pageable pageable);
+
+    /** 按类型和用户 ID 分页查询（含公共资源）。 */
+    Page<AsyncTask> findByKindAndUserIdOrUserIdIsNull(TaskKind kind, Long userId, Pageable pageable);
+
+    /** 按状态列表和用户 ID 分页查询（含公共资源）。 */
+    Page<AsyncTask> findByStatusInAndUserIdOrUserIdIsNull(List<TaskStatus> statuses, Long userId, Pageable pageable);
+
+    /** 按类型、状态列表和用户 ID 分页查询（含公共资源）。 */
+    Page<AsyncTask> findByKindAndStatusInAndUserIdOrUserIdIsNull(TaskKind kind, List<TaskStatus> statuses, Long userId, Pageable pageable);
 }

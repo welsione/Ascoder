@@ -3,6 +3,7 @@ package cn.welsione.ascoder.loganalysis.application;
 import cn.welsione.ascoder.common.exception.InvalidStateException;
 import cn.welsione.ascoder.common.exception.ResourceNotFoundException;
 import cn.welsione.ascoder.common.exception.ValidationException;
+import cn.welsione.ascoder.common.security.AuthenticatedUser;
 import cn.welsione.ascoder.loganalysis.domain.LogFile;
 import cn.welsione.ascoder.loganalysis.domain.LogFileParseStatus;
 import cn.welsione.ascoder.loganalysis.domain.LogUpload;
@@ -98,6 +99,10 @@ public class LogUploadService {
             entity.setCreatedAt(new Date());
             entity.setExpiresAt(new Date(System.currentTimeMillis() + ttlHours * 3600_000L));
             entity.setStoredPath("");
+            AuthenticatedUser submitter = AuthenticatedUser.currentOrNull();
+            if (submitter != null) {
+                entity.setUserId(submitter.getUserId());
+            }
             return repository.save(entity);
         });
 

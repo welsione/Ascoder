@@ -7,6 +7,7 @@ import cn.welsione.ascoder.codegraph.port.CodeGraphClient;
 import cn.welsione.ascoder.codegraph.port.CodeGraphToolResult;
 import cn.welsione.ascoder.common.exception.InvalidStateException;
 import cn.welsione.ascoder.common.exception.ResourceNotFoundException;
+import cn.welsione.ascoder.common.security.SecurityTestHelper;
 import cn.welsione.ascoder.common.task.AsyncTask;
 import cn.welsione.ascoder.common.task.AsyncTaskJpaRepository;
 import cn.welsione.ascoder.common.task.TaskEngine;
@@ -107,11 +108,13 @@ class ProjectSpaceServiceIntegrationTests extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        SecurityTestHelper.setupAdmin();
         Mockito.reset(gitRepositoryService, codeGraphClient);
     }
 
     @AfterEach
     void cleanup() throws InterruptedException {
+        SecurityTestHelper.clear();
         // 1. 取消并等待所有未完成任务终态
         List<AsyncTask> running = taskRepository.findByStatusIn(
                 List.of(TaskStatus.QUEUED, TaskStatus.RUNNING));

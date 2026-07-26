@@ -2,6 +2,7 @@ package cn.welsione.ascoder.loganalysis.application;
 
 import cn.welsione.ascoder.common.exception.InvalidStateException;
 import cn.welsione.ascoder.common.exception.ResourceNotFoundException;
+import cn.welsione.ascoder.common.security.SecurityTestHelper;
 import cn.welsione.ascoder.loganalysis.domain.LogUpload;
 import cn.welsione.ascoder.loganalysis.domain.LogUploadStatus;
 import cn.welsione.ascoder.loganalysis.persistence.LogFileJpaRepository;
@@ -10,6 +11,7 @@ import cn.welsione.ascoder.repository.projectspace.ProjectSpace;
 import cn.welsione.ascoder.repository.projectspace.ProjectSpaceJpaRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -66,6 +68,7 @@ class LogUploadServiceTests {
 
     @BeforeEach
     void setUp() {
+        SecurityTestHelper.setupAdmin();
         service = new LogUploadService(
                 repository,
                 logFileRepository,
@@ -77,6 +80,11 @@ class LogUploadServiceTests {
         ReflectionTestUtils.setField(service, "storageRoot", tempDir.toString());
         ReflectionTestUtils.setField(service, "maxFileBytes", 1024L);
         ReflectionTestUtils.setField(service, "ttlHours", 72L);
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityTestHelper.clear();
     }
 
     @Test

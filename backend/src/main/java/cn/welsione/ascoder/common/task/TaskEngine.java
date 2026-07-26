@@ -1,6 +1,7 @@
 package cn.welsione.ascoder.common.task;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import cn.welsione.ascoder.common.security.AuthenticatedUser;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.SmartInitializingSingleton;
@@ -139,6 +140,10 @@ public class TaskEngine implements SmartInitializingSingleton {
         task.setContextJson(contextJson);
         task.setMaxRetries(request.getMaxRetries());
         task.setTimeoutMs(request.getTimeoutMs());
+        AuthenticatedUser submitter = AuthenticatedUser.currentOrNull();
+        if (submitter != null) {
+            task.setUserId(submitter.getUserId());
+        }
         task = taskRepository.save(task);
 
         Long taskId = task.getId();
@@ -184,6 +189,14 @@ public class TaskEngine implements SmartInitializingSingleton {
      */
     @Transactional(readOnly = true)
     public Page<AsyncTask> list(TaskKind kind, List<TaskStatus> statuses, Pageable pageable) {
+        AuthenticatedUser current = AuthenticatedUser.currentOrNull();
+        if (current == null || current.isAdmin()) {
+            return listForAdmin(kind, statuses, pageable);
+        }
+        return listForUser(kind, statuses, current.getUserId(), pageable);
+    }
+
+    private Page<AsyncTask> listForAdmin(TaskKind kind, List<TaskStatus> statuses, Pageable pageable) {
         if (kind != null && statuses != null && !statuses.isEmpty()) {
             return taskRepository.findByKindAndStatusIn(kind, statuses, pageable);
         }
@@ -194,6 +207,19 @@ public class TaskEngine implements SmartInitializingSingleton {
             return taskRepository.findByStatusIn(statuses, pageable);
         }
         return taskRepository.findAll(pageable);
+    }
+
+    private Page<AsyncTask> listForUser(TaskKind kind, List<TaskStatus> statuses, Long userId, Pageable pageable) {
+        if (kind != null && statuses != null && !statuses.isEmpty()) {
+            return taskRepository.findByKindAndStatusInAndUserIdOrUserIdIsNull(kind, statuses, userId, pageable);
+        }
+        if (kind != null) {
+            return taskRepository.findByKindAndUserIdOrUserIdIsNull(kind, userId, pageable);
+        }
+        if (statuses != null && !statuses.isEmpty()) {
+            return taskRepository.findByStatusInAndUserIdOrUserIdIsNull(statuses, userId, pageable);
+        }
+        return taskRepository.findByUserIdOrUserIdIsNull(userId, pageable);
     }
 
     /**

@@ -30,6 +30,11 @@ public class Project {
     @Column(columnDefinition = "text")
     private String description;
 
+    /**
+     * 归属用户 ID。NULL 表示系统级公共资源，所有用户可见；管理员可看所有。
+     */
+    private Long userId;
+
     @Column(nullable = false)
     private Date createdAt = new Date();
 

@@ -6,6 +6,8 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
+
 /** 会话实体的 JPA 仓库。 */
 public interface ConversationJpaRepository extends JpaRepository<Conversation, Long> {
 
@@ -15,4 +17,6 @@ public interface ConversationJpaRepository extends JpaRepository<Conversation, L
     @Modifying
     @Query("update Conversation c set c.projectSpaceId = null where c.projectSpaceId = :projectSpaceId")
     int detachFromProjectSpace(@Param("projectSpaceId") Long projectSpaceId);
+
+    List<Conversation> findByUserIdOrUserIdIsNull(Long userId);
 }

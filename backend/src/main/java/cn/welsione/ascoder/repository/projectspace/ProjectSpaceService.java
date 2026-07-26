@@ -6,6 +6,7 @@ import cn.welsione.ascoder.common.FileUtil;
 import cn.welsione.ascoder.common.exception.DuplicateException;
 import cn.welsione.ascoder.common.exception.InvalidStateException;
 import cn.welsione.ascoder.common.exception.ResourceNotFoundException;
+import cn.welsione.ascoder.common.security.AuthenticatedUser;
 import cn.welsione.ascoder.common.task.TaskEngine;
 import cn.welsione.ascoder.common.task.TaskKind;
 import cn.welsione.ascoder.common.task.TaskSubmitRequest;
@@ -78,7 +79,11 @@ public class ProjectSpaceService {
 
     @Transactional(readOnly = true)
     public List<ProjectSpace> list() {
-        return repository.findAllByOrderByCreatedAtDesc();
+        AuthenticatedUser current = AuthenticatedUser.current();
+        if (current.isAdmin()) {
+            return repository.findAll();
+        }
+        return repository.findByUserIdOrUserIdIsNull(current.getUserId());
     }
 
     @Transactional(readOnly = true)
@@ -118,6 +123,7 @@ public class ProjectSpaceService {
         space.setDescription(trimToNull(request.getDescription()));
         space.setStatus(ProjectSpaceStatus.CREATED);
         space.setRootPath(rootPath(project.getName(), name));
+        space.setUserId(AuthenticatedUser.current().getUserId());
 
         try {
             ProjectSpace saved = repository.saveAndFlush(space);

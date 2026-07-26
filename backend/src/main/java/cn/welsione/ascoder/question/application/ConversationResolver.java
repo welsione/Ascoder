@@ -2,6 +2,7 @@ package cn.welsione.ascoder.question.application;
 
 import cn.welsione.ascoder.common.exception.ResourceNotFoundException;
 import cn.welsione.ascoder.common.exception.ValidationException;
+import cn.welsione.ascoder.common.security.AuthenticatedUser;
 import cn.welsione.ascoder.question.api.CreateQuestionRequest;
 import cn.welsione.ascoder.question.domain.Conversation;
 import cn.welsione.ascoder.question.persistence.ConversationJpaRepository;
@@ -37,6 +38,10 @@ class ConversationResolver {
         conversation.setRole(request.getRole());
         conversation.setBranchName(primary.getBranchName());
         conversation.setCommitSha(primary.getCommitSha());
+        AuthenticatedUser submitter = AuthenticatedUser.currentOrNull();
+        if (submitter != null) {
+            conversation.setUserId(submitter.getUserId());
+        }
         return conversationRepository.save(conversation);
     }
 

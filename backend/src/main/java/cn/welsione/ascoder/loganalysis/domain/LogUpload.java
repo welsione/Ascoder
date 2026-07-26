@@ -36,6 +36,11 @@ public class LogUpload {
     @JoinColumn(name = "projectSpaceId", nullable = false)
     private ProjectSpace projectSpace;
 
+    /**
+     * 归属用户 ID。NULL 表示系统级公共资源，所有用户可见；管理员可看所有。
+     */
+    private Long userId;
+
     @Column(length = 128)
     private String createdBy;
 

@@ -3,6 +3,7 @@ package cn.welsione.ascoder.repository.project;
 import cn.welsione.ascoder.common.exception.DuplicateException;
 import cn.welsione.ascoder.common.exception.ResourceNotFoundException;
 import cn.welsione.ascoder.common.exception.ValidationException;
+import cn.welsione.ascoder.common.security.AuthenticatedUser;
 import cn.welsione.ascoder.repository.CodeRepository;
 import cn.welsione.ascoder.repository.projectspace.ProjectSpaceService;
 import cn.welsione.ascoder.repository.RepositoryService;
@@ -36,7 +37,11 @@ public class ProjectService {
 
     @Transactional(readOnly = true)
     public List<Project> list() {
-        return repository.findAllByOrderByCreatedAtDesc();
+        AuthenticatedUser current = AuthenticatedUser.current();
+        if (current.isAdmin()) {
+            return repository.findAll();
+        }
+        return repository.findByUserIdOrUserIdIsNull(current.getUserId());
     }
 
     @Transactional(readOnly = true)
@@ -52,6 +57,7 @@ public class ProjectService {
         }
 
         Project project = ProjectMapper.INSTANCE.toEntity(request);
+        project.setUserId(AuthenticatedUser.current().getUserId());
         try {
             return repository.save(project);
         } catch (DataIntegrityViolationException ex) {

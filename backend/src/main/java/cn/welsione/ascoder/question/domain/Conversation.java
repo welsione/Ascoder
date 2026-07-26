@@ -37,6 +37,11 @@ public class Conversation {
     @Column(name = "branchWorkspaceId")
     private Long branchWorkspaceId;
 
+    /**
+     * 归属用户 ID。NULL 表示系统级公共资源，所有用户可见；管理员可看所有。
+     */
+    private Long userId;
+
     @Column(nullable = false, length = 200)
     private String title;
 

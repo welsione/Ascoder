@@ -19,4 +19,6 @@ public interface ProjectSpaceJpaRepository extends JpaRepository<ProjectSpace, L
     boolean existsByProject_IdAndName(Long projectId, String name);
 
     List<ProjectSpace> findByProject_Id(Long projectId);
+
+    List<ProjectSpace> findByUserIdOrUserIdIsNull(Long userId);
 }
