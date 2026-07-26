@@ -124,6 +124,7 @@ public class RoleService {
                 .collect(Collectors.toSet());
 
         rolePermissionRepository.deleteByRoleId(id);
+        rolePermissionRepository.flush();
         for (Permission perm : permissions) {
             RolePermission rp = new RolePermission();
             rp.setRoleId(id);
