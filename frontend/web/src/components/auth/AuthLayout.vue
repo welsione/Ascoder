@@ -73,7 +73,7 @@ function particleStyle(index: number) {
   justify-items: center;
   padding: var(--spacing-10) var(--spacing-8);
   overflow: hidden;
-  background: #111827;
+  background: #1e293b;
 }
 
 .brand-bg {
@@ -198,7 +198,7 @@ function particleStyle(index: number) {
 
 .brand-tagline {
   margin: 0;
-  font-size: var(--font-size-lg);
+  font-size: 18px;
   color: rgba(148, 163, 194, 0.65);
   letter-spacing: var(--tracking-wide);
   font-weight: var(--font-weight-medium);
