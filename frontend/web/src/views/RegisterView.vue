@@ -113,9 +113,9 @@ async function handleRegister() {
 
 <style scoped>
 .auth-card {
-  padding: var(--spacing-8) var(--spacing-6);
+  padding: var(--spacing-8);
   border: 1px solid var(--stroke);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-2xl);
   background: var(--surface);
   box-shadow: var(--shadow-panel), var(--highlight-edge);
 }
@@ -128,7 +128,7 @@ async function handleRegister() {
 
 .auth-title {
   margin: 0;
-  font-size: var(--font-size-3xl);
+  font-size: 28px;
   font-weight: var(--font-weight-bold);
   letter-spacing: var(--tracking-tighter);
   line-height: var(--line-height-display);
