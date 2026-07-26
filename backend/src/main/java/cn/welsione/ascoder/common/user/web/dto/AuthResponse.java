@@ -19,6 +19,7 @@ public class AuthResponse {
     private String accessToken;
     private String refreshToken;
     private long expiresIn;
+    private boolean mustChangePassword;
     private UserInfo user;
 
     @Getter

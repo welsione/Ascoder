@@ -44,6 +44,12 @@ public class User {
     @Column(nullable = false)
     private int loginFailCount = 0;
 
+    /**
+     * 是否已修改过密码。默认管理员首次创建时为 false，强制改密后置 true。
+     */
+    @Column(nullable = false)
+    private boolean passwordChanged = true;
+
     private LocalDateTime lastLoginAt;
 
     @Column(nullable = false, updatable = false)

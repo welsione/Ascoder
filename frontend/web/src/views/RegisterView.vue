@@ -4,9 +4,6 @@
       <template #header>
         <div class="register-header">
           <h2>注册账号</h2>
-          <p v-if="isFirstUser" class="first-user-tip">
-            您是首位注册用户，将自动成为系统管理员
-          </p>
         </div>
       </template>
       <el-form ref="formRef" :model="form" :rules="rules" label-width="0" @submit.prevent="handleRegister">
@@ -37,17 +34,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { User, Lock, UserFilled } from '@element-plus/icons-vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { useAuthStore } from '../stores/auth'
-import { getInitStatus } from '../services/authApi'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const formRef = ref<FormInstance>()
-const isFirstUser = ref(false)
 
 const form = reactive({
   username: '',
@@ -78,15 +73,6 @@ const rules: FormRules = {
     { validator: validateConfirmPassword, trigger: 'blur' },
   ],
 }
-
-onMounted(async () => {
-  try {
-    const status = await getInitStatus()
-    isFirstUser.value = !status.initialized
-  } catch {
-    // 忽略
-  }
-})
 
 async function handleRegister() {
   if (!formRef.value) return
@@ -122,11 +108,6 @@ async function handleRegister() {
 }
 .register-header h2 {
   margin: 0 0 8px 0;
-}
-.first-user-tip {
-  color: var(--el-color-warning);
-  font-size: 14px;
-  margin: 0;
 }
 .register-footer {
   text-align: center;

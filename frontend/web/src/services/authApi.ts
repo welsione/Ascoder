@@ -1,5 +1,5 @@
 import { request } from './httpClient'
-import type { LoginRequest, RegisterRequest, RefreshRequest, AuthResponse, InitStatusResponse, UserInfo } from '../types/auth'
+import type { LoginRequest, RegisterRequest, RefreshRequest, ChangePasswordRequest, AuthResponse, InitStatusResponse, UserInfo } from '../types/auth'
 
 export function getInitStatus() {
   return request<InitStatusResponse>('/api/auth/init-status')
@@ -39,4 +39,12 @@ export function logout(payload: RefreshRequest) {
 
 export function getCurrentUser() {
   return request<UserInfo>('/api/auth/me')
+}
+
+export function changePassword(payload: ChangePasswordRequest) {
+  return request<void>('/api/auth/change-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
 }

@@ -71,4 +71,13 @@ public class AuthController {
     public AuthResponse.UserInfo me() {
         return authService.me();
     }
+
+    /**
+     * 修改当前用户密码。默认管理员首次登录后强制改密。
+     */
+    @PostMapping("/change-password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void changePassword(@Valid @RequestBody ChangePasswordRequest request) {
+        authService.changePassword(request);
+    }
 }

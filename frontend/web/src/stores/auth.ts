@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import * as authApi from '../services/authApi'
-import type { UserInfo, LoginRequest, RegisterRequest } from '../types/auth'
+import type { UserInfo, LoginRequest, RegisterRequest, ChangePasswordRequest } from '../types/auth'
 
 const REFRESH_TOKEN_KEY = 'ascoder-refresh-token'
 
@@ -10,17 +10,21 @@ export const useAuthStore = defineStore('auth', () => {
   const accessToken = ref<string | null>(null)
   const refreshToken = ref<string | null>(localStorage.getItem(REFRESH_TOKEN_KEY))
   const tokenExpiresAt = ref<number>(0)
+  const mustChangePassword = ref(false)
   const loading = ref(false)
   const error = ref('')
 
   const isAuthenticated = computed(() => !!accessToken.value)
   const isAdmin = computed(() => user.value?.roles.includes('ADMIN') ?? false)
 
-  function setTokens(auth: { accessToken: string; refreshToken: string; expiresIn: number }) {
+  function setTokens(auth: { accessToken: string; refreshToken: string; expiresIn: number; mustChangePassword?: boolean }) {
     accessToken.value = auth.accessToken
     refreshToken.value = auth.refreshToken
     tokenExpiresAt.value = Date.now() + auth.expiresIn * 1000
     localStorage.setItem(REFRESH_TOKEN_KEY, auth.refreshToken)
+    if (auth.mustChangePassword !== undefined) {
+      mustChangePassword.value = auth.mustChangePassword
+    }
   }
 
   function clearTokens() {
@@ -28,6 +32,7 @@ export const useAuthStore = defineStore('auth', () => {
     refreshToken.value = null
     tokenExpiresAt.value = 0
     user.value = null
+    mustChangePassword.value = false
     localStorage.removeItem(REFRESH_TOKEN_KEY)
   }
 
@@ -93,6 +98,23 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  /**
+   * 修改当前用户密码，改密成功后清除强制改密标记。
+   */
+  async function changePassword(req: ChangePasswordRequest) {
+    loading.value = true
+    error.value = ''
+    try {
+      await authApi.changePassword(req)
+      mustChangePassword.value = false
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : '修改密码失败'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
   function hasPermission(code: string): boolean {
     if (!user.value) return false
     if (user.value.roles.includes('ADMIN')) return true
@@ -104,6 +126,7 @@ export const useAuthStore = defineStore('auth', () => {
     accessToken,
     refreshToken,
     tokenExpiresAt,
+    mustChangePassword,
     loading,
     error,
     isAuthenticated,
@@ -113,6 +136,7 @@ export const useAuthStore = defineStore('auth', () => {
     refresh,
     logout,
     fetchMe,
+    changePassword,
     setTokens,
     clearTokens,
     hasPermission,

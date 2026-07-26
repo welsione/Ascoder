@@ -54,7 +54,7 @@ public class AuthService {
     }
 
     /**
-     * 用户注册。首个用户自动获得 ADMIN 角色。
+     * 用户注册，分配 USER 角色。系统预置 admin 账户，注册不再产生管理员。
      */
     @Transactional
     public AuthResponse register(RegisterRequest request) {
@@ -68,21 +68,20 @@ public class AuthService {
         user.setUsername(request.getUsername());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setNickname(request.getNickname());
+        user.setPasswordChanged(true);
         user = userRepository.save(user);
 
-        boolean isFirstUser = userRepository.count() == 1;
-        String roleCode = isFirstUser ? "ADMIN" : "USER";
-        Role role = roleRepository.findByCode(roleCode)
-                .orElseThrow(() -> new IllegalStateException("内置角色不存在: " + roleCode));
+        Role role = roleRepository.findByCode("USER")
+                .orElseThrow(() -> new IllegalStateException("内置角色不存在: USER"));
 
         UserRole userRole = new UserRole();
         userRole.setUserId(user.getId());
         userRole.setRoleId(role.getId());
         userRoleRepository.save(userRole);
 
-        log.info("用户注册成功: username={}, role={}, isFirstUser={}", request.getUsername(), roleCode, isFirstUser);
+        log.info("用户注册成功: username={}", request.getUsername());
 
-        Set<String> roles = Set.of(roleCode);
+        Set<String> roles = Set.of("USER");
         Set<String> permissions = getPermissionsByRoles(Set.of(role.getId()));
         TokenPair tokenPair = jwtTokenProvider.generateTokenPair(user.getId(), user.getUsername(), roles, permissions);
         saveRefreshToken(user.getId(), tokenPair.getRefreshToken(), null);
@@ -198,6 +197,36 @@ public class AuthService {
         );
     }
 
+    /**
+     * 修改当前用户密码。首次登录的默认管理员必须改密后方可正常使用系统。
+     */
+    @Transactional
+    public void changePassword(ChangePasswordRequest request) {
+        AuthenticatedUser current = AuthenticatedUser.current();
+        User user = userRepository.findById(current.getUserId())
+                .orElseThrow(() -> new AuthenticationException("用户不存在"));
+
+        if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
+            throw new AuthenticationException("原密码错误");
+        }
+
+        if (passwordEncoder.matches(request.getNewPassword(), user.getPassword())) {
+            throw new ValidationException("新密码不能与原密码相同");
+        }
+
+        validatePassword(request.getNewPassword());
+
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        user.setPasswordChanged(true);
+        userRepository.save(user);
+
+        // 改密后吊销所有现存 Refresh Token，强制其他设备重新登录
+        refreshTokenRepository.findByUserIdAndRevokedAtIsNull(user.getId())
+                .forEach(rt -> rt.setRevokedAt(LocalDateTime.now()));
+
+        log.info("用户修改密码: userId={}", user.getId());
+    }
+
     // ========== 私有方法 ==========
 
     private void validatePassword(String password) {
@@ -258,6 +287,7 @@ public class AuthService {
         response.setAccessToken(tokenPair.getAccessToken());
         response.setRefreshToken(tokenPair.getRefreshToken());
         response.setExpiresIn(tokenPair.getExpiresIn());
+        response.setMustChangePassword(!user.isPasswordChanged());
         response.setUser(new AuthResponse.UserInfo(
                 user.getId(), user.getUsername(), user.getNickname(), roles, permissions
         ));

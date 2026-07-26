@@ -20,6 +20,12 @@ const router = createRouter({
       meta: { public: true },
     },
     {
+      path: '/change-password',
+      name: 'change-password',
+      component: () => import('../views/ChangePasswordView.vue'),
+      meta: { public: true },
+    },
+    {
       path: '/',
       redirect: '/projects',
     },
@@ -106,7 +112,7 @@ const router = createRouter({
   ],
 })
 
-const WHITE_LIST = ['/login', '/register']
+const WHITE_LIST = ['/login', '/register', '/change-password']
 
 router.beforeEach(async (to) => {
   const auth = useAuthStore()
@@ -125,12 +131,13 @@ router.beforeEach(async (to) => {
       try {
         await auth.refresh()
         await auth.fetchMe()
-        return true
       } catch {
         auth.clearTokens()
+        return { name: 'login', query: { redirect: to.fullPath } }
       }
+    } else {
+      return { name: 'login', query: { redirect: to.fullPath } }
     }
-    return { name: 'login', query: { redirect: to.fullPath } }
   }
 
   // 已认证但无用户信息（页面刷新后）
@@ -141,6 +148,11 @@ router.beforeEach(async (to) => {
       auth.clearTokens()
       return { name: 'login', query: { redirect: to.fullPath } }
     }
+  }
+
+  // 强制改密：默认管理员首次登录必须先改密
+  if (auth.mustChangePassword && to.path !== '/change-password') {
+    return { name: 'change-password' }
   }
 
   return true

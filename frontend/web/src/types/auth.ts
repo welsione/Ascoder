@@ -13,10 +13,16 @@ export interface RefreshRequest {
   refreshToken: string
 }
 
+export interface ChangePasswordRequest {
+  oldPassword: string
+  newPassword: string
+}
+
 export interface AuthResponse {
   accessToken: string
   refreshToken: string
   expiresIn: number
+  mustChangePassword: boolean
   user: UserInfo
 }
 
