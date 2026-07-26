@@ -2146,7 +2146,6 @@ select {
     min-height: 100vh;
     padding: 56px var(--spacing-5) 96px;
   }
-}
 
   .project-page-header h1,
   .project-home-hero h1 {

@@ -21,7 +21,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/mcp-servers")
 @RequiredArgsConstructor
-@PreAuthorize("hasAuthority('MCP_SERVER:MANAGE')")
+@PreAuthorize("hasAuthority('MCP_SERVER:READ')")
 public class McpServerController {
 
     private final McpServerService mcpServerService;
@@ -33,11 +33,13 @@ public class McpServerController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAuthority('MCP_SERVER:MANAGE')")
     public McpServerConfig create(@Valid @RequestBody CreateMcpServerRequest request) {
         return mcpServerService.create(request);
     }
 
     @PatchMapping("/{id}/enabled")
+    @PreAuthorize("hasAuthority('MCP_SERVER:MANAGE')")
     public McpServerConfig updateEnabled(
             @PathVariable Long id,
             @RequestBody UpdateMcpServerEnabledRequest request

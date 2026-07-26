@@ -72,6 +72,7 @@ onMounted(() => {
 
     <div class="settings-nav-list">
       <button
+        v-permission="'REPOSITORY:READ'"
         class="settings-nav-item"
         :class="{ active: currentSection() === 'repositories' }"
         type="button"
@@ -84,6 +85,7 @@ onMounted(() => {
         <small>{{ repositoryStore.repositories.length }} 个仓库</small>
       </button>
       <button
+        v-permission="'REPOSITORY:READ'"
         class="settings-nav-item"
         :class="{ active: currentSection() === 'tasks' }"
         type="button"
@@ -96,6 +98,7 @@ onMounted(() => {
         <small>{{ asyncTaskStore.activeCount }} 个运行中</small>
       </button>
       <button
+        v-permission="'SKILL:READ'"
         class="settings-nav-item"
         :class="{ active: currentSection() === 'skills' }"
         type="button"
@@ -108,6 +111,7 @@ onMounted(() => {
         <small>{{ skillStore.enabledCount }} 个已启用</small>
       </button>
       <button
+        v-permission="'TOOL:READ'"
         class="settings-nav-item"
         :class="{ active: currentSection() === 'tools' }"
         type="button"
@@ -120,6 +124,7 @@ onMounted(() => {
         <small>{{ toolStore.enabledCount }} / {{ toolStore.totalCount }} 已启用</small>
       </button>
       <button
+        v-permission="'AGENT_CONFIG:READ'"
         class="settings-nav-item"
         :class="{ active: currentSection() === 'agents' }"
         type="button"
@@ -132,6 +137,7 @@ onMounted(() => {
         <small>{{ agentStore.enabledAgents.length }} 个已启用</small>
       </button>
       <button
+        v-permission="'LLM_PROVIDER:MANAGE'"
         class="settings-nav-item"
         :class="{ active: currentSection() === 'llm-providers' }"
         type="button"
@@ -170,6 +176,7 @@ onMounted(() => {
         <small>角色与权限</small>
       </button>
       <button
+        v-permission="'SYSTEM_SETTINGS:READ'"
         class="settings-nav-item"
         :class="{ active: currentSection() === 'general' }"
         type="button"
@@ -182,6 +189,7 @@ onMounted(() => {
         <small>运行时调参</small>
       </button>
       <button
+        v-permission="'MCP_SERVER:READ'"
         class="settings-nav-item"
         :class="{ active: currentSection() === 'mcp', disabled: !mcpConfigEnabled }"
         type="button"

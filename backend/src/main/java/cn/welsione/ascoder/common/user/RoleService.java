@@ -123,7 +123,7 @@ public class RoleService {
                         .orElseThrow(() -> new ResourceNotFoundException("权限不存在: " + code)))
                 .collect(Collectors.toSet());
 
-        rolePermissionRepository.findByRoleId(id).forEach(rolePermissionRepository::delete);
+        rolePermissionRepository.deleteByRoleId(id);
         for (Permission perm : permissions) {
             RolePermission rp = new RolePermission();
             rp.setRoleId(id);

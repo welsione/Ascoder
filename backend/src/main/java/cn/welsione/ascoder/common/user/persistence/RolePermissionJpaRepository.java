@@ -10,4 +10,6 @@ import java.util.List;
  */
 public interface RolePermissionJpaRepository extends JpaRepository<RolePermission, Long> {
     List<RolePermission> findByRoleId(Long roleId);
+
+    void deleteByRoleId(Long roleId);
 }

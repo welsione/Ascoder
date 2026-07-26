@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
+import { useAuthStore } from '../stores/auth'
 import SettingsSidebar from '../components/settings/SettingsSidebar.vue'
 import RepositorySection from '../components/settings/RepositorySection.vue'
 import TaskSection from '../components/settings/TaskSection.vue'
@@ -14,7 +15,22 @@ import RoleSection from '../components/settings/RoleSection.vue'
 import type { Section } from '../types/settings'
 
 const route = useRoute()
+const authStore = useAuthStore()
 const mainRef = ref<HTMLElement | null>(null)
+
+/** section → 所需权限码映射 */
+const SECTION_PERMISSION: Record<Section, string> = {
+  repositories: 'REPOSITORY:READ',
+  tasks: 'REPOSITORY:READ',
+  skills: 'SKILL:READ',
+  tools: 'TOOL:READ',
+  agents: 'AGENT_CONFIG:READ',
+  'llm-providers': 'LLM_PROVIDER:MANAGE',
+  general: 'SYSTEM_SETTINGS:READ',
+  users: 'USER:MANAGE',
+  roles: 'ROLE:MANAGE',
+  mcp: 'MCP_SERVER:READ',
+}
 
 function normalizeSection(value: string | undefined): Section {
   if (value === 'repository' || value === 'repositories') return 'repositories'
@@ -32,6 +48,11 @@ function normalizeSection(value: string | undefined): Section {
 
 const section = computed<Section>(() => {
   return normalizeSection(route.params.section as string | undefined)
+})
+
+const hasSectionPermission = computed(() => {
+  const permission = SECTION_PERMISSION[section.value]
+  return authStore.hasPermission(permission)
 })
 
 const sectionMeta = computed(() => {
@@ -93,24 +114,37 @@ watch(section, () => {
         </div>
       </header>
 
-      <RepositorySection v-if="section === 'repositories'" />
-      <TaskSection v-else-if="section === 'tasks'" />
-      <SkillSection v-else-if="section === 'skills'" />
-      <ToolSection v-else-if="section === 'tools'" />
-      <AgentSection v-else-if="section === 'agents'" />
-      <LlmProviderSection v-else-if="section === 'llm-providers'" />
-      <GeneralSection v-else-if="section === 'general'" />
-      <UserSection v-else-if="section === 'users'" />
-      <RoleSection v-else-if="section === 'roles'" />
-      <section v-else class="surface-panel settings-block settings-disabled-panel">
+      <template v-if="hasSectionPermission">
+        <RepositorySection v-if="section === 'repositories'" />
+        <TaskSection v-else-if="section === 'tasks'" />
+        <SkillSection v-else-if="section === 'skills'" />
+        <ToolSection v-else-if="section === 'tools'" />
+        <AgentSection v-else-if="section === 'agents'" />
+        <LlmProviderSection v-else-if="section === 'llm-providers'" />
+        <GeneralSection v-else-if="section === 'general'" />
+        <UserSection v-else-if="section === 'users'" />
+        <RoleSection v-else-if="section === 'roles'" />
+        <section v-else class="surface-panel settings-block settings-disabled-panel">
+          <div class="section-heading">
+            <div>
+              <p class="kicker">暂未开放</p>
+              <h2>MCP 配置入口已临时关闭</h2>
+            </div>
+          </div>
+          <p class="settings-disabled-copy">
+            CodeGraph MCP 接入方案确认前，暂不允许在前端新增或修改 MCP Server。
+          </p>
+        </section>
+      </template>
+      <section v-else class="surface-panel settings-block">
         <div class="section-heading">
           <div>
-            <p class="kicker">暂未开放</p>
-            <h2>MCP 配置入口已临时关闭</h2>
+            <p class="kicker">无权访问</p>
+            <h2>当前角色无权访问此功能</h2>
           </div>
         </div>
         <p class="settings-disabled-copy">
-          CodeGraph MCP 接入方案确认前，暂不允许在前端新增或修改 MCP Server。
+          请联系管理员获取相应权限，或返回其他可用功能页面。
         </p>
       </section>
     </section>

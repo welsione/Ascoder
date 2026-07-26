@@ -193,13 +193,15 @@ public class AuthService {
         User user = userRepository.findById(current.getUserId())
                 .orElseThrow(() -> new AuthenticationException("用户不存在"));
         Set<String> roles = getRolesByUserId(user.getId());
+        Set<Long> roleIds = getRoleIdsByUserId(user.getId());
+        Set<String> permissions = getPermissionsByRoles(roleIds);
         return new AuthResponse.UserInfo(
                 user.getId(),
                 user.getUsername(),
                 user.getNickname(),
                 user.getEmail(),
                 roles,
-                current.getPermissions()
+                permissions
         );
     }
 

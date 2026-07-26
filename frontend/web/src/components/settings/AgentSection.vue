@@ -236,7 +236,7 @@ const taskKindOptions = [
         <el-button circle :loading="agentStore.loading" title="刷新" aria-label="刷新" @click="agentStore.fetch">
           <RefreshCw aria-hidden="true" :size="16" :stroke-width="1.8" />
         </el-button>
-        <el-button type="primary" @click="openCreate">
+        <el-button v-if="canManage" type="primary" @click="openCreate">
           <BotMessageSquare class="button-icon" :size="16" :stroke-width="1.8" />
           新增 Agent
         </el-button>
@@ -286,7 +286,7 @@ const taskKindOptions = [
           {{ formatTime(agentStore.lastRunAt[row.agentId], '—') }}
         </template>
       </el-table-column>
-      <el-table-column label="启用" width="80">
+      <el-table-column v-if="canManage" label="启用" width="80">
         <template #default="{ row }">
           <el-switch :model-value="row.enabled" @change="handleToggleEnabled(row, $event)" />
         </template>
@@ -299,7 +299,7 @@ const taskKindOptions = [
       <el-table-column label="操作" width="160" fixed="right">
         <template #default="{ row }">
           <div class="table-actions">
-            <el-tooltip content="编辑" placement="top" :show-after="300">
+            <el-tooltip v-if="canManage" content="编辑" placement="top" :show-after="300">
               <el-button size="small" circle aria-label="编辑" @click="openEdit(row)">
                 <Pencil aria-hidden="true" :size="15" :stroke-width="1.8" />
               </el-button>
@@ -314,7 +314,7 @@ const taskKindOptions = [
                 <Activity aria-hidden="true" :size="15" :stroke-width="1.8" />
               </el-button>
             </el-tooltip>
-            <el-tooltip content="删除" placement="top" :show-after="300">
+            <el-tooltip v-if="canManage" content="删除" placement="top" :show-after="300">
               <el-button size="small" circle type="danger" plain :disabled="row.builtin" aria-label="删除" @click="handleDelete(row)">
                 <Trash2 aria-hidden="true" :size="15" :stroke-width="1.8" />
               </el-button>

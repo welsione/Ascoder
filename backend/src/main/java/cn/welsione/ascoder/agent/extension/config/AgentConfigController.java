@@ -36,7 +36,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/agents")
 @RequiredArgsConstructor
-@PreAuthorize("hasAuthority('AGENT_CONFIG:MANAGE')")
+@PreAuthorize("hasAuthority('AGENT_CONFIG:READ')")
 public class AgentConfigController {
 
     private final AgentConfigService service;
@@ -59,27 +59,32 @@ public class AgentConfigController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAuthority('AGENT_CONFIG:MANAGE')")
     public AgentConfig create(@Valid @RequestBody CreateAgentConfigRequest request) {
         return service.create(request);
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('AGENT_CONFIG:MANAGE')")
     public AgentConfig update(@PathVariable Long id, @Valid @RequestBody UpdateAgentConfigRequest request) {
         return service.update(id, request);
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAuthority('AGENT_CONFIG:MANAGE')")
     public void delete(@PathVariable Long id) {
         service.delete(id);
     }
 
     @PatchMapping("/{id}/enabled")
+    @PreAuthorize("hasAuthority('AGENT_CONFIG:MANAGE')")
     public AgentConfig updateEnabled(@PathVariable Long id, @RequestBody UpdateAgentEnabledRequest request) {
         return service.updateEnabled(id, request.isEnabled());
     }
 
     @PostMapping("/{id}/test-render")
+    @PreAuthorize("hasAuthority('AGENT_CONFIG:MANAGE')")
     public TestRenderResponse testRender(@PathVariable Long id, @RequestBody TestRenderRequest request) {
         return service.testRender(id, request.getSampleContext());
     }

@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useNotify } from '../../composables/useNotify'
 import { RefreshCw, Cpu, Plug, Pencil, Trash2 } from 'lucide-vue-next'
 import { useLlmProviderStore } from '../../stores/llmProvider'
+import { useAuthStore } from '../../stores/auth'
 import type { LlmProvider, LlmProviderType, CreateLlmProviderRequest } from '../../types/llmProvider'
 
 const notify = useNotify()
 const store = useLlmProviderStore()
+const authStore = useAuthStore()
+const canManage = computed(() => authStore.hasPermission('LLM_PROVIDER:MANAGE'))
 
 const drawerVisible = ref(false)
 const editingId = ref<number | null>(null)
@@ -143,7 +146,7 @@ async function handleToggleEnabled(provider: LlmProvider, enabled: boolean) {
         <el-button circle :loading="store.loading" title="刷新" aria-label="刷新" @click="store.fetchProviders()">
           <RefreshCw aria-hidden="true" :size="16" :stroke-width="1.8" />
         </el-button>
-        <el-button type="primary" @click="openCreate">
+        <el-button v-if="canManage" type="primary" @click="openCreate">
           <Cpu class="button-icon" :size="16" :stroke-width="1.8" />
           新增供应商
         </el-button>
@@ -184,7 +187,7 @@ async function handleToggleEnabled(provider: LlmProvider, enabled: boolean) {
           <el-switch :model-value="row.isDefault" @change="handleSetDefault(row)" />
         </template>
       </el-table-column>
-      <el-table-column label="启用" width="80">
+      <el-table-column v-if="canManage" label="启用" width="80">
         <template #default="{ row }">
           <el-switch :model-value="row.enabled" @change="handleToggleEnabled(row, $event)" />
         </template>
@@ -194,7 +197,7 @@ async function handleToggleEnabled(provider: LlmProvider, enabled: boolean) {
           <el-tag v-if="row.builtin" size="small" type="info">是</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="110" fixed="right">
+      <el-table-column v-if="canManage" label="操作" width="110" fixed="right">
         <template #default="{ row }">
           <div class="table-actions">
             <el-tooltip content="编辑" placement="top" :show-after="300">

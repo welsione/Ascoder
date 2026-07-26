@@ -3,11 +3,14 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useNotify } from '../../composables/useNotify'
 import { CircleX, RefreshCw, RotateCcw, Trash2 } from 'lucide-vue-next'
 import { useAsyncTaskStore } from '../../stores/asyncTask'
+import { useAuthStore } from '../../stores/auth'
 import { formatTime } from '../../utils/format'
 import type { TaskKind, TaskStatus } from '../../types/asyncTask'
 
 const notify = useNotify()
 const store = useAsyncTaskStore()
+const authStore = useAuthStore()
+const canManage = computed(() => authStore.hasPermission('REPOSITORY:MANAGE'))
 
 const kindOptions: { label: string; value: TaskKind }[] = [
   { label: 'Git 克隆', value: 'GIT_CLONE' },
@@ -172,7 +175,7 @@ onUnmounted(() => {
         <h2>查看和管理所有异步任务的执行状态与进度</h2>
       </div>
       <div class="section-actions">
-        <el-button :loading="store.loading" title="清理僵尸任务" @click="handleCleanup">
+        <el-button v-if="canManage" :loading="store.loading" title="清理僵尸任务" @click="handleCleanup">
           <Trash2 :size="16" :stroke-width="1.8" />
           清理僵尸任务
         </el-button>
@@ -281,7 +284,7 @@ onUnmounted(() => {
           {{ formatDuration(row.startedAt, row.finishedAt) }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="120" fixed="right">
+      <el-table-column v-if="canManage" label="操作" width="120" fixed="right">
         <template #default="{ row }">
           <div class="table-actions">
             <el-tooltip v-if="isCancellable(row.status)" content="取消任务" placement="top" :show-after="300">

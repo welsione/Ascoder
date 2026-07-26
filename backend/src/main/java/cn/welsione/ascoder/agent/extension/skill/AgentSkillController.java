@@ -21,7 +21,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/skills")
 @RequiredArgsConstructor
-@PreAuthorize("hasAuthority('SKILL:MANAGE')")
+@PreAuthorize("hasAuthority('SKILL:READ')")
 public class AgentSkillController {
 
     private final AgentSkillService skillService;
@@ -38,6 +38,7 @@ public class AgentSkillController {
     }
 
     @PatchMapping("/{id}/enabled")
+    @PreAuthorize("hasAuthority('SKILL:MANAGE')")
     public AgentSkillConfig updateEnabled(
             @PathVariable Long id,
             @RequestBody UpdateAgentSkillEnabledRequest request

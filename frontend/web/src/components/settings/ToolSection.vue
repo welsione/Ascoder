@@ -2,9 +2,12 @@
 import { computed } from 'vue'
 import { RefreshCw, ShieldAlert, SlidersHorizontal } from 'lucide-vue-next'
 import { useAgentToolStore } from '../../stores/agentTool'
+import { useAuthStore } from '../../stores/auth'
 import type { AgentToolRiskLevel } from '../../types/agentTool'
 
 const toolStore = useAgentToolStore()
+const authStore = useAuthStore()
+const canManage = computed(() => authStore.hasPermission('TOOL:MANAGE'))
 
 const riskType = computed(() => {
   return (risk: AgentToolRiskLevel) => {
@@ -94,7 +97,7 @@ const riskText = computed(() => {
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="启用" width="110">
+      <el-table-column v-if="canManage" label="启用" width="110">
         <template #default="{ row }">
           <el-switch
             :model-value="row.enabled"

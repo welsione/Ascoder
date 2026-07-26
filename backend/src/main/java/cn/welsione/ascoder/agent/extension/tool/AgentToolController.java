@@ -17,7 +17,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/agent-tools")
 @RequiredArgsConstructor
-@PreAuthorize("hasAuthority('TOOL:MANAGE')")
+@PreAuthorize("hasAuthority('TOOL:READ')")
 public class AgentToolController {
 
     private final AgentToolService toolService;
@@ -28,6 +28,7 @@ public class AgentToolController {
     }
 
     @PatchMapping("/{id}/enabled")
+    @PreAuthorize("hasAuthority('TOOL:MANAGE')")
     public AgentToolConfig updateEnabled(
             @PathVariable Long id,
             @RequestBody UpdateAgentToolEnabledRequest request

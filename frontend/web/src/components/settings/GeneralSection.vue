@@ -3,10 +3,13 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useNotify } from '../../composables/useNotify'
 import { RefreshCw, SlidersHorizontal, RotateCcw } from 'lucide-vue-next'
 import { useRuntimeSettingStore } from '../../stores/runtimeSetting'
+import { useAuthStore } from '../../stores/auth'
 import type { RuntimeSetting, RuntimeSettingCategory } from '../../types/runtimeSetting'
 
 const notify = useNotify()
 const store = useRuntimeSettingStore()
+const authStore = useAuthStore()
+const canWrite = computed(() => authStore.hasPermission('SYSTEM_SETTINGS:WRITE'))
 
 // key → 当前输入值（编辑缓冲）
 const draft = reactive<Record<string, string | boolean | number>>({})
@@ -118,7 +121,7 @@ function isDirty(s: RuntimeSetting): boolean {
             部分项（如 SSE 线程池 core/max/queue）需重启进程生效。
           </p>
         </div>
-        <el-button text :loading="store.saving" @click="handleReset(cat.key)">
+        <el-button v-if="canWrite" text :loading="store.saving" @click="handleReset(cat.key)">
           <RotateCcw class="button-icon" :size="14" :stroke-width="1.8" />
           恢复该分类默认
         </el-button>
@@ -139,7 +142,7 @@ function isDirty(s: RuntimeSetting): boolean {
 
           <!-- BOOLEAN：switch -->
           <div v-if="s.valueType === 'BOOLEAN'" class="switch-wrap">
-            <el-switch v-model="draft[s.key]" />
+            <el-switch v-model="draft[s.key]" :disabled="!canWrite" />
           </div>
           <!-- INT / LONG / DOUBLE：number -->
           <el-input-number
@@ -147,12 +150,14 @@ function isDirty(s: RuntimeSetting): boolean {
             v-model="draft[s.key]"
             :min="s.valueType === 'DOUBLE' ? 0 : 1"
             :step="s.valueType === 'DOUBLE' ? 0.01 : 1"
+            :disabled="!canWrite"
           />
           <!-- STRING：text -->
           <el-input
             v-else
             v-model="draft[s.key]"
             :placeholder="`默认: ${s.defaultValue}`"
+            :disabled="!canWrite"
           />
 
           <div class="config-item-footer">
@@ -163,7 +168,7 @@ function isDirty(s: RuntimeSetting): boolean {
             </p>
             <Transition name="config-save">
               <el-button
-                v-if="isDirty(s)"
+                v-if="canWrite && isDirty(s)"
                 type="primary"
                 size="small"
                 :loading="savingKey === s.key"
