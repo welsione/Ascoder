@@ -75,7 +75,7 @@ function particleStyle(index: number) {
 <style scoped>
 .auth-shell {
   display: grid;
-  grid-template-columns: 2fr 3fr;
+  grid-template-columns: 5fr 8fr;
   min-height: 100vh;
 }
 
@@ -88,7 +88,7 @@ function particleStyle(index: number) {
   justify-items: center;
   padding: var(--spacing-10) var(--spacing-8);
   overflow: hidden;
-  background: #080c16;
+  background: #111827;
 }
 
 .brand-bg {
