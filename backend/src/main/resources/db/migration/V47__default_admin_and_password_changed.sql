@@ -3,9 +3,9 @@ ALTER TABLE users ADD COLUMN passwordChanged BOOLEAN NOT NULL DEFAULT TRUE COMME
 
 -- 预置默认管理员账户（用户名 admin / 密码 admin123）
 -- BCrypt(strength=12) 哈希，首次登录强制修改密码
--- 使用 SELECT WHERE NOT EXISTS 守卫，避免测试库残留导致重复插入失败
+-- ON DUPLICATE KEY UPDATE：admin 已存在时重置为默认密码并标记需改密（兼容旧库已有 admin 的情况）
 INSERT INTO users (username, password, nickname, enabled, accountNonLocked, loginFailCount, passwordChanged, createdAt, updatedAt)
-SELECT
+VALUES (
     'admin',
     '$2a$12$G6lI8B3u/mnEXpjB9NcZ4..lwyDCTGj7lTr7r685fUnidiDXQJRU.',
     '默认管理员',
@@ -15,8 +15,15 @@ SELECT
     FALSE,
     CURRENT_TIMESTAMP,
     CURRENT_TIMESTAMP
-FROM dual
-WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = 'admin');
+)
+ON DUPLICATE KEY UPDATE
+    password = VALUES(password),
+    nickname = VALUES(nickname),
+    enabled = TRUE,
+    accountNonLocked = TRUE,
+    loginFailCount = 0,
+    passwordChanged = FALSE,
+    updatedAt = CURRENT_TIMESTAMP;
 
 -- 为默认管理员分配 ADMIN 角色
 INSERT INTO userRoles (userId, roleId, createdAt)
