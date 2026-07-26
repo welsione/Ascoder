@@ -127,6 +127,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          # 用 PAT 而非默认 GITHUB_TOKEN：GITHUB_TOKEN 推送的 tag 不会触发其他 workflow
+          # （GitHub 限制），会导致 release 创建的 v* tag 永远不触发镜像构建。
+          token: ${{ secrets.PAT_FOR_TAG_PUSH }}
 
       - name: Calculate next version
         id: version
@@ -263,7 +266,8 @@ jobs:
       - name: Create tag and release
         if: steps.check_tag.outputs.skip != 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # 用 PAT 创建 release，与 tag push 保持一致
+          GH_TOKEN: ${{ secrets.PAT_FOR_TAG_PUSH }}
           NEW_TAG: ${{ steps.version.outputs.new_tag }}
           NOTES_FILE: ${{ steps.append_images.outputs.notes_file }}
         run: |
