@@ -30,6 +30,7 @@ public class AuthResponse {
         private Long id;
         private String username;
         private String nickname;
+        private String email;
         private Set<String> roles;
         private Set<String> permissions;
     }

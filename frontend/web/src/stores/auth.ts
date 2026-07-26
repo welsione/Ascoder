@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import * as authApi from '../services/authApi'
-import type { UserInfo, LoginRequest, RegisterRequest, ChangePasswordRequest } from '../types/auth'
+import type { UserInfo, LoginRequest, RegisterRequest, ChangePasswordRequest, UpdateProfileRequest } from '../types/auth'
 
 const REFRESH_TOKEN_KEY = 'ascoder-refresh-token'
 
@@ -115,6 +115,23 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  /**
+   * 更新当前用户个人信息（昵称、邮箱），成功后同步更新本地 user 状态。
+   */
+  async function updateProfile(req: UpdateProfileRequest) {
+    loading.value = true
+    error.value = ''
+    try {
+      const updated = await authApi.updateProfile(req)
+      user.value = updated
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : '更新个人信息失败'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
   function hasPermission(code: string): boolean {
     if (!user.value) return false
     if (user.value.roles.includes('ADMIN')) return true
@@ -137,6 +154,7 @@ export const useAuthStore = defineStore('auth', () => {
     logout,
     fetchMe,
     changePassword,
+    updateProfile,
     setTokens,
     clearTokens,
     hasPermission,

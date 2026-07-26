@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { ArrowRight, FolderGit2, Plus, Settings } from 'lucide-vue-next'
 import { useProjectStore } from '../stores/project'
 import { useAppleSpring } from '../composables/useAppleMotion'
+import UserMenu from '../components/auth/UserMenu.vue'
 import logoUrl from '../images/logo.svg'
 
 const projectStore = useProjectStore()
@@ -21,10 +22,13 @@ useAppleSpring(
   <section class="project-home-page">
     <div class="project-home-center">
       <img class="project-home-logo" :src="logoUrl" alt="Ascoder" />
-      <router-link to="/settings" class="project-home-settings" aria-label="设置" title="设置">
-        <Settings aria-hidden="true" :size="22" :stroke-width="1.8" />
-        <span class="sr-only">设置</span>
-      </router-link>
+      <div class="project-home-actions">
+        <router-link to="/settings" class="project-home-settings" aria-label="设置" title="设置">
+          <Settings aria-hidden="true" :size="22" :stroke-width="1.8" />
+          <span class="sr-only">设置</span>
+        </router-link>
+        <UserMenu />
+      </div>
       <p class="project-home-subtitle">选择项目进入项目空间</p>
     </div>
 

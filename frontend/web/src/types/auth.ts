@@ -18,6 +18,11 @@ export interface ChangePasswordRequest {
   newPassword: string
 }
 
+export interface UpdateProfileRequest {
+  nickname?: string
+  email?: string
+}
+
 export interface AuthResponse {
   accessToken: string
   refreshToken: string
@@ -30,6 +35,7 @@ export interface UserInfo {
   id: number
   username: string
   nickname: string | null
+  email: string | null
   roles: string[]
   permissions: string[]
 }

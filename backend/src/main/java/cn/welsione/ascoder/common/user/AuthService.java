@@ -197,6 +197,7 @@ public class AuthService {
                 user.getId(),
                 user.getUsername(),
                 user.getNickname(),
+                user.getEmail(),
                 roles,
                 current.getPermissions()
         );
@@ -230,6 +231,34 @@ public class AuthService {
                 .forEach(rt -> rt.setRevokedAt(LocalDateTime.now()));
 
         log.info("用户修改密码: userId={}", user.getId());
+    }
+
+    /**
+     * 当前用户更新个人信息（昵称、邮箱）。
+     */
+    @Transactional
+    public AuthResponse.UserInfo updateProfile(UpdateProfileRequest request) {
+        AuthenticatedUser current = AuthenticatedUser.current();
+        User user = userRepository.findById(current.getUserId())
+                .orElseThrow(() -> new AuthenticationException("用户不存在"));
+
+        if (request.getNickname() != null) {
+            user.setNickname(request.getNickname());
+        }
+        if (request.getEmail() != null) {
+            if (!request.getEmail().isBlank() && userRepository.existsByEmail(request.getEmail())
+                    && !request.getEmail().equals(user.getEmail())) {
+                throw new DuplicateException("邮箱已存在: " + request.getEmail());
+            }
+            user.setEmail(request.getEmail().isBlank() ? null : request.getEmail());
+        }
+        userRepository.save(user);
+
+        Set<String> roles = getRolesByUserId(user.getId());
+        log.info("用户更新个人信息: userId={}", user.getId());
+        return new AuthResponse.UserInfo(
+                user.getId(), user.getUsername(), user.getNickname(), user.getEmail(), roles, current.getPermissions()
+        );
     }
 
     // ========== 私有方法 ==========
@@ -306,7 +335,7 @@ public class AuthService {
         response.setExpiresIn(tokenPair.getExpiresIn());
         response.setMustChangePassword(!user.isPasswordChanged());
         response.setUser(new AuthResponse.UserInfo(
-                user.getId(), user.getUsername(), user.getNickname(), roles, permissions
+                user.getId(), user.getUsername(), user.getNickname(), user.getEmail(), roles, permissions
         ));
         return response;
     }

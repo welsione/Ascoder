@@ -952,7 +952,7 @@ select {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   grid-template-areas:
-    "logo settings"
+    "logo actions"
     "subtitle subtitle";
   align-items: start;
   gap: var(--spacing-3);
@@ -1331,9 +1331,15 @@ select {
   color: var(--chat-accent);
 }
 
-.project-home-settings {
-  grid-area: settings;
+.project-home-actions {
+  grid-area: actions;
   place-self: start end;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+}
+
+.project-home-settings {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1918,6 +1924,13 @@ select {
 
 .settings-nav-list {
   gap: var(--spacing-2);
+}
+
+.settings-drawer-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: var(--spacing-3);
+  border-top: 1px solid var(--stroke);
 }
 
 .settings-nav-item {

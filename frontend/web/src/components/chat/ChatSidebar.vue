@@ -6,6 +6,7 @@ import { useQuestionStore } from '../../stores/question'
 import { useProjectStore } from '../../stores/project'
 import { useProjectSpaceStore } from '../../stores/projectSpace'
 import ChatHistoryItem from './HistoryItem.vue'
+import UserMenu from '../auth/UserMenu.vue'
 import logoUrl from '../../images/logo.svg'
 import { formatTime } from '../../utils/format'
 
@@ -338,6 +339,9 @@ function exportChat() {
         导出对话
       </button>
 
+      <div class="sidebar-user-menu">
+        <UserMenu />
+      </div>
     </div>
   </aside>
 </template>
@@ -373,6 +377,12 @@ function exportChat() {
   gap: var(--spacing-2);
   padding-top: var(--spacing-2);
   border-top: 1px solid var(--chat-divider);
+}
+
+.sidebar-user-menu {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: var(--spacing-1);
 }
 
 .conversation-group {

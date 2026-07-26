@@ -10,6 +10,7 @@ import { useAgentStore } from '../../stores/agent'
 import { useLlmProviderStore } from '../../stores/llmProvider'
 import { useAsyncTaskStore } from '../../stores/asyncTask'
 import { useUserStore } from '../../stores/user'
+import UserMenu from '../auth/UserMenu.vue'
 import type { Section } from '../../types/settings'
 
 const route = useRoute()
@@ -194,6 +195,10 @@ onMounted(() => {
         </span>
         <small>{{ mcpConfigEnabled ? `${mcpStore.enabledCount} 个已启用` : '暂未开放' }}</small>
       </button>
+    </div>
+
+    <div class="settings-drawer-footer">
+      <UserMenu />
     </div>
   </aside>
 </template>
