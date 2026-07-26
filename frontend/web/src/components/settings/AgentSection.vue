@@ -1,17 +1,21 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { useNotify } from '../../composables/useNotify'
 import { RefreshCw, BotMessageSquare, Pencil, Eye, Activity, Trash2 } from 'lucide-vue-next'
 import { useAgentStore } from '../../stores/agent'
 import { useAgentToolStore } from '../../stores/agentTool'
 import { useSkillStore } from '../../stores/skill'
 import { useMcpServerStore } from '../../stores/mcpServer'
 import { useLlmProviderStore } from '../../stores/llmProvider'
+import { useAuthStore } from '../../stores/auth'
 import * as api from '../../services/agentApi'
 import { formatTime } from '../../utils/format'
 import type { AgentConfig, AgentRuntimeStatus, AgentRunRecord, TestRenderResponse } from '../../types/agent'
 import AgentEventList from './AgentEventList.vue'
 
+const notify = useNotify()
+const authStore = useAuthStore()
+const canManage = computed(() => authStore.hasPermission('AGENT_CONFIG:MANAGE'))
 const agentStore = useAgentStore()
 const toolStore = useAgentToolStore()
 const skillStore = useSkillStore()
@@ -146,10 +150,10 @@ async function handleSubmit() {
   try {
     if (editingId.value) {
       await api.update(editingId.value, agentStore.form)
-      ElMessage.success('Agent 配置已更新')
+      notify.success('Agent 配置已更新')
     } else {
       await api.create(agentStore.form)
-      ElMessage.success('Agent 已创建')
+      notify.success('Agent 已创建')
     }
     formDrawerVisible.value = false
     await agentStore.fetch()
@@ -160,13 +164,14 @@ async function handleSubmit() {
 
 async function handleDelete(config: AgentConfig) {
   if (config.builtin) {
-    ElMessage.warning('内置 Agent 不可删除')
+    notify.warning('内置 Agent 不可删除')
     return
   }
-  await ElMessageBox.confirm(`确认删除 Agent「${config.displayName}」？`, '删除确认', { type: 'warning' })
+  const ok = await notify.confirm(`确认删除 Agent「${config.displayName}」？`, '删除确认', { type: 'warning' })
+  if (!ok) return
   try {
     await api.remove(config.id)
-    ElMessage.success('已删除')
+    notify.success('已删除')
     await agentStore.fetch()
   } catch {
     // error
@@ -175,15 +180,12 @@ async function handleDelete(config: AgentConfig) {
 
 async function handleToggleEnabled(config: AgentConfig, enabled: boolean) {
   if (!enabled && config.required) {
-    try {
-      await ElMessageBox.confirm(
-        `「${config.displayName}」是必选 Agent，禁用后将不参与问答。确认禁用？`,
-        '禁用确认',
-        { type: 'warning', confirmButtonText: '确认禁用' }
-      )
-    } catch {
-      return // 取消
-    }
+    const ok = await notify.confirm(
+      `「${config.displayName}」是必选 Agent，禁用后将不参与问答。确认禁用？`,
+      '禁用确认',
+      { type: 'warning', confirmButtonText: '确认禁用' }
+    )
+    if (!ok) return // 取消
   }
   try {
     await api.updateEnabled(config.id, enabled)

@@ -60,9 +60,11 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
-import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+import { type FormInstance, type FormRules } from 'element-plus'
+import { useNotify } from '../composables/useNotify'
 import { useAuthStore } from '../stores/auth'
 
+const notify = useNotify()
 const authStore = useAuthStore()
 const profileFormRef = ref<FormInstance>()
 const passwordFormRef = ref<FormInstance>()
@@ -132,9 +134,9 @@ async function handleUpdateProfile() {
         nickname: profileForm.nickname || undefined,
         email: profileForm.email || undefined,
       })
-      ElMessage.success('个人信息已更新')
+      notify.success('个人信息已更新')
     } catch {
-      ElMessage.error(authStore.error || '更新失败')
+      notify.error(new Error(authStore.error || '更新失败'), '更新失败')
     } finally {
       profileLoading.value = false
     }
@@ -151,7 +153,7 @@ async function handleChangePassword() {
         oldPassword: passwordForm.oldPassword,
         newPassword: passwordForm.newPassword,
       })
-      ElMessage.success('密码修改成功，请重新登录')
+      notify.success('密码修改成功，请重新登录')
       passwordForm.oldPassword = ''
       passwordForm.newPassword = ''
       passwordForm.confirmPassword = ''
@@ -160,7 +162,7 @@ async function handleChangePassword() {
       await authStore.logout()
       window.location.href = '/login'
     } catch {
-      ElMessage.error(authStore.error || '修改密码失败')
+      notify.error(new Error(authStore.error || '修改密码失败'), '修改密码失败')
     } finally {
       passwordLoading.value = false
     }

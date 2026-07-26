@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
 import { RefreshCw, ShieldPlus, Pencil, KeyRound, Trash2 } from 'lucide-vue-next'
+import { useNotify } from '../../composables/useNotify'
 import * as roleApi from '../../services/roleApi'
 import { formatTime } from '../../utils/format'
 import type { RoleSummary, PermissionSummary } from '../../services/roleApi'
 
+const notify = useNotify()
 const roles = ref<RoleSummary[]>([])
 const permissions = ref<PermissionSummary[]>([])
 const loading = ref(false)
@@ -52,7 +53,7 @@ function openCreate() {
 
 async function handleCreate() {
   if (!createForm.value.code || !createForm.value.name) {
-    ElMessage.warning('请填写角色编码和名称')
+    notify.warning('请填写角色编码和名称')
     return
   }
   createLoading.value = true
@@ -62,11 +63,11 @@ async function handleCreate() {
       name: createForm.value.name,
       description: createForm.value.description || undefined,
     })
-    ElMessage.success('角色已创建')
+    notify.success('角色已创建')
     createDialogVisible.value = false
     await fetchAll()
   } catch (err) {
-    ElMessage.error(err instanceof Error ? err.message : '创建角色失败')
+    notify.error(err, '创建角色失败')
   } finally {
     createLoading.value = false
   }
@@ -101,11 +102,11 @@ async function handleEdit() {
     }
     payload.description = editForm.value.description || undefined
     await roleApi.updateRole(editingId.value, payload)
-    ElMessage.success('角色已更新')
+    notify.success('角色已更新')
     editDialogVisible.value = false
     await fetchAll()
   } catch (err) {
-    ElMessage.error(err instanceof Error ? err.message : '更新角色失败')
+    notify.error(err, '更新角色失败')
   } finally {
     editLoading.value = false
   }
@@ -127,7 +128,7 @@ async function openAssignPermissions(role: RoleSummary) {
     const detail = await roleApi.getRole(role.id)
     selectedPermissions.value = [...detail.permissions]
   } catch (err) {
-    ElMessage.error(err instanceof Error ? err.message : '加载权限失败')
+    notify.error(err, '加载权限失败')
   } finally {
     permLoading.value = false
   }
@@ -138,11 +139,11 @@ async function handleAssignPermissions() {
   permLoading.value = true
   try {
     await roleApi.assignRolePermissions(permRoleId.value, { permissionCodes: selectedPermissions.value })
-    ElMessage.success('权限已更新')
+    notify.success('权限已更新')
     permDialogVisible.value = false
     await fetchAll()
   } catch (err) {
-    ElMessage.error(err instanceof Error ? err.message : '分配权限失败')
+    notify.error(err, '分配权限失败')
   } finally {
     permLoading.value = false
   }
@@ -151,18 +152,17 @@ async function handleAssignPermissions() {
 // ---- 删除角色 ----
 async function handleDelete(role: RoleSummary) {
   if (role.builtin) {
-    ElMessage.warning('内置角色不可删除')
+    notify.warning('内置角色不可删除')
     return
   }
+  const ok = await notify.confirm(`确认删除角色「${role.name}」？此操作不可恢复。`, '删除确认')
+  if (!ok) return
   try {
-    await ElMessageBox.confirm(`确认删除角色「${role.name}」？此操作不可恢复。`, '删除确认', { type: 'warning' })
     await roleApi.deleteRole(role.id)
-    ElMessage.success('角色已删除')
+    notify.success('角色已删除')
     await fetchAll()
   } catch (err) {
-    if (err !== 'cancel' && err !== 'close') {
-      ElMessage.error(err instanceof Error ? err.message : '删除角色失败')
-    }
+    notify.error(err, '删除角色失败')
   }
 }
 </script>

@@ -53,10 +53,12 @@
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { Lock } from '@element-plus/icons-vue'
-import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+import { type FormInstance, type FormRules } from 'element-plus'
+import { useNotify } from '../composables/useNotify'
 import { useAuthStore } from '../stores/auth'
 import AuthLayout from '../components/auth/AuthLayout.vue'
 
+const notify = useNotify()
 const router = useRouter()
 const authStore = useAuthStore()
 const formRef = ref<FormInstance>()
@@ -96,10 +98,10 @@ async function handleSubmit() {
         oldPassword: form.oldPassword,
         newPassword: form.newPassword,
       })
-      ElMessage.success('密码修改成功')
+      notify.success('密码修改成功')
       router.push('/')
     } catch {
-      ElMessage.error(authStore.error || '修改密码失败')
+      notify.error(new Error(authStore.error || '修改密码失败'), '修改密码失败')
     }
   })
 }

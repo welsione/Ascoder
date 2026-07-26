@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { ElMessage } from 'element-plus'
 import { Plus, RefreshCw, ServerCog } from 'lucide-vue-next'
 import { useMcpServerStore } from '../../stores/mcpServer'
+import { useNotify } from '../../composables/useNotify'
 
 const mcpStore = useMcpServerStore()
+const notify = useNotify()
 const drawerVisible = ref(false)
 
 function openCreate() {
@@ -20,7 +21,7 @@ async function createMcp() {
   const created = await mcpStore.create()
   if (created) {
     drawerVisible.value = false
-    ElMessage.success('MCP Server 已添加')
+    notify.success('MCP Server 已添加')
   }
 }
 </script>

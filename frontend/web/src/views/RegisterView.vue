@@ -55,10 +55,12 @@
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { User, Lock, UserFilled } from '@element-plus/icons-vue'
-import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+import { type FormInstance, type FormRules } from 'element-plus'
+import { useNotify } from '../composables/useNotify'
 import { useAuthStore } from '../stores/auth'
 import AuthLayout from '../components/auth/AuthLayout.vue'
 
+const notify = useNotify()
 const router = useRouter()
 const authStore = useAuthStore()
 const formRef = ref<FormInstance>()
@@ -105,7 +107,7 @@ async function handleRegister() {
       })
       router.push('/')
     } catch {
-      ElMessage.error(authStore.error || '注册失败')
+      notify.error(new Error(authStore.error || '注册失败'), '注册失败')
     }
   })
 }

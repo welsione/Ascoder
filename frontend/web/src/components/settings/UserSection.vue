@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { useNotify } from '../../composables/useNotify'
 import { RefreshCw, UserPlus, Pencil, KeyRound, LockOpen, Users, Trash2 } from 'lucide-vue-next'
 import { useUserStore } from '../../stores/user'
 import { useAuthStore } from '../../stores/auth'
@@ -10,6 +10,7 @@ import { formatTime } from '../../utils/format'
 import type { UserSummary } from '../../services/userApi'
 import type { RoleSummary } from '../../services/roleApi'
 
+const notify = useNotify()
 const userStore = useUserStore()
 const authStore = useAuthStore()
 
@@ -58,7 +59,7 @@ function openCreate() {
 
 async function handleCreate() {
   if (!createForm.value.username || !createForm.value.password) {
-    ElMessage.warning('请填写用户名和密码')
+    notify.warning('请填写用户名和密码')
     return
   }
   createLoading.value = true
@@ -70,11 +71,11 @@ async function handleCreate() {
       email: createForm.value.email || undefined,
       roleCodes: createForm.value.roleCodes,
     })
-    ElMessage.success('用户已创建')
+    notify.success('用户已创建')
     createDialogVisible.value = false
     await userStore.fetchAll()
   } catch (err) {
-    ElMessage.error(err instanceof Error ? err.message : '创建用户失败')
+    notify.error(err, '创建用户失败')
   } finally {
     createLoading.value = false
   }
@@ -105,11 +106,11 @@ async function handleEdit() {
       email: editForm.value.email || undefined,
       enabled: editForm.value.enabled,
     })
-    ElMessage.success('用户已更新')
+    notify.success('用户已更新')
     editDialogVisible.value = false
     await userStore.fetchAll()
   } catch (err) {
-    ElMessage.error(err instanceof Error ? err.message : '更新用户失败')
+    notify.error(err, '更新用户失败')
   } finally {
     editLoading.value = false
   }
@@ -130,16 +131,16 @@ function openResetPassword(user: UserSummary) {
 async function handleResetPassword() {
   if (passwordUserId.value === null) return
   if (!passwordForm.value.newPassword) {
-    ElMessage.warning('请输入新密码')
+    notify.warning('请输入新密码')
     return
   }
   passwordLoading.value = true
   try {
     await userApi.resetUserPassword(passwordUserId.value, { newPassword: passwordForm.value.newPassword })
-    ElMessage.success('密码已重置')
+    notify.success('密码已重置')
     passwordDialogVisible.value = false
   } catch (err) {
-    ElMessage.error(err instanceof Error ? err.message : '重置密码失败')
+    notify.error(err, '重置密码失败')
   } finally {
     passwordLoading.value = false
   }
@@ -162,11 +163,11 @@ async function handleAssignRoles() {
   rolesLoading.value = true
   try {
     await userApi.assignUserRoles(rolesUserId.value, { roleCodes: rolesForm.value.roleCodes })
-    ElMessage.success('角色已分配')
+    notify.success('角色已分配')
     rolesDialogVisible.value = false
     await userStore.fetchAll()
   } catch (err) {
-    ElMessage.error(err instanceof Error ? err.message : '分配角色失败')
+    notify.error(err, '分配角色失败')
   } finally {
     rolesLoading.value = false
   }
@@ -179,10 +180,10 @@ async function handleUnlock(user: UserSummary) {
   unlockingId.value = user.id
   try {
     await userApi.unlockUser(user.id)
-    ElMessage.success('用户已解锁')
+    notify.success('用户已解锁')
     await userStore.fetchAll()
   } catch (err) {
-    ElMessage.error(err instanceof Error ? err.message : '解锁失败')
+    notify.error(err, '解锁失败')
   } finally {
     unlockingId.value = null
   }
@@ -191,18 +192,17 @@ async function handleUnlock(user: UserSummary) {
 // ---- 删除用户 ----
 async function handleDelete(user: UserSummary) {
   if (user.username === 'admin') {
-    ElMessage.warning('admin 用户不可删除')
+    notify.warning('admin 用户不可删除')
     return
   }
+  const ok = await notify.confirm(`确认删除用户「${user.username}」？此操作不可恢复。`, '删除确认', { type: 'warning' })
+  if (!ok) return
   try {
-    await ElMessageBox.confirm(`确认删除用户「${user.username}」？此操作不可恢复。`, '删除确认', { type: 'warning' })
     await userApi.deleteUser(user.id)
-    ElMessage.success('用户已删除')
+    notify.success('用户已删除')
     await userStore.fetchAll()
   } catch (err) {
-    if (err !== 'cancel' && err !== 'close') {
-      ElMessage.error(err instanceof Error ? err.message : '删除用户失败')
-    }
+    notify.error(err, '删除用户失败')
   }
 }
 

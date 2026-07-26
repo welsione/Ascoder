@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { useNotify } from '../composables/useNotify'
 import {
   ArrowLeft,
   ArrowRight,
@@ -24,6 +24,7 @@ import { formatTime } from '../utils/format'
 
 const route = useRoute()
 const router = useRouter()
+const notify = useNotify()
 const projectStore = useProjectStore()
 const projectSpaceStore = useProjectSpaceStore()
 const questionStore = useQuestionStore()
@@ -249,9 +250,9 @@ async function prepareAndIndexSpace() {
   const updated = await projectSpaceStore.prepareAndIndex(space.value.id)
   if (updated?.status === 'READY') {
     questionStore.form.projectSpaceId = updated.id
-    ElMessage.success('分析空间已可提问')
+    notify.success('分析空间已可提问')
   } else if (updated) {
-    ElMessage.warning('分析空间尚未完成索引，请查看状态')
+    notify.warning('分析空间尚未完成索引，请查看状态')
   }
 }
 
@@ -260,10 +261,10 @@ async function indexSpace() {
   const updated = await projectSpaceStore.index(space.value.id)
   if (updated?.status === 'READY') {
     questionStore.form.projectSpaceId = updated.id
-    ElMessage.success('分析空间索引已完成')
+    notify.success('分析空间索引已完成')
   } else if (updated) {
     questionStore.form.projectSpaceId = null
-    ElMessage.warning('分析空间尚未完成索引，请查看状态')
+    notify.warning('分析空间尚未完成索引，请查看状态')
   }
 }
 
@@ -272,10 +273,10 @@ async function reindexSpace() {
   const updated = await projectSpaceStore.reindex(space.value.id)
   if (updated?.status === 'READY') {
     questionStore.form.projectSpaceId = updated.id
-    ElMessage.success('分析空间已重新索引完成')
+    notify.success('分析空间已重新索引完成')
   } else if (updated) {
     questionStore.form.projectSpaceId = null
-    ElMessage.warning('分析空间尚未完成重新索引，请查看状态')
+    notify.warning('分析空间尚未完成重新索引，请查看状态')
   }
 }
 
@@ -285,11 +286,11 @@ async function refreshSpace() {
   await projectSpaceStore.fetchMembers(space.value.id)
   if (updated?.status === 'STALE') {
     questionStore.form.projectSpaceId = null
-    ElMessage.warning('项目空间已过期，请重新准备代码并索引')
+    notify.warning('项目空间已过期，请重新准备代码并索引')
   } else if (staleMembers.value.length) {
-    ElMessage.warning('已刷新，当前空间有成员落后远端分支')
+    notify.warning('已刷新，当前空间有成员落后远端分支')
   } else if (updated) {
-    ElMessage.success('项目空间状态已刷新')
+    notify.success('项目空间状态已刷新')
   }
 }
 
@@ -297,7 +298,7 @@ async function pullSpace() {
   if (!space.value) return
   const updated = await projectSpaceStore.pullRemote(space.value.id)
   if (updated) {
-    ElMessage.info('拉取任务已提交，fetch 完成后请点击刷新按钮查看最新提交记录')
+    notify.info('拉取任务已提交，fetch 完成后请点击刷新按钮查看最新提交记录')
   }
 }
 
@@ -306,7 +307,7 @@ async function deleteSpace() {
   const deletedId = space.value.id
   const ok = await projectSpaceStore.remove(deletedId)
   if (ok) {
-    ElMessage.success('项目空间已删除')
+    notify.success('项目空间已删除')
     const next = projectSpaces.value.find((item) => item.id !== deletedId) ?? null
     selectedSpaceId.value = next?.id ?? null
   }

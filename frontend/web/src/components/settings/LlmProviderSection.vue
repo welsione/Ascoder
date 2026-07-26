@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { useNotify } from '../../composables/useNotify'
 import { RefreshCw, Cpu, Plug, Pencil, Trash2 } from 'lucide-vue-next'
 import { useLlmProviderStore } from '../../stores/llmProvider'
 import type { LlmProvider, LlmProviderType, CreateLlmProviderRequest } from '../../types/llmProvider'
 
+const notify = useNotify()
 const store = useLlmProviderStore()
 
 const drawerVisible = ref(false)
@@ -72,7 +73,7 @@ function onDrawerClosed() {
 
 async function handleSubmit() {
   if (!form.value.name || !form.value.baseUrl || !form.value.modelId) {
-    ElMessage.warning('请填写名称、Base URL 和模型 ID')
+    notify.warning('请填写名称、Base URL 和模型 ID')
     return
   }
   // 编辑时 apiKey 为空则保留原值（不发送空字符串覆盖）
@@ -84,17 +85,17 @@ async function handleSubmit() {
   if (editingId.value) {
     const result = await store.updateProvider(editingId.value, payload as CreateLlmProviderRequest)
     if (result) {
-      ElMessage.success('供应商已更新')
+      notify.success('供应商已更新')
       drawerVisible.value = false
     }
   } else {
     if (!payload.apiKey) {
-      ElMessage.warning('新增供应商时 API Key 不能为空')
+      notify.warning('新增供应商时 API Key 不能为空')
       return
     }
     const result = await store.createProvider(payload as CreateLlmProviderRequest)
     if (result) {
-      ElMessage.success('供应商已创建')
+      notify.success('供应商已创建')
       drawerVisible.value = false
     }
   }
@@ -102,15 +103,12 @@ async function handleSubmit() {
 
 async function handleDelete(provider: LlmProvider) {
   if (provider.builtin) {
-    ElMessage.warning('内置供应商不可删除')
+    notify.warning('内置供应商不可删除')
     return
   }
-  try {
-    await ElMessageBox.confirm(`确认删除供应商「${provider.name}」？`, '删除确认', { type: 'warning' })
-    await store.deleteProvider(provider.id)
-  } catch {
-    // 用户取消
-  }
+  const ok = await notify.confirm(`确认删除供应商「${provider.name}」？`, '删除确认', { type: 'warning' })
+  if (!ok) return
+  await store.deleteProvider(provider.id)
 }
 
 async function handleTestConnection(provider: LlmProvider) {
@@ -118,9 +116,9 @@ async function handleTestConnection(provider: LlmProvider) {
   await store.testConnection(provider.id)
   testingId.value = null
   if (store.testResult?.success) {
-    ElMessage.success(`连接成功 (${store.testResult.latencyMs}ms)`)
+    notify.success(`连接成功 (${store.testResult.latencyMs}ms)`)
   } else {
-    ElMessage.error(store.testResult?.message ?? '连接失败')
+    notify.error(store.testResult?.message ?? '连接失败', '连接失败')
   }
 }
 

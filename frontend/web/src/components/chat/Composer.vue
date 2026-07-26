@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import { useNotify } from '../../composables/useNotify'
 import { Clipboard, Eraser, Paperclip, Send } from 'lucide-vue-next'
 import { useQuestionStore } from '../../stores/question'
 import { useLlmProviderStore } from '../../stores/llmProvider'
 import { roleOptions } from '../../constants'
 
+const notify = useNotify()
 const questionStore = useQuestionStore()
 const llmProviderStore = useLlmProviderStore()
 const input = ref('')
@@ -127,7 +128,7 @@ async function submit() {
   if (!llmProviderStore.hasProviders) {
     await llmProviderStore.fetchProviders()
     if (!llmProviderStore.hasProviders) {
-      ElMessage.warning('尚未配置 LLM 供应商，请先在设置页配置')
+      notify.warning('尚未配置 LLM 供应商，请先在设置页配置')
       return
     }
   }
@@ -252,25 +253,25 @@ async function onLogFileChange(e: Event) {
   const files = target.files
   if (!files || files.length === 0) return
   if (!questionStore.form.projectSpaceId) {
-    ElMessage.warning('请先选择项目空间')
+    notify.warning('请先选择项目空间')
     target.value = ''
     return
   }
   for (const file of Array.from(files)) {
     const lower = file.name.toLowerCase()
     if (!ALLOWED_LOG_EXT.some((ext) => lower.endsWith(ext))) {
-      ElMessage.warning(`仅支持 .log / .txt / .zip 日志文件，已跳过：${file.name}`)
+      notify.warning(`仅支持 .log / .txt / .zip 日志文件，已跳过：${file.name}`)
       continue
     }
     if (file.size > MAX_LOG_SIZE) {
-      ElMessage.warning(`单个日志文件不能超过 50MB，已跳过：${file.name}`)
+      notify.warning(`单个日志文件不能超过 50MB，已跳过：${file.name}`)
       continue
     }
     const result = await questionStore.attachLog(file)
     if (result) {
-      ElMessage.success(`已附加日志：${result.originalFilename}`)
+      notify.success(`已附加日志：${result.originalFilename}`)
     } else if (questionStore.error) {
-      ElMessage.error(questionStore.error)
+      notify.error(new Error(questionStore.error), '操作失败')
     }
   }
   target.value = ''

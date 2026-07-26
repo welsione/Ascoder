@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { useNotify } from '../../composables/useNotify'
 import { RefreshCw, SlidersHorizontal, RotateCcw } from 'lucide-vue-next'
 import { useRuntimeSettingStore } from '../../stores/runtimeSetting'
 import type { RuntimeSetting, RuntimeSettingCategory } from '../../types/runtimeSetting'
 
+const notify = useNotify()
 const store = useRuntimeSettingStore()
 
 // key → 当前输入值（编辑缓冲）
@@ -52,9 +53,9 @@ async function handleSave(key: string) {
   try {
     const v = draft[key]
     await store.update(key, String(v))
-    ElMessage.success(`已保存：${key}`)
+    notify.success(`已保存：${key}`)
   } catch {
-    ElMessage.error(store.error || '保存失败')
+    notify.error(store.error || '保存失败', '保存失败')
   } finally {
     savingKey.value = null
   }
@@ -66,9 +67,9 @@ async function handleReset(category: RuntimeSettingCategory) {
     for (const s of store.settingsOf(category)) {
       draft[s.key] = parseDraftValue(s)
     }
-    ElMessage.success(`已恢复「${category}」分类的默认值`)
+    notify.success(`已恢复「${category}」分类的默认值`)
   } catch {
-    ElMessage.error(store.error || '恢复默认失败')
+    notify.error(store.error || '恢复默认失败', '恢复默认失败')
   }
 }
 

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, Bot, BrainCircuit, CheckCircle2, DatabaseZap, FileCheck2, GitBranch, History, Plus, ShieldCheck, Sparkles, Trash2 } from 'lucide-vue-next'
+import { useNotify } from '../composables/useNotify'
 import * as api from '../services/selfLearningApi'
 import { useProjectSpaceStore } from '../stores/projectSpace'
 import { formatTime } from '../utils/format'
@@ -34,6 +34,7 @@ type JsonObject = Record<string, unknown>
 
 const route = useRoute()
 const router = useRouter()
+const notify = useNotify()
 const projectSpaceStore = useProjectSpaceStore()
 const projectSpaceId = computed(() => Number(route.params.projectSpaceId))
 const space = computed(() => projectSpaceStore.spaces.find((item) => item.id === projectSpaceId.value) ?? null)
@@ -355,7 +356,7 @@ async function loadAll() {
       selectedInsightId.value = nextInsights[0]?.id ?? null
     }
   } catch (err) {
-    ElMessage.error(err instanceof Error ? err.message : '加载自学习数据失败')
+    notify.error(err, '加载自学习数据失败')
   } finally {
     loading.value = false
   }
@@ -371,16 +372,16 @@ async function updateSettings(patch: Partial<SelfLearningSettings>) {
   try {
     settings.value = await api.updateSettings(projectSpaceId.value, patch)
     await reloadSummary()
-    ElMessage.success('自学习设置已更新')
+    notify.success('自学习设置已更新')
   } catch (err) {
-    ElMessage.error(err instanceof Error ? err.message : '更新自学习设置失败')
+    notify.error(err, '更新自学习设置失败')
     await loadAll()
   }
 }
 
 async function runAgent() {
   if (!settings.value?.enabled) {
-    ElMessage.warning('请先开启自学习功能')
+    notify.warning('请先开启自学习功能')
     return
   }
   runningAgent.value = true
@@ -399,9 +400,9 @@ async function runAgent() {
     insights.value = nextInsights
     agentRuns.value = nextAgentRuns
     selectedInsightId.value = nextInsights[0]?.id ?? null
-    ElMessage.success(lastAgentRun.value.message)
+    notify.success(lastAgentRun.value.message)
   } catch (err) {
-    ElMessage.error(err instanceof Error ? err.message : '运行 Self Learning Agent 失败')
+    notify.error(err, '运行 Self Learning Agent 失败')
   } finally {
     runningAgent.value = false
   }
@@ -409,11 +410,11 @@ async function runAgent() {
 
 async function importHistory() {
   if (!settings.value?.enabled) {
-    ElMessage.warning('请先开启自学习功能')
+    notify.warning('请先开启自学习功能')
     return
   }
   if (!settings.value.rawEventCaptureEnabled) {
-    ElMessage.warning('请先开启原始事件记录')
+    notify.warning('请先开启原始事件记录')
     return
   }
   importingHistory.value = true
@@ -427,20 +428,20 @@ async function importHistory() {
     summary.value = nextSummary
     settings.value = nextSummary.settings
     rawEvents.value = nextRawEvents
-    ElMessage.success(`${result.message} 已跳过 ${result.skippedRawEventCount} 条已有记录。`)
+    notify.success(`${result.message} 已跳过 ${result.skippedRawEventCount} 条已有记录。`)
   } catch (err) {
-    ElMessage.error(err instanceof Error ? err.message : '导入历史聊天失败')
+    notify.error(err, '导入历史聊天失败')
   } finally {
     importingHistory.value = false
   }
 }
 
 async function cleanupLegacyRawEvents() {
-  await ElMessageBox.confirm(
+  const ok = await notify.confirm(
     '将删除旧粒度的 USER_QUESTION / QUERY_PLAN / ASSISTANT_ANSWER 原始记录；关联的未审核洞察会删除，已生成正式知识的内容会标记为待复核。确认继续？',
-    '清理旧粒度记录',
-    { type: 'warning' }
+    '清理旧粒度记录'
   )
+  if (!ok) return
   cleaningLegacy.value = true
   try {
     const result = await api.cleanupLegacyRawEvents(projectSpaceId.value)
@@ -456,35 +457,29 @@ async function cleanupLegacyRawEvents() {
     rawEvents.value = nextRawEvents
     insights.value = nextInsights
     knowledgeItems.value = nextKnowledge
-    ElMessage.success(
+    notify.success(
       `${result.message} 删除洞察 ${result.deletedInsightCount} 条，标记待复核知识 ${result.staleKnowledgeItemCount} 条。`
     )
   } catch (err) {
-    if (err !== 'cancel') {
-      ElMessage.error(err instanceof Error ? err.message : '清理旧粒度记录失败')
-    }
+    notify.error(err, '清理旧粒度记录失败')
   } finally {
     cleaningLegacy.value = false
   }
 }
 
 async function cleanupLegacyInsights() {
-  try {
-    await ElMessageBox.confirm(
-      '将删除旧版 Self Learning Agent 生成的待审核洞察，保留原始 conversation 记录，之后可用新版后台整理重新生成。确认清理吗？',
-      '清理旧版候选洞察',
-      { type: 'warning' }
-    )
-  } catch {
-    return
-  }
+  const ok = await notify.confirm(
+    '将删除旧版 Self Learning Agent 生成的待审核洞察，保留原始 conversation 记录，之后可用新版后台整理重新生成。确认清理吗？',
+    '清理旧版候选洞察'
+  )
+  if (!ok) return
   cleaningLegacyInsights.value = true
   try {
     const result = await api.cleanupLegacyInsights(projectSpaceId.value)
-    ElMessage.success(result.message)
+    notify.success(result.message)
     await loadAll()
   } catch (err) {
-    ElMessage.error(err instanceof Error ? err.message : '清理旧版候选洞察失败')
+    notify.error(err, '清理旧版候选洞察失败')
   } finally {
     cleaningLegacyInsights.value = false
   }
@@ -540,7 +535,7 @@ function openInsightDialog(item?: LearningInsight) {
 
 async function saveInsight() {
   if (!insightForm.title.trim() || !insightForm.conclusion.trim()) {
-    ElMessage.warning('请填写洞察标题和结论')
+    notify.warning('请填写洞察标题和结论')
     return
   }
   saving.value = true
@@ -554,9 +549,9 @@ async function saveInsight() {
     insights.value = await api.listInsights(projectSpaceId.value, insightStatusFilter.value)
     selectedInsightId.value = editingInsightId.value ?? insights.value[0]?.id ?? null
     await reloadSummary()
-    ElMessage.success('候选洞察已保存')
+    notify.success('候选洞察已保存')
   } catch (err) {
-    ElMessage.error(err instanceof Error ? err.message : '保存候选洞察失败')
+    notify.error(err, '保存候选洞察失败')
   } finally {
     saving.value = false
   }
@@ -568,18 +563,17 @@ async function approveInsight(item: LearningInsight) {
   knowledgeItems.value = await api.listKnowledgeItems(projectSpaceId.value, knowledgeStatusFilter.value)
   selectedInsightId.value = insights.value[0]?.id ?? null
   await reloadSummary()
-  ElMessage.success('已审核通过并生成正式知识')
+  notify.success('已审核通过并生成正式知识')
 }
 
 async function rejectInsight(item: LearningInsight) {
-  await ElMessageBox.confirm('确认拒绝这条候选洞察？拒绝后不会进入正式知识库。', '拒绝洞察', {
-    type: 'warning',
-  })
+  const ok = await notify.confirm('确认拒绝这条候选洞察？拒绝后不会进入正式知识库。', '拒绝洞察')
+  if (!ok) return
   await api.rejectInsight(projectSpaceId.value, item.id, '管理员拒绝，未进入正式知识库。')
   insights.value = await api.listInsights(projectSpaceId.value, insightStatusFilter.value)
   selectedInsightId.value = insights.value[0]?.id ?? null
   await reloadSummary()
-  ElMessage.success('候选洞察已拒绝')
+  notify.success('候选洞察已拒绝')
 }
 
 async function verifySelectedInsight() {
@@ -588,9 +582,9 @@ async function verifySelectedInsight() {
   verificationResult.value = null
   try {
     verificationResult.value = await api.verifyInsight(projectSpaceId.value, selectedInsight.value.id)
-    ElMessage.success('Insight Review Agent 已完成代码复核')
+    notify.success('Insight Review Agent 已完成代码复核')
   } catch (err) {
-    ElMessage.error(err instanceof Error ? err.message : '洞察复核失败')
+    notify.error(err, '洞察复核失败')
   } finally {
     verifyingInsight.value = false
   }
@@ -606,7 +600,7 @@ function openRefineDialog() {
 
 async function refineSelectedInsight() {
   if (!selectedInsight.value || !refineInstruction.value.trim()) {
-    ElMessage.warning('请先输入希望微调的内容')
+    notify.warning('请先输入希望微调的内容')
     return
   }
   const userInstruction = refineInstruction.value.trim()
@@ -623,13 +617,13 @@ async function refineSelectedInsight() {
       content: `${result.assistantMessage}\n建议标题：${result.suggestion.title}\n建议结论：${result.suggestion.conclusion}`,
     })
     refineInstruction.value = ''
-    ElMessage.success(result.assistantMessage)
+    notify.success(result.assistantMessage)
   } catch (err) {
     refineMessages.value.push({
       role: 'assistant',
       content: err instanceof Error ? `微调失败：${err.message}` : '微调失败',
     })
-    ElMessage.error(err instanceof Error ? err.message : '洞察微调失败')
+    notify.error(err, '洞察微调失败')
   } finally {
     refiningInsight.value = false
   }
@@ -680,7 +674,7 @@ function openKnowledgeDialog(item?: LearningKnowledgeItem) {
 
 async function saveKnowledge() {
   if (!knowledgeForm.title.trim() || !knowledgeForm.content.trim()) {
-    ElMessage.warning('请填写知识标题和内容')
+    notify.warning('请填写知识标题和内容')
     return
   }
   saving.value = true
@@ -693,9 +687,9 @@ async function saveKnowledge() {
     knowledgeDialogVisible.value = false
     knowledgeItems.value = await api.listKnowledgeItems(projectSpaceId.value, knowledgeStatusFilter.value)
     await reloadSummary()
-    ElMessage.success('正式知识已保存')
+    notify.success('正式知识已保存')
   } catch (err) {
-    ElMessage.error(err instanceof Error ? err.message : '保存正式知识失败')
+    notify.error(err, '保存正式知识失败')
   } finally {
     saving.value = false
   }
@@ -705,24 +699,23 @@ async function archiveKnowledge(item: LearningKnowledgeItem) {
   await api.archiveKnowledgeItem(projectSpaceId.value, item.id)
   knowledgeItems.value = await api.listKnowledgeItems(projectSpaceId.value, knowledgeStatusFilter.value)
   await reloadSummary()
-  ElMessage.success('正式知识已归档')
+  notify.success('正式知识已归档')
 }
 
 async function markKnowledgeStale(item: LearningKnowledgeItem) {
   await api.markKnowledgeItemStale(projectSpaceId.value, item.id, '管理员标记为待复核。')
   knowledgeItems.value = await api.listKnowledgeItems(projectSpaceId.value, knowledgeStatusFilter.value)
   await reloadSummary()
-  ElMessage.success('正式知识已标记为待复核')
+  notify.success('正式知识已标记为待复核')
 }
 
 async function deleteKnowledge(item: LearningKnowledgeItem) {
-  await ElMessageBox.confirm('确认删除这条正式知识？删除后无法参与后续回答召回。', '删除知识', {
-    type: 'warning',
-  })
+  const ok = await notify.confirm('确认删除这条正式知识？删除后无法参与后续回答召回。', '删除知识')
+  if (!ok) return
   await api.deleteKnowledgeItem(projectSpaceId.value, item.id)
   knowledgeItems.value = await api.listKnowledgeItems(projectSpaceId.value, knowledgeStatusFilter.value)
   await reloadSummary()
-  ElMessage.success('正式知识已删除')
+  notify.success('正式知识已删除')
 }
 
 onMounted(loadAll)

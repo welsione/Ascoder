@@ -1,12 +1,16 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ref, computed } from 'vue'
+import { useNotify } from '../../composables/useNotify'
 import { GitBranch, KeyRound, Plus, RefreshCw } from 'lucide-vue-next'
 import { useRepositoryStore } from '../../stores/repository'
+import { useAuthStore } from '../../stores/auth'
 import { formatTime } from '../../utils/format'
 import type { CodeRepository } from '../../types/repository'
 
+const notify = useNotify()
 const repositoryStore = useRepositoryStore()
+const authStore = useAuthStore()
+const canManage = computed(() => authStore.hasPermission('REPOSITORY:MANAGE'))
 const sourceMode = ref<'remote' | 'local'>('remote')
 const drawerVisible = ref(false)
 
@@ -59,13 +63,13 @@ async function createRepository() {
   const created = await repositoryStore.create()
   if (created) {
     drawerVisible.value = false
-    ElMessage.success('仓库已添加')
+    notify.success('仓库已添加')
   }
 }
 
 async function refreshBranches(repoId: number) {
   await repositoryStore.refreshBranches(repoId)
-  ElMessage.info('分支刷新任务已提交，完成后请刷新查看最新分支')
+  notify.info('分支刷新任务已提交，完成后请刷新查看最新分支')
 }
 
 function openCredentialDialog(repository: CodeRepository) {
@@ -84,7 +88,7 @@ async function saveCredentials() {
   )
   if (updated) {
     credentialDialogVisible.value = false
-    ElMessage.success('凭据已更新')
+    notify.success('凭据已更新')
   }
 }
 </script>
@@ -112,7 +116,7 @@ async function saveCredentials() {
         >
           <RefreshCw aria-hidden="true" :size="16" :stroke-width="1.8" />
         </el-button>
-        <el-button type="primary" @click="openCreateRepository">
+        <el-button v-permission="'REPOSITORY:MANAGE'" type="primary" @click="openCreateRepository">
           <Plus class="button-icon" aria-hidden="true" :size="16" :stroke-width="1.8" />
           添加仓库
         </el-button>
@@ -160,7 +164,7 @@ async function saveCredentials() {
           {{ formatTime(row.lastPulledAt, '未同步') }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="168" fixed="right">
+      <el-table-column v-if="canManage" label="操作" width="168" fixed="right">
         <template #default="{ row }">
           <div class="table-actions">
             <el-tooltip content="同步代码" placement="top" :show-after="300">

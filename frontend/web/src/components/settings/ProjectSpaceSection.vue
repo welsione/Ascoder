@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { useNotify } from '../../composables/useNotify'
 import { Search } from '@element-plus/icons-vue'
 import {
   DatabaseZap,
@@ -30,6 +30,7 @@ const props = withDefaults(defineProps<{
   sourceSpaceId: null,
 })
 
+const notify = useNotify()
 const router = useRouter()
 const projectStore = useProjectStore()
 const projectSpaceStore = useProjectSpaceStore()
@@ -249,18 +250,15 @@ watch(
 
 async function handleCreateAndIndex() {
   if (!isFormValid.value) {
-    ElMessage.warning('请完成所有必填项')
+    notify.warning('请完成所有必填项')
     return
   }
-  try {
-    await ElMessageBox.confirm(
-      isDeriveMode.value ? '确认创建新版本并开始索引？' : '确认创建分析空间并开始索引？',
-      '创建确认',
-      { confirmButtonText: '确认创建', cancelButtonText: '取消', type: 'info' }
-    )
-  } catch {
-    return
-  }
+  const ok = await notify.confirm(
+    isDeriveMode.value ? '确认创建新版本并开始索引？' : '确认创建分析空间并开始索引？',
+    '创建确认',
+    { confirmButtonText: '确认创建', cancelButtonText: '取消', type: 'info' }
+  )
+  if (!ok) return
 
   if (projectSpaceStore.form.projectId && projectSpaceStore.form.memberBranches.length === 0) {
     await projectStore.fetchMembers(projectSpaceStore.form.projectId)
@@ -277,11 +275,11 @@ async function handleCreateAndIndex() {
   const updated = await projectSpaceStore.prepareAndIndex(space.id)
   creatingAndIndexing.value = false
   if (updated?.status === 'READY') {
-    ElMessage.success(isDeriveMode.value ? '新分析空间已创建并可提问' : '分析空间已创建并可提问')
+    notify.success(isDeriveMode.value ? '新分析空间已创建并可提问' : '分析空间已创建并可提问')
     clearDraft()
     router.push({ name: 'project-detail', params: { projectId: updated.projectId }, query: { spaceId: String(updated.id) } })
   } else if (updated) {
-    ElMessage.warning('分析空间已创建，但尚未完成索引，请查看状态')
+    notify.warning('分析空间已创建，但尚未完成索引，请查看状态')
     router.push({ name: 'project-detail', params: { projectId: updated.projectId }, query: { spaceId: String(updated.id) } })
   }
 }
@@ -297,21 +295,18 @@ async function selectSpace(spaceId: number) {
 }
 
 async function prepareAndIndexSpace(spaceId: number) {
-  try {
-    await ElMessageBox.confirm('确认准备代码并执行索引？此操作可能需要一些时间。', '索引确认', {
-      confirmButtonText: '开始索引',
-      cancelButtonText: '取消',
-      type: 'info',
-    })
-  } catch {
-    return
-  }
+  const ok = await notify.confirm('确认准备代码并执行索引？此操作可能需要一些时间。', '索引确认', {
+    confirmButtonText: '开始索引',
+    cancelButtonText: '取消',
+    type: 'info',
+  })
+  if (!ok) return
   const updated = await projectSpaceStore.prepareAndIndex(spaceId)
   if (updated) {
     if (updated.status === 'READY') {
-      ElMessage.success('分析空间已可提问')
+      notify.success('分析空间已可提问')
     } else {
-      ElMessage.warning('分析空间尚未完成索引，请查看状态')
+      notify.warning('分析空间尚未完成索引，请查看状态')
     }
   }
 }
@@ -320,49 +315,46 @@ async function refreshSpace(spaceId: number) {
   const updated = await projectSpaceStore.refresh(spaceId)
   if (!updated) return
   if (updated.status === 'STALE') {
-    ElMessage.warning('项目空间已过期，请重新准备代码并索引')
+    notify.warning('项目空间已过期，请重新准备代码并索引')
   } else {
-    ElMessage.success('项目空间状态已刷新')
+    notify.success('项目空间状态已刷新')
   }
 }
 
 async function deleteSpace(spaceId: number) {
-  try {
-    await ElMessageBox.confirm(
-      '删除该项目空间？不会删除底层仓库和 worktree。此操作不可恢复。',
-      '删除确认',
-      { confirmButtonText: '确认删除', cancelButtonText: '取消', type: 'warning' }
-    )
-    const ok = await projectSpaceStore.remove(spaceId)
-    if (ok) ElMessage.success('项目空间已删除')
-  } catch {
-    // 用户取消
-  }
+  const ok = await notify.confirm(
+    '删除该项目空间？不会删除底层仓库和 worktree。此操作不可恢复。',
+    '删除确认',
+    { confirmButtonText: '确认删除', cancelButtonText: '取消', type: 'warning' }
+  )
+  if (!ok) return
+  const removed = await projectSpaceStore.remove(spaceId)
+  if (removed) notify.success('项目空间已删除')
 }
 
 async function restoreFromDraft() {
   const data = restoreDraft()
   if (data) {
     Object.assign(projectSpaceStore.form, data)
-    ElMessage.success('已恢复草稿')
+    notify.success('已恢复草稿')
   }
 }
 
-function handleReset() {
-  ElMessageBox.confirm('确认重置所有配置项？未保存的修改将丢失。', '重置确认', {
+async function handleReset() {
+  const ok = await notify.confirm('确认重置所有配置项？未保存的修改将丢失。', '重置确认', {
     confirmButtonText: '确认重置',
     cancelButtonText: '取消',
     type: 'warning',
-  }).then(() => {
-    projectSpaceStore.form.projectId = null
-    projectSpaceStore.form.name = ''
-    projectSpaceStore.form.description = ''
-    projectSpaceStore.form.defaultBranch = ''
-    projectSpaceStore.form.memberBranches = []
-    clearDraft()
-    clearHistory()
-    ElMessage.success('已重置')
-  }).catch(() => {})
+  })
+  if (!ok) return
+  projectSpaceStore.form.projectId = null
+  projectSpaceStore.form.name = ''
+  projectSpaceStore.form.description = ''
+  projectSpaceStore.form.defaultBranch = ''
+  projectSpaceStore.form.memberBranches = []
+  clearDraft()
+  clearHistory()
+  notify.success('已重置')
 }
 </script>
 

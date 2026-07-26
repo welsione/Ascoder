@@ -1,11 +1,15 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ref, computed } from 'vue'
 import { Plus, RefreshCw, WandSparkles } from 'lucide-vue-next'
 import { useSkillStore } from '../../stores/skill'
+import { useAuthStore } from '../../stores/auth'
+import { useNotify } from '../../composables/useNotify'
 import { formatTime } from '../../utils/format'
 
 const skillStore = useSkillStore()
+const authStore = useAuthStore()
+const notify = useNotify()
+const canManage = computed(() => authStore.hasPermission('SKILL:MANAGE'))
 const drawerVisible = ref(false)
 
 function openCreate() {
@@ -21,7 +25,7 @@ async function createSkill() {
   const created = await skillStore.create()
   if (created) {
     drawerVisible.value = false
-    ElMessage.success('Skill 已添加')
+    notify.success('Skill 已添加')
   }
 }
 </script>
@@ -43,7 +47,7 @@ async function createSkill() {
         >
           <RefreshCw aria-hidden="true" :size="16" :stroke-width="1.8" />
         </el-button>
-        <el-button type="primary" @click="openCreate">
+        <el-button v-permission="'SKILL:MANAGE'" type="primary" @click="openCreate">
           <Plus class="button-icon" aria-hidden="true" :size="16" :stroke-width="1.8" />
           添加 Skill
         </el-button>
@@ -54,7 +58,7 @@ async function createSkill() {
       <el-table-column prop="name" label="名称" min-width="160" show-overflow-tooltip />
       <el-table-column prop="description" label="描述" min-width="260" show-overflow-tooltip />
       <el-table-column prop="source" label="来源" width="120" />
-      <el-table-column label="启用" width="80">
+      <el-table-column v-if="canManage" label="启用" width="80">
         <template #default="{ row }">
           <el-switch :model-value="row.enabled" @change="skillStore.toggleEnabled(row.id, $event)" />
         </template>

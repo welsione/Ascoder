@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { useNotify } from '../../composables/useNotify'
 import { CircleX, RefreshCw, RotateCcw, Trash2 } from 'lucide-vue-next'
 import { useAsyncTaskStore } from '../../stores/asyncTask'
 import { formatTime } from '../../utils/format'
 import type { TaskKind, TaskStatus } from '../../types/asyncTask'
 
+const notify = useNotify()
 const store = useAsyncTaskStore()
 
 const kindOptions: { label: string; value: TaskKind }[] = [
@@ -87,52 +88,43 @@ function isRetryable(status: TaskStatus) {
 }
 
 async function handleCancel(taskId: number) {
-  try {
-    await ElMessageBox.confirm('确定要取消该任务吗？运行中的任务将被中断。', '取消任务', {
-      confirmButtonText: '确定取消',
-      cancelButtonText: '返回',
-      type: 'warning',
-    })
-    await store.cancelTask(taskId)
-    ElMessage.success('任务已取消')
-  } catch {
-    // 用户点击了返回
-  }
+  const ok = await notify.confirm('确定要取消该任务吗？运行中的任务将被中断。', '取消任务', {
+    confirmButtonText: '确定取消',
+    cancelButtonText: '返回',
+    type: 'warning',
+  })
+  if (!ok) return
+  await store.cancelTask(taskId)
+  notify.success('任务已取消')
 }
 
 async function handleRetry(taskId: number) {
-  try {
-    await ElMessageBox.confirm('确定要重试该任务吗？', '重试任务', {
-      confirmButtonText: '确定重试',
-      cancelButtonText: '返回',
-      type: 'info',
-    })
-    await store.retryTask(taskId)
-    ElMessage.success('任务已重新提交')
-  } catch {
-    // 用户点击了返回
-  }
+  const ok = await notify.confirm('确定要重试该任务吗？', '重试任务', {
+    confirmButtonText: '确定重试',
+    cancelButtonText: '返回',
+    type: 'info',
+  })
+  if (!ok) return
+  await store.retryTask(taskId)
+  notify.success('任务已重新提交')
 }
 
 async function handleCleanup() {
-  try {
-    await ElMessageBox.confirm(
-      '将超过 24 小时仍在排队或运行状态的任务标记为失败。确定清理？',
-      '清理僵尸任务',
-      {
-        confirmButtonText: '确定清理',
-        cancelButtonText: '返回',
-        type: 'warning',
-      },
-    )
-    const cleaned = await store.cleanupStaleTasks(24)
-    if (cleaned > 0) {
-      ElMessage.success(`已清理 ${cleaned} 个僵尸任务`)
-    } else {
-      ElMessage.info('没有需要清理的僵尸任务')
-    }
-  } catch {
-    // 用户点击了返回
+  const ok = await notify.confirm(
+    '将超过 24 小时仍在排队或运行状态的任务标记为失败。确定清理？',
+    '清理僵尸任务',
+    {
+      confirmButtonText: '确定清理',
+      cancelButtonText: '返回',
+      type: 'warning',
+    },
+  )
+  if (!ok) return
+  const cleaned = await store.cleanupStaleTasks(24)
+  if (cleaned > 0) {
+    notify.success(`已清理 ${cleaned} 个僵尸任务`)
+  } else {
+    notify.info('没有需要清理的僵尸任务')
   }
 }
 

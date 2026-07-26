@@ -42,10 +42,12 @@
 import { ref, reactive } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { User, Lock } from '@element-plus/icons-vue'
-import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+import { type FormInstance, type FormRules } from 'element-plus'
+import { useNotify } from '../composables/useNotify'
 import { useAuthStore } from '../stores/auth'
 import AuthLayout from '../components/auth/AuthLayout.vue'
 
+const notify = useNotify()
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
@@ -70,7 +72,7 @@ async function handleLogin() {
       const redirect = (route.query.redirect as string) || '/'
       router.push(redirect)
     } catch {
-      ElMessage.error(authStore.error || '登录失败')
+      notify.error(new Error(authStore.error || '登录失败'), '登录失败')
     }
   })
 }

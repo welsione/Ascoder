@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { useNotify } from '../../composables/useNotify'
 import { Search } from '@element-plus/icons-vue'
 import { Plus, RefreshCw, RotateCcw, Save, Trash2, Undo2 } from 'lucide-vue-next'
 import { useProjectStore } from '../../stores/project'
@@ -8,6 +8,7 @@ import { useRepositoryStore } from '../../stores/repository'
 import { useDraftAutoSave } from '../../composables/useDraftAutoSave'
 import { useChangeHistory } from '../../composables/useChangeHistory'
 
+const notify = useNotify()
 const projectStore = useProjectStore()
 const repositoryStore = useRepositoryStore()
 const showCreateProject = ref(false)
@@ -68,7 +69,7 @@ async function handleCreateProject() {
   takeSnapshot()
   const project = await projectStore.create()
   if (project) {
-    ElMessage.success('项目已创建')
+    notify.success('项目已创建')
     showCreateProject.value = false
     clearDraft()
   }
@@ -98,82 +99,76 @@ async function selectProject(projectId: number | null) {
 
 async function addRepository() {
   if (!selectedProject.value) {
-    ElMessage.warning('请先选择项目')
+    notify.warning('请先选择项目')
     return
   }
   if (!projectStore.memberForm.repositoryId) {
-    ElMessage.warning('请选择仓库')
+    notify.warning('请选择仓库')
     return
   }
   takeSnapshot()
   const member = await projectStore.addRepository()
   if (member) {
-    ElMessage.success('仓库已加入项目')
+    notify.success('仓库已加入项目')
   }
 }
 
 async function removeRepository(memberId: number) {
-  try {
-    await ElMessageBox.confirm('确认将此仓库移出项目？', '移出确认', {
-      confirmButtonText: '确认移出',
-      cancelButtonText: '取消',
-      type: 'warning',
-    })
-    takeSnapshot()
-    const removed = await projectStore.removeRepository(memberId)
-    if (removed) ElMessage.success('仓库已移出项目')
-  } catch {
-    // 用户取消
-  }
+  const ok = await notify.confirm('确认将此仓库移出项目？', '移出确认', {
+    confirmButtonText: '确认移出',
+    cancelButtonText: '取消',
+    type: 'warning',
+  })
+  if (!ok) return
+  takeSnapshot()
+  const removed = await projectStore.removeRepository(memberId)
+  if (removed) notify.success('仓库已移出项目')
 }
 
 async function batchRemove() {
   if (!selectedMemberIds.value.length) {
-    ElMessage.warning('请先选择要移出的仓库')
+    notify.warning('请先选择要移出的仓库')
     return
   }
-  try {
-    await ElMessageBox.confirm(
-      `确认批量移出 ${selectedMemberIds.value.length} 个仓库？`,
-      '批量移出确认',
-      { confirmButtonText: '确认移出', cancelButtonText: '取消', type: 'warning' }
-    )
-    takeSnapshot()
-    for (const id of selectedMemberIds.value) {
-      await projectStore.removeRepository(id)
-    }
-    selectedMemberIds.value = []
-    ElMessage.success('批量移出完成')
-  } catch {
-    // 用户取消
+  const ok = await notify.confirm(
+    `确认批量移出 ${selectedMemberIds.value.length} 个仓库？`,
+    '批量移出确认',
+    { confirmButtonText: '确认移出', cancelButtonText: '取消', type: 'warning' }
+  )
+  if (!ok) return
+  takeSnapshot()
+  for (const id of selectedMemberIds.value) {
+    await projectStore.removeRepository(id)
   }
+  selectedMemberIds.value = []
+  notify.success('批量移出完成')
 }
 
 async function restoreFromDraft() {
   const data = restoreDraft()
   if (data) {
     Object.assign(projectStore.form, data)
-    ElMessage.success('已恢复草稿')
+    notify.success('已恢复草稿')
   }
 }
 
-function handleReset() {
-  ElMessageBox.confirm('确认重置所有未保存的修改？', '重置确认', {
+async function handleReset() {
+  const ok = await notify.confirm('确认重置所有未保存的修改？', '重置确认', {
     confirmButtonText: '确认重置',
     cancelButtonText: '取消',
     type: 'warning',
-  }).then(() => {
-    projectStore.form.name = ''
-    projectStore.form.description = ''
-    projectStore.memberForm.repositoryId = null
-    projectStore.memberForm.alias = ''
-    projectStore.memberForm.role = 'repository'
-    projectStore.memberForm.primaryRepository = false
-    projectStore.memberForm.sortOrder = 0
-    clearDraft()
-    clearHistory()
-    ElMessage.success('已重置')
-  }).catch(() => {})
+  })
+  if (!ok) return
+  projectStore.form.name = ''
+  projectStore.form.description = ''
+  projectStore.memberForm.repositoryId = null
+  projectStore.memberForm.alias = ''
+  projectStore.memberForm.role = 'repository'
+  projectStore.memberForm.primaryRepository = false
+  projectStore.memberForm.sortOrder = 0
+  clearDraft()
+  clearHistory()
+  notify.success('已重置')
 }
 </script>
 
