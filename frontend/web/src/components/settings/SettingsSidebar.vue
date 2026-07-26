@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useRoute, useRouter } from 'vue-router'
 import { onMounted } from 'vue'
-import { Activity, ArrowLeft, Blocks, BotMessageSquare, Cpu, FolderGit2, Settings, SlidersHorizontal, WandSparkles } from 'lucide-vue-next'
+import { Activity, ArrowLeft, Blocks, BotMessageSquare, Cpu, FolderGit2, Settings, ShieldCheck, SlidersHorizontal, UserCircle, WandSparkles } from 'lucide-vue-next'
 import { useRepositoryStore } from '../../stores/repository'
 import { useSkillStore } from '../../stores/skill'
 import { useMcpServerStore } from '../../stores/mcpServer'
@@ -9,6 +9,7 @@ import { useAgentToolStore } from '../../stores/agentTool'
 import { useAgentStore } from '../../stores/agent'
 import { useLlmProviderStore } from '../../stores/llmProvider'
 import { useAsyncTaskStore } from '../../stores/asyncTask'
+import { useUserStore } from '../../stores/user'
 import type { Section } from '../../types/settings'
 
 const route = useRoute()
@@ -20,6 +21,7 @@ const toolStore = useAgentToolStore()
 const agentStore = useAgentStore()
 const llmProviderStore = useLlmProviderStore()
 const asyncTaskStore = useAsyncTaskStore()
+const userStore = useUserStore()
 const mcpConfigEnabled = true
 
 function currentSection(): Section {
@@ -31,6 +33,8 @@ function currentSection(): Section {
   if (s === 'agents') return 'agents'
   if (s === 'llm-providers') return 'llm-providers'
   if (s === 'general') return 'general'
+  if (s === 'users') return 'users'
+  if (s === 'roles') return 'roles'
   if (s === 'mcp') return s
   return 'repositories'
 }
@@ -137,6 +141,32 @@ onMounted(() => {
           模型供应商
         </span>
         <small>{{ llmProviderStore.enabledProviders.length }} 个已启用</small>
+      </button>
+      <button
+        v-permission="'USER:MANAGE'"
+        class="settings-nav-item"
+        :class="{ active: currentSection() === 'users' }"
+        type="button"
+        @click="navigate('users')"
+      >
+        <span>
+          <UserCircle class="inline-icon" aria-hidden="true" :size="16" :stroke-width="1.8" />
+          用户管理
+        </span>
+        <small>{{ userStore.users.length }} 个用户</small>
+      </button>
+      <button
+        v-permission="'ROLE:MANAGE'"
+        class="settings-nav-item"
+        :class="{ active: currentSection() === 'roles' }"
+        type="button"
+        @click="navigate('roles')"
+      >
+        <span>
+          <ShieldCheck class="inline-icon" aria-hidden="true" :size="16" :stroke-width="1.8" />
+          角色权限
+        </span>
+        <small>角色与权限</small>
       </button>
       <button
         class="settings-nav-item"

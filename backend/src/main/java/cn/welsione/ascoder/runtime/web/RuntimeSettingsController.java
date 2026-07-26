@@ -5,6 +5,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,6 +26,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/settings")
 @RequiredArgsConstructor
+@PreAuthorize("hasAuthority('SYSTEM_SETTINGS:READ')")
 public class RuntimeSettingsController {
 
     private final RuntimeSettingsService service;
@@ -40,6 +42,7 @@ public class RuntimeSettingsController {
     }
 
     @PutMapping("/{key}")
+    @PreAuthorize("hasAuthority('SYSTEM_SETTINGS:WRITE')")
     public RuntimeSettingsService.SettingView update(@PathVariable String key,
                                                      @Valid @RequestBody UpdateSettingRequest request) {
         service.write(key, request.getValue());
@@ -52,6 +55,7 @@ public class RuntimeSettingsController {
 
     @PostMapping("/reset/{category}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAuthority('SYSTEM_SETTINGS:WRITE')")
     public void reset(@PathVariable String category) {
         service.reset(category);
     }

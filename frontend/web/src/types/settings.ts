@@ -7,3 +7,5 @@ export type Section =
   | 'llm-providers'
   | 'mcp'
   | 'general'
+  | 'users'
+  | 'roles'

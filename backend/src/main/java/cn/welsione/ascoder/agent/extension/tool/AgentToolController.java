@@ -1,6 +1,7 @@
 package cn.welsione.ascoder.agent.extension.tool;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -16,6 +17,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/agent-tools")
 @RequiredArgsConstructor
+@PreAuthorize("hasAuthority('TOOL:MANAGE')")
 public class AgentToolController {
 
     private final AgentToolService toolService;

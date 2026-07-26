@@ -9,6 +9,8 @@ import ToolSection from '../components/settings/ToolSection.vue'
 import AgentSection from '../components/settings/AgentSection.vue'
 import LlmProviderSection from '../components/settings/LlmProviderSection.vue'
 import GeneralSection from '../components/settings/GeneralSection.vue'
+import UserSection from '../components/settings/UserSection.vue'
+import RoleSection from '../components/settings/RoleSection.vue'
 import type { Section } from '../types/settings'
 
 const route = useRoute()
@@ -22,6 +24,8 @@ function normalizeSection(value: string | undefined): Section {
   if (value === 'agents') return 'agents'
   if (value === 'llm-providers') return 'llm-providers'
   if (value === 'general') return 'general'
+  if (value === 'users') return 'users'
+  if (value === 'roles') return 'roles'
   if (value === 'mcp') return 'mcp'
   return 'repositories'
 }
@@ -51,6 +55,12 @@ const sectionMeta = computed(() => {
   }
   if (section.value === 'general') {
     return { title: '通用设置', description: '运行时调参与默认值管理，立即对后续请求生效。' }
+  }
+  if (section.value === 'users') {
+    return { title: '用户管理', description: '管理平台用户账号、角色分配与登录状态。' }
+  }
+  if (section.value === 'roles') {
+    return { title: '角色权限', description: '管理角色定义与权限分配，控制用户可访问的功能范围。' }
   }
   return { title: 'MCP 管理', description: '配置代理可调用的外部工具服务，扩展问答时的执行能力。' }
 })
@@ -90,6 +100,8 @@ watch(section, () => {
       <AgentSection v-else-if="section === 'agents'" />
       <LlmProviderSection v-else-if="section === 'llm-providers'" />
       <GeneralSection v-else-if="section === 'general'" />
+      <UserSection v-else-if="section === 'users'" />
+      <RoleSection v-else-if="section === 'roles'" />
       <section v-else class="surface-panel settings-block settings-disabled-panel">
         <div class="section-heading">
           <div>
