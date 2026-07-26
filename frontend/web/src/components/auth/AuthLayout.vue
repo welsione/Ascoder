@@ -60,7 +60,7 @@ function particleStyle(index: number) {
 <style scoped>
 .auth-shell {
   display: grid;
-  grid-template-columns: 5fr 8fr;
+  grid-template-columns: 2fr 5fr;
   min-height: 100vh;
 }
 
@@ -73,7 +73,7 @@ function particleStyle(index: number) {
   justify-items: center;
   padding: var(--spacing-10) var(--spacing-8);
   overflow: hidden;
-  background: #1e293b;
+  background: #334155;
 }
 
 .brand-bg {
@@ -198,7 +198,7 @@ function particleStyle(index: number) {
 
 .brand-tagline {
   margin: 0;
-  font-size: 18px;
+  font-size: 22px;
   color: rgba(148, 163, 194, 0.65);
   letter-spacing: var(--tracking-wide);
   font-weight: var(--font-weight-medium);
