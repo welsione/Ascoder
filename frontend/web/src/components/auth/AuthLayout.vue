@@ -75,7 +75,7 @@ function particleStyle(index: number) {
 <style scoped>
 .auth-shell {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 2fr 3fr;
   min-height: 100vh;
 }
 
