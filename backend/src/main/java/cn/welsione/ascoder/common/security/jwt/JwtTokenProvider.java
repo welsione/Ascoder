@@ -4,8 +4,10 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
@@ -32,17 +34,48 @@ public class JwtTokenProvider {
     private final SecretKey refreshKey;
     private final long accessTokenValidityMs;
     private final long refreshTokenValidityMs;
+    private final Environment environment;
+    private final String rawAccessSecret;
+    private final String rawRefreshSecret;
 
     public JwtTokenProvider(
             @Value("${ascoder.security.jwt.access-secret:}") String accessSecret,
             @Value("${ascoder.security.jwt.refresh-secret:}") String refreshSecret,
             @Value("${ascoder.security.jwt.access-token-validity-ms:1800000}") long accessTokenValidityMs,
-            @Value("${ascoder.security.jwt.refresh-token-validity-ms:604800000}") long refreshTokenValidityMs
+            @Value("${ascoder.security.jwt.refresh-token-validity-ms:604800000}") long refreshTokenValidityMs,
+            Environment environment
     ) {
+        this.rawAccessSecret = accessSecret;
+        this.rawRefreshSecret = refreshSecret;
         this.accessKey = resolveKey(accessSecret, "access");
         this.refreshKey = resolveKey(refreshSecret, "refresh");
         this.accessTokenValidityMs = accessTokenValidityMs;
         this.refreshTokenValidityMs = refreshTokenValidityMs;
+        this.environment = environment;
+    }
+
+    /**
+     * 生产环境启动时校验 JWT 密钥是否已配置。
+     * 若使用默认密钥则拒绝启动，防止密钥泄露导致 Token 伪造。
+     */
+    @PostConstruct
+    void validateKeyConfiguration() {
+        String[] activeProfiles = environment.getActiveProfiles();
+        boolean isProd = false;
+        for (String profile : activeProfiles) {
+            if ("prod".equalsIgnoreCase(profile)) {
+                isProd = true;
+                break;
+            }
+        }
+        if (isProd && (isDefaultKey(rawAccessSecret) || isDefaultKey(rawRefreshSecret))) {
+            throw new IllegalStateException(
+                    "生产环境必须配置 JWT 密钥！请设置环境变量 ASCODER_JWT_ACCESS_SECRET 和 ASCODER_JWT_REFRESH_SECRET");
+        }
+    }
+
+    private boolean isDefaultKey(String secret) {
+        return secret == null || secret.isBlank();
     }
 
     /**

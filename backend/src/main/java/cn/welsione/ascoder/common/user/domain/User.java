@@ -50,6 +50,11 @@ public class User {
     @Column(nullable = false)
     private boolean passwordChanged = true;
 
+    /**
+     * 账户锁定时间，用于计算自动解锁时长。非空表示当前处于锁定状态。
+     */
+    private LocalDateTime lockedAt;
+
     private LocalDateTime lastLoginAt;
 
     @Column(nullable = false, updatable = false)
@@ -57,4 +62,21 @@ public class User {
 
     @Column(nullable = false)
     private LocalDateTime updatedAt = LocalDateTime.now();
+
+    /**
+     * 锁定账户，记录锁定时间。
+     */
+    public void lock() {
+        this.accountNonLocked = false;
+        this.lockedAt = LocalDateTime.now();
+    }
+
+    /**
+     * 解锁账户，重置失败计数和锁定时间。
+     */
+    public void unlock() {
+        this.accountNonLocked = true;
+        this.loginFailCount = 0;
+        this.lockedAt = null;
+    }
 }

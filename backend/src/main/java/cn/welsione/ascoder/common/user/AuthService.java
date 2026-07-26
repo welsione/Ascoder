@@ -102,7 +102,12 @@ public class AuthService {
         }
 
         if (!user.isAccountNonLocked()) {
-            throw new AuthenticationException("账户已被锁定，请稍后再试");
+            if (isLockExpired(user)) {
+                user.unlock();
+                userRepository.save(user);
+            } else {
+                throw new AuthenticationException("账户已被锁定，请 " + lockDurationMinutes + " 分钟后再试");
+            }
         }
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
@@ -229,9 +234,11 @@ public class AuthService {
 
     // ========== 私有方法 ==========
 
+    private static final int MIN_PASSWORD_LENGTH = 8;
+
     private void validatePassword(String password) {
-        if (password.length() < 6) {
-            throw new ValidationException("密码长度不能少于 6 个字符");
+        if (password.length() < MIN_PASSWORD_LENGTH) {
+            throw new ValidationException("密码长度不能少于 " + MIN_PASSWORD_LENGTH + " 个字符");
         }
         boolean hasLetter = password.chars().anyMatch(Character::isLetter);
         boolean hasDigit = password.chars().anyMatch(Character::isDigit);
@@ -243,10 +250,20 @@ public class AuthService {
     private void handleLoginFailure(User user) {
         user.setLoginFailCount(user.getLoginFailCount() + 1);
         if (user.getLoginFailCount() >= maxFailCount) {
-            user.setAccountNonLocked(false);
+            user.lock();
             log.warn("账户锁定: username={}, failCount={}", user.getUsername(), user.getLoginFailCount());
         }
         userRepository.save(user);
+    }
+
+    /**
+     * 判断账户锁定是否已过期（超过 lockDurationMinutes 自动解锁）。
+     */
+    private boolean isLockExpired(User user) {
+        if (user.getLockedAt() == null) {
+            return true;
+        }
+        return user.getLockedAt().plusMinutes(lockDurationMinutes).isBefore(LocalDateTime.now());
     }
 
     private void saveRefreshToken(Long userId, String refreshToken, String userAgent) {

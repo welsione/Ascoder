@@ -13,7 +13,7 @@
             :prefix-icon="Lock" show-password />
         </el-form-item>
         <el-form-item prop="newPassword">
-          <el-input v-model="form.newPassword" type="password" placeholder="新密码（至少 6 位，含字母和数字）"
+          <el-input v-model="form.newPassword" type="password" placeholder="新密码（至少 8 位，含字母和数字）"
             size="large" :prefix-icon="Lock" show-password />
         </el-form-item>
         <el-form-item prop="confirmPassword">
@@ -61,7 +61,7 @@ const rules: FormRules = {
   oldPassword: [{ required: true, message: '请输入原密码', trigger: 'blur' }],
   newPassword: [
     { required: true, message: '请输入新密码', trigger: 'blur' },
-    { min: 6, max: 128, message: '密码长度 6-128 个字符', trigger: 'blur' },
+    { min: 8, max: 128, message: '密码长度 8-128 个字符', trigger: 'blur' },
   ],
   confirmPassword: [
     { required: true, message: '请确认新密码', trigger: 'blur' },

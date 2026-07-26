@@ -131,8 +131,7 @@ public class UserService {
     @Transactional
     public void unlock(Long id) {
         User user = findUser(id);
-        user.setAccountNonLocked(true);
-        user.setLoginFailCount(0);
+        user.unlock();
         userRepository.save(user);
         log.info("管理员解锁用户: userId={}", id);
     }
@@ -178,9 +177,11 @@ public class UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("用户不存在: " + id));
     }
 
+    private static final int MIN_PASSWORD_LENGTH = 8;
+
     private void validatePassword(String password) {
-        if (password == null || password.length() < 6) {
-            throw new ValidationException("密码长度不能少于 6 个字符");
+        if (password == null || password.length() < MIN_PASSWORD_LENGTH) {
+            throw new ValidationException("密码长度不能少于 " + MIN_PASSWORD_LENGTH + " 个字符");
         }
         boolean hasLetter = password.chars().anyMatch(Character::isLetter);
         boolean hasDigit = password.chars().anyMatch(Character::isDigit);

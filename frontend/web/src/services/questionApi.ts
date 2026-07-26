@@ -1,4 +1,5 @@
 import { request } from './httpClient'
+import { useAuthStore } from '../stores/auth'
 import type { QuestionRecord } from '../types/question'
 
 export function getAll() {
@@ -67,8 +68,14 @@ export async function uploadLog(projectSpaceId: number, file: File): Promise<Log
   formData.append('projectSpaceId', String(projectSpaceId))
   formData.append('file', file)
   const base = import.meta.env.VITE_API_BASE_URL ?? ''
+  const auth = useAuthStore()
+  const headers: Record<string, string> = {}
+  if (auth.accessToken) {
+    headers['Authorization'] = `Bearer ${auth.accessToken}`
+  }
   const response = await fetch(`${base}/api/log-uploads`, {
     method: 'POST',
+    headers,
     body: formData,
   })
   if (!response.ok) {
@@ -191,10 +198,15 @@ export function stream(
   onEvent: (event: StreamEvent) => void
 ): () => void {
   const controller = new AbortController()
+  const auth = useAuthStore()
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (auth.accessToken) {
+    headers['Authorization'] = `Bearer ${auth.accessToken}`
+  }
 
   fetch(`${SSE_BASE_URL}/api/questions/stream`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(payload),
     signal: controller.signal,
   }).then(async (response) => {
@@ -224,9 +236,15 @@ export function resumeStream(
   onEvent: (event: StreamEvent) => void
 ): () => void {
   const controller = new AbortController()
+  const auth = useAuthStore()
+  const headers: Record<string, string> = {}
+  if (auth.accessToken) {
+    headers['Authorization'] = `Bearer ${auth.accessToken}`
+  }
 
   fetch(`${SSE_BASE_URL}/api/questions/${questionId}/stream/resume`, {
     method: 'POST',
+    headers,
     signal: controller.signal,
   }).then(async (response) => {
     if (!response.ok) {
@@ -255,9 +273,15 @@ export function retryStream(
   onEvent: (event: StreamEvent) => void
 ): () => void {
   const controller = new AbortController()
+  const auth = useAuthStore()
+  const headers: Record<string, string> = {}
+  if (auth.accessToken) {
+    headers['Authorization'] = `Bearer ${auth.accessToken}`
+  }
 
   fetch(`${SSE_BASE_URL}/api/questions/${questionId}/stream/retry`, {
     method: 'POST',
+    headers,
     signal: controller.signal,
   }).then(async (response) => {
     if (!response.ok) {
