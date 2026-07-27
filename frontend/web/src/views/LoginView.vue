@@ -8,15 +8,14 @@
       </div>
 
       <!-- 表单主体 -->
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="0" @submit.prevent="handleLogin"
-        class="auth-form">
-        <el-form-item prop="username">
+      <el-form :model="form" label-width="0" @submit.prevent="handleLogin" class="auth-form">
+        <el-form-item>
           <div class="field">
             <label class="field-label">用户名</label>
             <el-input v-model="form.username" placeholder="输入用户名" size="large" :prefix-icon="User" />
           </div>
         </el-form-item>
-        <el-form-item prop="password">
+        <el-form-item>
           <div class="field">
             <label class="field-label">密码</label>
             <el-input v-model="form.password" type="password" placeholder="输入密码" size="large"
@@ -39,10 +38,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { reactive } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { User, Lock } from '@element-plus/icons-vue'
-import { type FormInstance, type FormRules } from 'element-plus'
 import { useNotify } from '../composables/useNotify'
 import { useAuthStore } from '../stores/auth'
 import AuthLayout from '../components/auth/AuthLayout.vue'
@@ -51,30 +49,31 @@ const notify = useNotify()
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
-const formRef = ref<FormInstance>()
 
 const form = reactive({
   username: '',
   password: '',
 })
 
-const rules: FormRules = {
-  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
-  password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
+function validateForm(): string | null {
+  if (!form.username) return '请输入用户名'
+  if (!form.password) return '请输入密码'
+  return null
 }
 
 async function handleLogin() {
-  if (!formRef.value) return
-  await formRef.value.validate(async (valid) => {
-    if (!valid) return
-    try {
-      await authStore.login({ ...form })
-      const redirect = (route.query.redirect as string) || '/'
-      router.push(redirect)
-    } catch {
-      notify.error(new Error(authStore.error || '登录失败'), '登录失败')
-    }
-  })
+  const error = validateForm()
+  if (error) {
+    notify.warning(error)
+    return
+  }
+  try {
+    await authStore.login({ ...form })
+    const redirect = (route.query.redirect as string) || '/'
+    router.push(redirect)
+  } catch {
+    notify.error(new Error(authStore.error || '登录失败'), '登录失败')
+  }
 }
 </script>
 

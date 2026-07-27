@@ -49,22 +49,27 @@ const filteredMembers = computed(() => {
   )
 })
 
-const nameError = computed(() => {
+function validateProjectName(): string | null {
   if (!projectStore.form.name && showCreateProject.value) return '项目名称不能为空'
   if (projectStore.form.name.length > 120) return '项目名称不能超过 120 个字符'
-  return ''
-})
+  return null
+}
 
-const aliasError = computed(() => {
+function validateAlias(): string | null {
   if (projectStore.memberForm.alias && !/^[a-zA-Z0-9_-]+$/.test(projectStore.memberForm.alias)) {
     return '目录别名只支持字母、数字、下划线和中划线'
   }
-  return ''
-})
+  return null
+}
 
-const isFormValid = computed(() => !!projectStore.form.name.trim() && !nameError.value)
+const isFormValid = computed(() => !!projectStore.form.name.trim())
 
 async function handleCreateProject() {
+  const nameError = validateProjectName()
+  if (nameError) {
+    notify.warning(nameError)
+    return
+  }
   if (!isFormValid.value) return
   takeSnapshot()
   const project = await projectStore.create()
@@ -104,6 +109,11 @@ async function addRepository() {
   }
   if (!projectStore.memberForm.repositoryId) {
     notify.warning('请选择仓库')
+    return
+  }
+  const aliasErr = validateAlias()
+  if (aliasErr) {
+    notify.warning(aliasErr)
     return
   }
   takeSnapshot()
@@ -255,9 +265,7 @@ async function handleReset() {
             maxlength="120"
             clearable
             show-word-limit
-            :class="{ 'is-error': nameError }"
           />
-          <p v-if="nameError" class="field-error">{{ nameError }}</p>
         </div>
         <div>
           <label class="field-label">描述</label>
@@ -357,9 +365,7 @@ async function handleReset() {
           placeholder="例如 order-service"
           maxlength="120"
           clearable
-          :class="{ 'is-error': aliasError }"
         />
-        <p v-if="aliasError" class="field-error">{{ aliasError }}</p>
       </div>
       <div class="config-field">
         <label class="field-label">角色</label>

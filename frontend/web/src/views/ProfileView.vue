@@ -10,8 +10,7 @@
       <!-- 基本信息 -->
       <div class="profile-section">
         <h3 class="section-title">基本信息</h3>
-        <el-form ref="profileFormRef" :model="profileForm" :rules="profileRules" label-width="80px"
-          @submit.prevent="handleUpdateProfile">
+        <el-form :model="profileForm" label-width="80px" @submit.prevent="handleUpdateProfile">
           <el-form-item label="用户名">
             <el-input :model-value="authStore.user?.username" disabled />
           </el-form-item>
@@ -22,10 +21,10 @@
               </el-tag>
             </div>
           </el-form-item>
-          <el-form-item label="昵称" prop="nickname">
+          <el-form-item label="昵称">
             <el-input v-model="profileForm.nickname" placeholder="输入昵称" clearable />
           </el-form-item>
-          <el-form-item label="邮箱" prop="email">
+          <el-form-item label="邮箱">
             <el-input v-model="profileForm.email" placeholder="输入邮箱（可选）" clearable />
           </el-form-item>
           <el-form-item>
@@ -37,15 +36,14 @@
       <!-- 修改密码 -->
       <div class="profile-section">
         <h3 class="section-title">修改密码</h3>
-        <el-form ref="passwordFormRef" :model="passwordForm" :rules="passwordRules" label-width="80px"
-          @submit.prevent="handleChangePassword">
-          <el-form-item label="原密码" prop="oldPassword">
+        <el-form :model="passwordForm" label-width="80px" @submit.prevent="handleChangePassword">
+          <el-form-item label="原密码">
             <el-input v-model="passwordForm.oldPassword" type="password" placeholder="输入原密码" show-password />
           </el-form-item>
-          <el-form-item label="新密码" prop="newPassword">
+          <el-form-item label="新密码">
             <el-input v-model="passwordForm.newPassword" type="password" placeholder="至少 8 位，含字母和数字" show-password />
           </el-form-item>
-          <el-form-item label="确认密码" prop="confirmPassword">
+          <el-form-item label="确认密码">
             <el-input v-model="passwordForm.confirmPassword" type="password" placeholder="确认新密码" show-password
               @keyup.enter="handleChangePassword" />
           </el-form-item>
@@ -60,14 +58,11 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
-import { type FormInstance, type FormRules } from 'element-plus'
 import { useNotify } from '../composables/useNotify'
 import { useAuthStore } from '../stores/auth'
 
 const notify = useNotify()
 const authStore = useAuthStore()
-const profileFormRef = ref<FormInstance>()
-const passwordFormRef = ref<FormInstance>()
 const profileLoading = ref(false)
 const passwordLoading = ref(false)
 
@@ -82,30 +77,20 @@ const passwordForm = reactive({
   confirmPassword: '',
 })
 
-const profileRules: FormRules = {
-  email: [
-    { type: 'email', message: '请输入有效的邮箱地址', trigger: 'blur' },
-  ],
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+function validateProfile(): string | null {
+  if (profileForm.email && !EMAIL_RE.test(profileForm.email)) return '请输入有效的邮箱地址'
+  return null
 }
 
-const validateConfirmPassword = (_rule: unknown, value: string, callback: (error?: Error) => void) => {
-  if (value !== passwordForm.newPassword) {
-    callback(new Error('两次输入的密码不一致'))
-  } else {
-    callback()
-  }
-}
-
-const passwordRules: FormRules = {
-  oldPassword: [{ required: true, message: '请输入原密码', trigger: 'blur' }],
-  newPassword: [
-    { required: true, message: '请输入新密码', trigger: 'blur' },
-    { min: 8, max: 128, message: '密码长度 8-128 个字符', trigger: 'blur' },
-  ],
-  confirmPassword: [
-    { required: true, message: '请确认新密码', trigger: 'blur' },
-    { validator: validateConfirmPassword, trigger: 'blur' },
-  ],
+function validatePassword(): string | null {
+  if (!passwordForm.oldPassword) return '请输入原密码'
+  if (!passwordForm.newPassword) return '请输入新密码'
+  if (passwordForm.newPassword.length < 8 || passwordForm.newPassword.length > 128) return '密码长度 8-128 个字符'
+  if (!passwordForm.confirmPassword) return '请确认新密码'
+  if (passwordForm.confirmPassword !== passwordForm.newPassword) return '两次输入的密码不一致'
+  return null
 }
 
 function roleName(code: string): string {
@@ -125,48 +110,49 @@ onMounted(() => {
 })
 
 async function handleUpdateProfile() {
-  if (!profileFormRef.value) return
-  await profileFormRef.value.validate(async (valid) => {
-    if (!valid) return
-    profileLoading.value = true
-    try {
-      await authStore.updateProfile({
-        nickname: profileForm.nickname || undefined,
-        email: profileForm.email || undefined,
-      })
-      notify.success('个人信息已更新')
-    } catch {
-      notify.error(new Error(authStore.error || '更新失败'), '更新失败')
-    } finally {
-      profileLoading.value = false
-    }
-  })
+  const error = validateProfile()
+  if (error) {
+    notify.warning(error)
+    return
+  }
+  profileLoading.value = true
+  try {
+    await authStore.updateProfile({
+      nickname: profileForm.nickname || undefined,
+      email: profileForm.email || undefined,
+    })
+    notify.success('个人信息已更新')
+  } catch {
+    notify.error(new Error(authStore.error || '更新失败'), '更新失败')
+  } finally {
+    profileLoading.value = false
+  }
 }
 
 async function handleChangePassword() {
-  if (!passwordFormRef.value) return
-  await passwordFormRef.value.validate(async (valid) => {
-    if (!valid) return
-    passwordLoading.value = true
-    try {
-      await authStore.changePassword({
-        oldPassword: passwordForm.oldPassword,
-        newPassword: passwordForm.newPassword,
-      })
-      notify.success('密码修改成功，请重新登录')
-      passwordForm.oldPassword = ''
-      passwordForm.newPassword = ''
-      passwordForm.confirmPassword = ''
-      passwordFormRef.value?.resetFields()
-      // 改密后需要重新登录
-      await authStore.logout()
-      window.location.href = '/login'
-    } catch {
-      notify.error(new Error(authStore.error || '修改密码失败'), '修改密码失败')
-    } finally {
-      passwordLoading.value = false
-    }
-  })
+  const error = validatePassword()
+  if (error) {
+    notify.warning(error)
+    return
+  }
+  passwordLoading.value = true
+  try {
+    await authStore.changePassword({
+      oldPassword: passwordForm.oldPassword,
+      newPassword: passwordForm.newPassword,
+    })
+    notify.success('密码修改成功，请重新登录')
+    passwordForm.oldPassword = ''
+    passwordForm.newPassword = ''
+    passwordForm.confirmPassword = ''
+    // 改密后需要重新登录
+    await authStore.logout()
+    window.location.href = '/login'
+  } catch {
+    notify.error(new Error(authStore.error || '修改密码失败'), '修改密码失败')
+  } finally {
+    passwordLoading.value = false
+  }
 }
 </script>
 

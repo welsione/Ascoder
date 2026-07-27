@@ -70,18 +70,17 @@ const selectedProjectMemberText = computed(() => {
   return `${selectedProject.value.name} · ${count} 个仓库`
 })
 
-const spaceNameError = computed(() => {
+function validateSpaceName(): string | null {
   if (!projectSpaceStore.form.name.trim()) return '空间名称不能为空'
   if (projectSpaceStore.form.name.length > 120) return '空间名称不能超过 120 个字符'
-  return ''
-})
+  return null
+}
 
 const isFormValid = computed(() =>
   !!projectSpaceStore.form.projectId &&
   !!projectSpaceStore.form.name.trim() &&
   projectSpaceStore.form.memberBranches.length > 0 &&
-  projectSpaceStore.form.memberBranches.every((member) => member.branchId || member.branchName.trim()) &&
-  !spaceNameError.value
+  projectSpaceStore.form.memberBranches.every((member) => member.branchId || member.branchName.trim())
 )
 
 const filteredSpaces = computed(() => {
@@ -249,6 +248,11 @@ watch(
 )
 
 async function handleCreateAndIndex() {
+  const nameError = validateSpaceName()
+  if (nameError) {
+    notify.warning(nameError)
+    return
+  }
   if (!isFormValid.value) {
     notify.warning('请完成所有必填项')
     return
@@ -406,10 +410,8 @@ async function handleReset() {
             maxlength="120"
             clearable
             show-word-limit
-            :class="{ 'is-error': spaceNameError }"
             @input="nameTouched = true"
           />
-          <p v-if="spaceNameError" class="field-error">{{ spaceNameError }}</p>
         </div>
         <div class="config-field">
           <label class="field-label">默认分支</label>

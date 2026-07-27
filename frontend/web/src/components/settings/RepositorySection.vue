@@ -94,12 +94,6 @@ async function saveCredentials() {
 </script>
 
 <template>
-  <section class="repository-flow surface-panel">
-    <span><strong>接入仓库</strong></span>
-    <span class="flow-divider" aria-hidden="true" />
-    <span>分支会出现在<strong>项目空间</strong>创建流程中</span>
-  </section>
-
   <section class="surface-panel settings-block">
     <div class="section-heading repository-card-heading">
       <div>
@@ -322,26 +316,6 @@ async function saveCredentials() {
 </template>
 
 <style scoped>
-.repository-flow {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--spacing-3);
-  padding: var(--spacing-3) var(--spacing-4);
-  color: var(--muted);
-  font-size: var(--font-size-sm);
-}
-
-.repository-flow strong {
-  color: var(--text);
-}
-
-.flow-divider {
-  width: 28px;
-  height: 1px;
-  background: var(--stroke);
-}
-
 .repository-card-heading h2 {
   font-size: var(--font-size-xl);
 }

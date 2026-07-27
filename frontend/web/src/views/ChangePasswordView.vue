@@ -12,23 +12,22 @@
       </div>
 
       <!-- 表单主体 -->
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="0" @submit.prevent="handleSubmit"
-        class="auth-form">
-        <el-form-item prop="oldPassword">
+      <el-form :model="form" label-width="0" @submit.prevent="handleSubmit" class="auth-form">
+        <el-form-item>
           <div class="field">
             <label class="field-label">原密码</label>
             <el-input v-model="form.oldPassword" type="password" placeholder="输入原密码" size="large"
               :prefix-icon="Lock" show-password />
           </div>
         </el-form-item>
-        <el-form-item prop="newPassword">
+        <el-form-item>
           <div class="field">
             <label class="field-label">新密码</label>
             <el-input v-model="form.newPassword" type="password" placeholder="至少 8 位，含字母和数字" size="large"
               :prefix-icon="Lock" show-password />
           </div>
         </el-form-item>
-        <el-form-item prop="confirmPassword">
+        <el-form-item>
           <div class="field">
             <label class="field-label">确认新密码</label>
             <el-input v-model="form.confirmPassword" type="password" placeholder="再次输入新密码" size="large"
@@ -50,10 +49,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { Lock } from '@element-plus/icons-vue'
-import { type FormInstance, type FormRules } from 'element-plus'
 import { useNotify } from '../composables/useNotify'
 import { useAuthStore } from '../stores/auth'
 import AuthLayout from '../components/auth/AuthLayout.vue'
@@ -61,7 +59,6 @@ import AuthLayout from '../components/auth/AuthLayout.vue'
 const notify = useNotify()
 const router = useRouter()
 const authStore = useAuthStore()
-const formRef = ref<FormInstance>()
 
 const form = reactive({
   oldPassword: '',
@@ -69,41 +66,31 @@ const form = reactive({
   confirmPassword: '',
 })
 
-const validateConfirmPassword = (_rule: unknown, value: string, callback: (error?: Error) => void) => {
-  if (value !== form.newPassword) {
-    callback(new Error('两次输入的密码不一致'))
-  } else {
-    callback()
-  }
-}
-
-const rules: FormRules = {
-  oldPassword: [{ required: true, message: '请输入原密码', trigger: 'blur' }],
-  newPassword: [
-    { required: true, message: '请输入新密码', trigger: 'blur' },
-    { min: 8, max: 128, message: '密码长度 8-128 个字符', trigger: 'blur' },
-  ],
-  confirmPassword: [
-    { required: true, message: '请确认新密码', trigger: 'blur' },
-    { validator: validateConfirmPassword, trigger: 'blur' },
-  ],
+function validateForm(): string | null {
+  if (!form.oldPassword) return '请输入原密码'
+  if (!form.newPassword) return '请输入新密码'
+  if (form.newPassword.length < 8 || form.newPassword.length > 128) return '密码长度 8-128 个字符'
+  if (!form.confirmPassword) return '请确认新密码'
+  if (form.confirmPassword !== form.newPassword) return '两次输入的密码不一致'
+  return null
 }
 
 async function handleSubmit() {
-  if (!formRef.value) return
-  await formRef.value.validate(async (valid) => {
-    if (!valid) return
-    try {
-      await authStore.changePassword({
-        oldPassword: form.oldPassword,
-        newPassword: form.newPassword,
-      })
-      notify.success('密码修改成功')
-      router.push('/')
-    } catch {
-      notify.error(new Error(authStore.error || '修改密码失败'), '修改密码失败')
-    }
-  })
+  const error = validateForm()
+  if (error) {
+    notify.warning(error)
+    return
+  }
+  try {
+    await authStore.changePassword({
+      oldPassword: form.oldPassword,
+      newPassword: form.newPassword,
+    })
+    notify.success('密码修改成功')
+    router.push('/')
+  } catch {
+    notify.error(new Error(authStore.error || '修改密码失败'), '修改密码失败')
+  }
 }
 
 async function handleLogout() {
