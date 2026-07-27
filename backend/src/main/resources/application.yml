@@ -65,6 +65,7 @@ ascoder:
     index-timeout-seconds: ${CODEGRAPH_INDEX_TIMEOUT_SECONDS:3600}
   git:
     timeout-seconds: ${GIT_TIMEOUT_SECONDS:120}
+    ssl-verify: ${GIT_SSL_VERIFY:true}
   security:
     jwt:
       access-secret: ${ASCODER_JWT_ACCESS_SECRET:}

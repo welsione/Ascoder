@@ -53,6 +53,9 @@ services:
       # Set to http://host.docker.internal:8443 and run: python3 scripts/git-tls-proxy.py 8443
       GIT_TLS_PROXY: ${GIT_TLS_PROXY:-}
       ASCODER_GIT_TLS_PROXY: ${GIT_TLS_PROXY:-}
+      # Disable Git SSL certificate verification (for self-signed certs or GnuTLS incompatibility)
+      # Set to "false" if you see "GnuTLS handshake failed" errors with private Git servers.
+      GIT_SSL_VERIFY: ${GIT_SSL_VERIFY:-true}
       # Logback 日志输出目录（对应 logback-spring.xml 中的 LOG_PATH）
       LOG_PATH: /app/logs
       JVM_OPTS: ${JVM_OPTS:--Xmx512m -Xms256m}

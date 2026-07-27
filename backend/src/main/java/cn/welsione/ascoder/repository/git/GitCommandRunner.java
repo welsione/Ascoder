@@ -19,6 +19,9 @@ import java.util.Map;
  *
  * <p>通过 {@code GIT_CONFIG_COUNT} 注入 {@code safe.directory=*}，
  * 绕过 Git 2.35.2+ 的 dubious ownership 检查，避免 Docker 挂载卷属主不一致时拒绝操作。</p>
+ *
+ * <p>当 {@code ascoder.git.ssl-verify} 设为 {@code false} 时，额外注入 {@code http.sslVerify=false}，
+ * 用于内网自签名证书或 GnuTLS 不兼容的 Git 服务器场景。</p>
  */
 @Slf4j
 @Component
@@ -26,6 +29,9 @@ public class GitCommandRunner extends SyncCommandRunner {
 
     @Value("${ascoder.git.http-proxy:}")
     private String httpProxy;
+
+    @Value("${ascoder.git.ssl-verify:true}")
+    private boolean sslVerify;
 
     @Override
     protected Map<String, String> getEnvironment() {
@@ -36,6 +42,12 @@ public class GitCommandRunner extends SyncCommandRunner {
         env.put("GIT_CONFIG_COUNT", "1");
         env.put("GIT_CONFIG_KEY_0", "safe.directory");
         env.put("GIT_CONFIG_VALUE_0", "*");
+        if (!sslVerify) {
+            env.put("GIT_CONFIG_COUNT", "2");
+            env.put("GIT_CONFIG_KEY_1", "http.sslVerify");
+            env.put("GIT_CONFIG_VALUE_1", "false");
+            log.info("Git SSL 证书验证已禁用（ascoder.git.ssl-verify=false）");
+        }
         if (httpProxy != null && !httpProxy.isBlank()) {
             env.put("https_proxy", httpProxy);
             env.put("http_proxy", httpProxy);
