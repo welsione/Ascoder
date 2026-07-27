@@ -16,6 +16,9 @@ import java.util.Map;
  *
  * <p>支持通过 {@code ascoder.git.http-proxy} 配置 HTTP 代理，
  * 让容器内 Git 通过代理访问 TLS 不兼容的远程服务器。</p>
+ *
+ * <p>通过 {@code GIT_CONFIG_COUNT} 注入 {@code safe.directory=*}，
+ * 绕过 Git 2.35.2+ 的 dubious ownership 检查，避免 Docker 挂载卷属主不一致时拒绝操作。</p>
  */
 @Slf4j
 @Component
@@ -28,6 +31,11 @@ public class GitCommandRunner extends SyncCommandRunner {
     protected Map<String, String> getEnvironment() {
         Map<String, String> env = new HashMap<>();
         env.put("GIT_TERMINAL_PROMPT", "0");
+        // Docker 挂载卷的属主与容器用户不一致时，Git 2.35.2+ 会拒绝操作（dubious ownership）。
+        // 通过环境变量注入 safe.directory=* 绕过检查，避免逐个仓库添加例外。
+        env.put("GIT_CONFIG_COUNT", "1");
+        env.put("GIT_CONFIG_KEY_0", "safe.directory");
+        env.put("GIT_CONFIG_VALUE_0", "*");
         if (httpProxy != null && !httpProxy.isBlank()) {
             env.put("https_proxy", httpProxy);
             env.put("http_proxy", httpProxy);
