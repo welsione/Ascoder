@@ -50,7 +50,7 @@ class BranchRefreshTaskDefinitionTests {
 
         definition.execute(context, progress);
 
-        verify(repositoryBranchService).refresh(eq(42L), any());
+        verify(repositoryBranchService).fetchAndRefresh(eq(42L), any());
     }
 
     @Test

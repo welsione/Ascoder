@@ -4,6 +4,8 @@ import cn.welsione.ascoder.repository.git.GitBranchInfo;
 import cn.welsione.ascoder.repository.git.GitRepositoryService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.transaction.support.TransactionCallback;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.file.Path;
 import java.util.Date;
@@ -24,10 +26,12 @@ class RepositoryBranchServiceTests {
     private final RepositoryBranchJpaRepository repository = mock(RepositoryBranchJpaRepository.class);
     private final CodeRepositoryJpaRepository codeRepositoryJpaRepository = mock(CodeRepositoryJpaRepository.class);
     private final GitRepositoryService gitRepositoryService = mock(GitRepositoryService.class);
+    private final TransactionTemplate transactionTemplate = mock(TransactionTemplate.class);
     private final RepositoryBranchService service = new RepositoryBranchService(
             repository,
             codeRepositoryJpaRepository,
-            gitRepositoryService
+            gitRepositoryService,
+            transactionTemplate
     );
 
     @Test
@@ -73,6 +77,11 @@ class RepositoryBranchServiceTests {
                 .thenReturn(List.of(remoteHead, remoteTracking));
         when(repository.findByRepository_IdAndActiveTrueOrderByNameAscSourceKindAsc(1L))
                 .thenReturn(List.of(remoteHead));
+        // TransactionTemplate.execute：直接执行回调
+        when(transactionTemplate.execute(any())).thenAnswer(inv -> {
+            TransactionCallback<?> cb = inv.getArgument(0);
+            return cb.doInTransaction(null);
+        });
 
         List<RepositoryBranch> branches = service.refresh(1L);
 
