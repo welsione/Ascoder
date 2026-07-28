@@ -51,6 +51,9 @@ public class RepositoryBranchService {
      * DB 更新通过 {@link TransactionTemplate} 在短事务内执行，
      * 绕过 Spring AOP 自调用限制。</p>
      *
+     * <p>注意：{@link #ensureRepository(Long)} 内部的 DB 查询也在无事务状态下执行，
+     * 仅用于读取仓库元数据（路径、远程 URL），不涉及锁竞争，无需事务保护。</p>
+     *
      * @param repositoryId 仓库 ID
      * @param onLine fetch 阶段的行输出回调，可为 null
      * @return 活跃分支列表
@@ -68,10 +71,10 @@ public class RepositoryBranchService {
      * 刷新仓库分支：从 git 发现分支并更新 DB。
      *
      * <p>注意：此方法不再执行 git fetch，调用方需在调用前自行完成 fetch/pull。
-     * 保留 listRemoteHeads + listBranches 在事务内执行，这两者均为快速操作（秒级），
+     * 事务由 {@link #doRefreshInTransaction(Long)} 通过 {@link TransactionTemplate} 控制，
+     * listRemoteHeads + listBranches 均在该短事务内执行，这两者为快速操作（秒级），
      * 不会导致锁等待超时。</p>
      */
-    @Transactional
     public List<RepositoryBranch> refresh(Long repositoryId) {
         return doRefreshInTransaction(repositoryId);
     }
