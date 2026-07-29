@@ -6,7 +6,7 @@ import cn.welsione.ascoder.codegraph.infrastructure.cli.IndexProgressTracker;
 import cn.welsione.ascoder.codegraph.task.CodeGraphIndexContext;
 import cn.welsione.ascoder.codegraph.task.CodeGraphSyncContext;
 import cn.welsione.ascoder.common.FileUtil;
-import cn.welsione.ascoder.common.transaction.TransactionalEntityUpdater;
+import cn.welsione.ascoder.common.transaction.EntityUpdater;
 import cn.welsione.ascoder.common.exception.DuplicateException;
 import cn.welsione.ascoder.common.exception.InvalidStateException;
 import cn.welsione.ascoder.common.exception.ResourceNotFoundException;
@@ -68,6 +68,7 @@ public class ProjectSpaceService {
     private final GitCredentialStore gitCredentialStore;
     private final IndexProgressTracker indexProgressTracker;
     private final ApplicationEventPublisher eventPublisher;
+    private final EntityUpdater entityUpdater;
     private final TransactionTemplate transactionTemplate;
     private final QuestionRunningGuard questionRunningGuard;
     private final TaskEngine taskEngine;
@@ -235,7 +236,7 @@ public class ProjectSpaceService {
         }
 
         String staleReason = staleReasons.isEmpty() ? null : String.join("\n", staleReasons);
-        return TransactionalEntityUpdater.updateById(transactionTemplate, repository, id, managed -> {
+        return entityUpdater.updateById(repository, id, managed -> {
             if (staleReason == null) {
                 managed.touch();
             } else {

@@ -1,6 +1,6 @@
 package cn.welsione.ascoder.repository.workspace;
 
-import cn.welsione.ascoder.common.transaction.TransactionalEntityUpdater;
+import cn.welsione.ascoder.common.transaction.EntityUpdater;
 import cn.welsione.ascoder.common.FileUtil;
 import cn.welsione.ascoder.common.exception.InvalidStateException;
 import cn.welsione.ascoder.common.exception.ResourceNotFoundException;
@@ -8,6 +8,8 @@ import cn.welsione.ascoder.common.exception.ValidationException;
 import cn.welsione.ascoder.repository.git.GitRepositoryService;
 import cn.welsione.ascoder.repository.CodeRepository;
 import cn.welsione.ascoder.repository.RepositoryService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,34 +21,24 @@ import java.nio.file.Path;
 /**
  * 管理仓库分支对应的独立 worktree，并维护该分支可复现分析所需的索引状态。
  */
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class BranchWorkspaceService {
 
-    private static final String ENTITY_NAME = "分支 workspace";
+    private static final String ENTITY_NAME = "分支工作区";
 
     private final BranchWorkspaceJpaRepository repository;
     private final RepositoryService repositoryService;
     private final GitRepositoryService gitRepositoryService;
+    private final EntityUpdater entityUpdater;
     private final TransactionTemplate transactionTemplate;
-    private final Path worktreeRoot;
 
-    private final String repoRoot;
+    @Value("${ascoder.worktree-root:./data/worktrees}")
+    private String worktreeRoot;
 
-    public BranchWorkspaceService(
-            BranchWorkspaceJpaRepository repository,
-            RepositoryService repositoryService,
-            GitRepositoryService gitRepositoryService,
-            TransactionTemplate transactionTemplate,
-            @Value("${ascoder.worktree-root:./data/worktrees}") String worktreeRoot,
-            @Value("${ascoder.repo-root:./data/repos}") String repoRoot
-    ) {
-        this.repository = repository;
-        this.repositoryService = repositoryService;
-        this.gitRepositoryService = gitRepositoryService;
-        this.transactionTemplate = transactionTemplate;
-        this.worktreeRoot = Path.of(worktreeRoot).toAbsolutePath().normalize();
-        this.repoRoot = repoRoot;
-    }
+    @Value("${ascoder.repo-root:./data/repos}")
+    private String repoRoot;
 
     public BranchWorkspace prepare(Long repositoryId, CreateBranchWorkspaceRequest request) {
         return prepare(repositoryId, request, null);
@@ -57,12 +49,14 @@ public class BranchWorkspaceService {
      * 最后短事务回写 READY/FAILED 状态。
      *
      * <p>事务边界：git worktree 创建（可能耗时）在事务外执行，避免长时间持有数据库连接；
-     * DB 状态流转通过 {@link TransactionTemplate} 短事务完成。</p>
+     * DB 状态流转通过 {@link EntityUpdater} 短事务完成。</p>
      *
      * <p><b>禁止在事务上下文中调用</b>：本方法在事务外执行 git 操作，
      * catch 块中先以独立短事务回写 FAILED 状态再抛出业务异常；
      * 若在 {@code @Transactional} 上下文中调用，后续抛出的异常会触发外层事务回滚，
      * 导致 FAILED 状态丢失。方法入口通过 {@link TransactionSynchronizationManager} 断言无活跃事务。</p>
+     *
+     * @throws ValidationException git worktree 创建失败，调用方禁止在事务上下文中捕获此异常
      */
     public BranchWorkspace prepare(Long repositoryId, CreateBranchWorkspaceRequest request, String selectedCommitSha) {
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
@@ -85,10 +79,10 @@ public class BranchWorkspaceService {
                     Path.of(codeRepo.resolveLocalPath(repoRoot)),
                     branchName,
                     commitSha,
-                    Path.of(workspace.resolveWorktreePath(worktreeRoot.toString()))
+                    Path.of(workspace.resolveWorktreePath(worktreeRoot))
             );
-            return TransactionalEntityUpdater.updateById(
-                    transactionTemplate, repository, workspace.getId(),
+            return entityUpdater.updateById(
+                    repository, workspace.getId(),
                     managed -> managed.ready(commitSha, commitMessage), ENTITY_NAME);
         } catch (RuntimeException ex) {
             // 独立短事务回写 FAILED 状态：transactionTemplate.execute() 在无外层事务时
@@ -117,8 +111,8 @@ public class BranchWorkspaceService {
         String commitMessage = likelyChanged
                 ? gitRepositoryService.commitMessage(repoPath, remoteCommitSha)
                 : null;
-        return TransactionalEntityUpdater.updateById(
-                transactionTemplate, repository, id, managed -> {
+        return entityUpdater.updateById(
+                repository, id, managed -> {
                     if (!remoteCommitSha.equals(managed.getCommitSha())) {
                         managed.stale(remoteCommitSha, commitMessage);
                     } else {
@@ -149,7 +143,8 @@ public class BranchWorkspaceService {
         workspace.setCommitMessage(commitMessage);
         Path worktreePath = worktreePath(codeRepo, branchName);
         // 存储相对路径（repoName/branchName），运行时由 resolveWorktreePath() 拼接
-        String relativeWorktreePath = worktreeRoot.relativize(worktreePath).toString();
+        String relativeWorktreePath = Path.of(worktreeRoot).toAbsolutePath().normalize()
+                .relativize(worktreePath).toString();
         workspace.setWorktreePath(relativeWorktreePath);
         workspace.setCodegraphIndexPath(relativeWorktreePath + "/.codegraph");
         workspace.setStatus(BranchWorkspaceStatus.CREATED);
@@ -157,6 +152,8 @@ public class BranchWorkspaceService {
     }
 
     private Path worktreePath(CodeRepository codeRepo, String branchName) {
-        return worktreeRoot.resolve(FileUtil.safePathPart(codeRepo.getName())).resolve(FileUtil.safePathPart(branchName));
+        return Path.of(worktreeRoot).toAbsolutePath().normalize()
+                .resolve(FileUtil.safePathPart(codeRepo.getName()))
+                .resolve(FileUtil.safePathPart(branchName));
     }
 }
