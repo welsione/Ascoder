@@ -16,7 +16,11 @@ import java.util.List;
 
 /**
  * 分支工作区 REST 控制器，所有响应均通过 DTO 序列化以避免暴露实体内部结构。
+ *
+ * @deprecated 前端未接入分支 workspace 管理 UI，所有端点均无调用方，预留 API 暂不维护。
+ *     内部仍通过 {@link BranchWorkspaceService} 的 prepare/refresh 服务项目空间准备与新鲜度检查。
  */
+@Deprecated
 @RestController
 @RequiredArgsConstructor
 public class BranchWorkspaceController {

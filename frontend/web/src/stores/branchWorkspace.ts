@@ -8,6 +8,11 @@ interface BranchWorkspaceForm {
   branchName: string
 }
 
+/**
+ * 分支工作区 store。
+ *
+ * @deprecated 前端未接入分支 workspace 管理 UI，无任何组件使用此 store，预留暂不维护。
+ */
 export const useBranchWorkspaceStore = defineStore('branchWorkspace', () => {
   const crud = useCrudStore<BranchWorkspace, BranchWorkspaceForm>({
     initialForm: () => ({ branchName: '' }),
