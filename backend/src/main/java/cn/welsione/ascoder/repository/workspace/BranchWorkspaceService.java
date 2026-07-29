@@ -19,6 +19,7 @@ import java.nio.file.Path;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -122,19 +123,16 @@ public class BranchWorkspaceService {
                     commitSha,
                     Path.of(workspace.resolveWorktreePath(worktreeRoot.toString()))
             );
-            workspace.ready(commitSha, commitMessage);
-            transactionTemplate.executeWithoutResult(status -> repository.save(workspace));
-            return workspace;
+            return updateInTransaction(workspace.getId(), managed -> managed.ready(commitSha, commitMessage));
         } catch (RuntimeException ex) {
-            workspace.fail(ex.getMessage());
-            transactionTemplate.executeWithoutResult(status -> repository.save(workspace));
+            updateInTransaction(workspace.getId(), managed -> managed.fail(ex.getMessage()));
             throw new ValidationException(ex.getMessage(), ex);
         }
     }
 
     /**
      * @deprecated 前端未接入分支 workspace 管理 UI，无调用方。且在事务内同步执行 CodeGraph 全量索引，
-     * 存在长时间持有数据库连接的隐患，因未触发故暂不修复，后续接入时需改为异步任务。
+     * 存在长时间持有数据库连接的隐患，因未触发故暂不修复。TODO 后续接入前端时需重构为异步任务 + 短事务模式。
      */
     @Deprecated
     @Transactional
@@ -192,19 +190,18 @@ public class BranchWorkspaceService {
      */
     public BranchWorkspace refresh(Long id) {
         BranchWorkspace workspace = getEntity(id);
-        String commitSha = gitRepositoryService.commitSha(
-                Path.of(workspace.getRepository().resolveLocalPath(repoRoot)),
-                workspace.getBranchName()
-        );
-        if (!commitSha.equals(workspace.getCommitSha())) {
-            String commitMessage = gitRepositoryService.commitMessage(
-                    Path.of(workspace.getRepository().resolveLocalPath(repoRoot)), commitSha);
-            workspace.stale(commitSha, commitMessage);
-        } else {
-            workspace.touch();
-        }
-        transactionTemplate.executeWithoutResult(status -> repository.save(workspace));
-        return workspace;
+        Path repoPath = Path.of(workspace.getRepository().resolveLocalPath(repoRoot));
+        String remoteCommitSha = gitRepositoryService.commitSha(repoPath, workspace.getBranchName());
+        String commitMessage = remoteCommitSha.equals(workspace.getCommitSha())
+                ? null
+                : gitRepositoryService.commitMessage(repoPath, remoteCommitSha);
+        return updateInTransaction(id, managed -> {
+            if (!remoteCommitSha.equals(managed.getCommitSha())) {
+                managed.stale(remoteCommitSha, commitMessage);
+            } else {
+                managed.touch();
+            }
+        });
     }
 
     /**
@@ -244,6 +241,18 @@ public class BranchWorkspaceService {
     public BranchWorkspace getEntity(Long id) {
         return repository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("分支 workspace", id));
+    }
+
+    /**
+     * 在短事务内按 id 重新加载受管实体并应用变更，避免游离实体 merge 覆盖并发修改。
+     */
+    private BranchWorkspace updateInTransaction(Long id, Consumer<BranchWorkspace> updater) {
+        return transactionTemplate.execute(status -> {
+            BranchWorkspace managed = repository.findById(id)
+                    .orElseThrow(() -> new ResourceNotFoundException("分支 workspace", id));
+            updater.accept(managed);
+            return managed;
+        });
     }
 
     private BranchWorkspace createWorkspace(CodeRepository codeRepo, String branchName) {

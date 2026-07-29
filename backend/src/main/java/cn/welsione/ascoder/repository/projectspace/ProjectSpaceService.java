@@ -47,6 +47,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -231,13 +232,14 @@ public class ProjectSpaceService {
             inspectMemberFreshness(member, rootPath, staleReasons);
         }
 
-        if (staleReasons.isEmpty()) {
-            space.touch();
-        } else {
-            space.stale(String.join("\n", staleReasons));
-        }
-        transactionTemplate.executeWithoutResult(status -> repository.save(space));
-        return space;
+        String staleReason = staleReasons.isEmpty() ? null : String.join("\n", staleReasons);
+        return updateInTransaction(id, managed -> {
+            if (staleReason == null) {
+                managed.touch();
+            } else {
+                managed.stale(staleReason);
+            }
+        });
     }
 
     /**
@@ -314,6 +316,18 @@ public class ProjectSpaceService {
     public ProjectSpace getEntity(Long id) {
         return repository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("项目空间", id));
+    }
+
+    /**
+     * 在短事务内按 id 重新加载受管实体并应用变更，避免游离实体 merge 覆盖并发修改。
+     */
+    private ProjectSpace updateInTransaction(Long id, Consumer<ProjectSpace> updater) {
+        return transactionTemplate.execute(status -> {
+            ProjectSpace managed = repository.findById(id)
+                    .orElseThrow(() -> new ResourceNotFoundException("项目空间", id));
+            updater.accept(managed);
+            return managed;
+        });
     }
 
     private void createMembers(
