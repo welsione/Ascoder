@@ -3,8 +3,6 @@ package cn.welsione.ascoder.repository.workspace;
 import cn.welsione.ascoder.AbstractIntegrationTest;
 import cn.welsione.ascoder.IntegrationTestDataFactory;
 import cn.welsione.ascoder.MockExternalDependencies;
-import cn.welsione.ascoder.codegraph.port.CodeGraphClient;
-import cn.welsione.ascoder.codegraph.port.CodeGraphToolResult;
 import cn.welsione.ascoder.common.exception.ResourceNotFoundException;
 import cn.welsione.ascoder.common.exception.ValidationException;
 import cn.welsione.ascoder.repository.CodeRepository;
@@ -18,7 +16,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.file.Path;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -28,12 +25,12 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 /**
- * BranchWorkspaceService 集成测试：验证 worktree 准备、索引、查询与状态流转。
+ * BranchWorkspaceService 集成测试：验证 worktree 准备、新鲜度刷新与查询。
  *
- * <p>通过 {@link MockExternalDependencies} mock {@link GitRepositoryService} 和 {@link CodeGraphClient}，
- * 使 prepare/index 不触发真实 git CLI / codegraph CLI，聚焦状态流转与 DB 存储。</p>
+ * <p>通过 {@link MockExternalDependencies} mock {@link GitRepositoryService}，
+ * 使 prepare 不触发真实 git CLI，聚焦状态流转与 DB 存储。</p>
  *
- * <p>BranchWorkspaceService 的 prepare/index 均为同步 {@code @Transactional} 方法（不经过 TaskEngine），
+ * <p>BranchWorkspaceService 的 prepare 为同步方法（不经过 TaskEngine），
  * 因此使用 {@code @Transactional} 保证测试后自动回滚。</p>
  */
 @Import(MockExternalDependencies.class)
@@ -55,17 +52,14 @@ class BranchWorkspaceServiceIntegrationTests extends AbstractIntegrationTest {
     @Autowired
     private GitRepositoryService gitRepositoryService;
 
-    @Autowired
-    private CodeGraphClient codeGraphClient;
-
     @BeforeEach
     void setUp() {
-        Mockito.reset(gitRepositoryService, codeGraphClient);
+        Mockito.reset(gitRepositoryService);
         stubGitBasics();
     }
 
     /**
-     * Stub git 基础查询方法，使 prepare/index 不抛异常。
+     * Stub git 基础查询方法，使 prepare 不抛异常。
      */
     private void stubGitBasics() {
         when(gitRepositoryService.commitSha(any(), anyString())).thenReturn("abc123def456");
@@ -146,124 +140,20 @@ class BranchWorkspaceServiceIntegrationTests extends AbstractIntegrationTest {
     }
 
     @Test
-    void indexTransitionsToIndexedOnSuccess() {
-        CodeRepository repo = createLocalRepository();
-        BranchWorkspace workspace = service.prepare(repo.getId(),
-                new CreateBranchWorkspaceRequest("main"));
-
-        when(codeGraphClient.index(any(Path.class), any(Path.class), any()))
-                .thenReturn(CodeGraphToolResult.success("索引完成"));
-
-        BranchWorkspace indexed = service.index(workspace.getId());
-
-        assertEquals(BranchWorkspaceStatus.READY, indexed.getStatus());
-        assertNotNull(indexed.getLastIndexedAt());
-        assertEquals("abc123def456", indexed.getCommitSha());
-    }
-
-    @Test
-    void indexTransitionsToFailedOnCodeGraphError() {
-        CodeRepository repo = createLocalRepository();
-        BranchWorkspace workspace = service.prepare(repo.getId(),
-                new CreateBranchWorkspaceRequest("main"));
-
-        when(codeGraphClient.index(any(Path.class), any(Path.class), any()))
-                .thenReturn(CodeGraphToolResult.error("CodeGraph 索引失败：解析错误"));
-
-        BranchWorkspace failed = service.index(workspace.getId());
-
-        assertEquals(BranchWorkspaceStatus.FAILED, failed.getStatus());
-        assertNotNull(failed.getLastIndexError());
-        assertTrue(failed.getLastIndexError().contains("解析错误"));
-    }
-
-    @Test
-    void indexThrowsWhenGitThrowsException() {
-        CodeRepository repo = createLocalRepository();
-        BranchWorkspace workspace = service.prepare(repo.getId(),
-                new CreateBranchWorkspaceRequest("main"));
-
-        Mockito.reset(gitRepositoryService);
-        when(gitRepositoryService.commitSha(any(), anyString())).thenThrow(new RuntimeException("git rev-parse 失败"));
-
-        assertThrows(RuntimeException.class, () -> service.index(workspace.getId()));
-
-        BranchWorkspace failed = workspaceRepository.findById(workspace.getId()).orElseThrow();
-        assertEquals(BranchWorkspaceStatus.FAILED, failed.getStatus());
-    }
-
-    @Test
-    void indexThrowsWhenAlreadyIndexing() {
-        CodeRepository repo = createLocalRepository();
-        BranchWorkspace workspace = service.prepare(repo.getId(),
-                new CreateBranchWorkspaceRequest("main"));
-
-        // 手动设为 INDEXING 状态模拟正在索引
-        workspace.indexing();
-        workspaceRepository.save(workspace);
-
-        cn.welsione.ascoder.common.exception.InvalidStateException ex =
-                assertThrows(cn.welsione.ascoder.common.exception.InvalidStateException.class,
-                        () -> service.index(workspace.getId()));
-        assertTrue(ex.getMessage().contains("正在索引中"));
-    }
-
-    @Test
-    void listReturnsWorkspacesByRepository() {
-        CodeRepository repo = createLocalRepository();
-
-        service.prepare(repo.getId(), new CreateBranchWorkspaceRequest("main"));
-        service.prepare(repo.getId(), new CreateBranchWorkspaceRequest("develop"));
-
-        List<BranchWorkspace> workspaces = service.list(repo.getId());
-
-        assertEquals(2, workspaces.size());
-        assertTrue(workspaces.stream().anyMatch(w -> w.getBranchName().equals("main")));
-        assertTrue(workspaces.stream().anyMatch(w -> w.getBranchName().equals("develop")));
-    }
-
-    @Test
-    void getReturnsWorkspaceById() {
+    void getEntityReturnsWorkspaceById() {
         CodeRepository repo = createLocalRepository();
         BranchWorkspace created = service.prepare(repo.getId(),
                 new CreateBranchWorkspaceRequest("main"));
 
-        BranchWorkspace found = service.get(created.getId());
+        BranchWorkspace found = service.getEntity(created.getId());
 
         assertEquals(created.getId(), found.getId());
         assertEquals("main", found.getBranchName());
     }
 
     @Test
-    void getThrowsWhenNotFound() {
-        assertThrows(ResourceNotFoundException.class, () -> service.get(999999L));
-    }
-
-    @Test
-    void getReadyEntityThrowsWhenNotReady() {
-        CodeRepository repo = createLocalRepository();
-        BranchWorkspace workspace = service.prepare(repo.getId(),
-                new CreateBranchWorkspaceRequest("main"));
-
-        // 手动设为 FAILED 状态
-        workspace.fail("测试失败");
-        workspaceRepository.save(workspace);
-
-        cn.welsione.ascoder.common.exception.InvalidStateException ex =
-                assertThrows(cn.welsione.ascoder.common.exception.InvalidStateException.class,
-                        () -> service.getReadyEntity(workspace.getId(), repo.getId()));
-        assertTrue(ex.getMessage().contains("未就绪"));
-    }
-
-    @Test
-    void getReadyEntityThrowsWhenBelongsToDifferentRepo() {
-        CodeRepository repoA = createLocalRepository();
-        CodeRepository repoB = createLocalRepository();
-        BranchWorkspace workspace = service.prepare(repoA.getId(),
-                new CreateBranchWorkspaceRequest("main"));
-
-        assertThrows(ValidationException.class,
-                () -> service.getReadyEntity(workspace.getId(), repoB.getId()));
+    void getEntityThrowsWhenNotFound() {
+        assertThrows(ResourceNotFoundException.class, () -> service.getEntity(999999L));
     }
 
     @Test

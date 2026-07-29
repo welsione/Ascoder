@@ -6,6 +6,7 @@ import cn.welsione.ascoder.codegraph.infrastructure.cli.IndexProgressTracker;
 import cn.welsione.ascoder.codegraph.task.CodeGraphIndexContext;
 import cn.welsione.ascoder.codegraph.task.CodeGraphSyncContext;
 import cn.welsione.ascoder.common.FileUtil;
+import cn.welsione.ascoder.common.TransactionalEntityUpdater;
 import cn.welsione.ascoder.common.exception.DuplicateException;
 import cn.welsione.ascoder.common.exception.InvalidStateException;
 import cn.welsione.ascoder.common.exception.ResourceNotFoundException;
@@ -47,7 +48,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -56,6 +56,8 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class ProjectSpaceService {
+
+    private static final String ENTITY_NAME = "项目空间";
 
     private final ProjectSpaceJpaRepository repository;
     private final ProjectSpaceMemberJpaRepository memberRepository;
@@ -233,13 +235,13 @@ public class ProjectSpaceService {
         }
 
         String staleReason = staleReasons.isEmpty() ? null : String.join("\n", staleReasons);
-        return updateInTransaction(id, managed -> {
+        return TransactionalEntityUpdater.updateById(transactionTemplate, repository, id, managed -> {
             if (staleReason == null) {
                 managed.touch();
             } else {
                 managed.stale(staleReason);
             }
-        });
+        }, ENTITY_NAME);
     }
 
     /**
@@ -315,19 +317,7 @@ public class ProjectSpaceService {
     @Transactional(readOnly = true)
     public ProjectSpace getEntity(Long id) {
         return repository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("项目空间", id));
-    }
-
-    /**
-     * 在短事务内按 id 重新加载受管实体并应用变更，避免游离实体 merge 覆盖并发修改。
-     */
-    private ProjectSpace updateInTransaction(Long id, Consumer<ProjectSpace> updater) {
-        return transactionTemplate.execute(status -> {
-            ProjectSpace managed = repository.findById(id)
-                    .orElseThrow(() -> new ResourceNotFoundException("项目空间", id));
-            updater.accept(managed);
-            return managed;
-        });
+                .orElseThrow(() -> new ResourceNotFoundException(ENTITY_NAME, id));
     }
 
     private void createMembers(
