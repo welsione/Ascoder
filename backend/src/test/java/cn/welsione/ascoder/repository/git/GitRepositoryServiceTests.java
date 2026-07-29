@@ -32,25 +32,28 @@ class GitRepositoryServiceTests {
                 .thenReturn(
                         new CommandResult(false, "fatal: ambiguous argument 'hotfix/5.6.x'"),
                         new CommandResult(false, "fatal: ambiguous argument 'origin/hotfix/5.6.x'"),
-                        new CommandResult(true, ""),
                         new CommandResult(false, "fatal: ambiguous argument 'hotfix/5.6.x'"),
                         new CommandResult(true, "abc123\n")
                 );
+        when(commandRunner.runAsync(any(), any(), any(), any()))
+                .thenReturn(new CommandResult(true, ""));
 
         String commitSha = service.commitSha(repositoryPath, "hotfix/5.6.x");
 
         assertThat(commitSha).isEqualTo("abc123");
-        ArgumentCaptor<List<String>> captor = ArgumentCaptor.forClass(List.class);
-        verify(commandRunner, times(5)).run(captor.capture(), any(), any());
-        assertThat(captor.getAllValues())
+        ArgumentCaptor<List<String>> runCaptor = ArgumentCaptor.forClass(List.class);
+        verify(commandRunner, times(4)).run(runCaptor.capture(), any(), any());
+        assertThat(runCaptor.getAllValues())
                 .extracting(command -> command.get(command.size() - 1))
                 .containsExactly(
                         "hotfix/5.6.x",
                         "origin/hotfix/5.6.x",
-                        "--prune",
                         "hotfix/5.6.x",
                         "origin/hotfix/5.6.x"
                 );
+        ArgumentCaptor<List<String>> asyncCaptor = ArgumentCaptor.forClass(List.class);
+        verify(commandRunner, times(1)).runAsync(asyncCaptor.capture(), any(), any(), any());
+        assertThat(asyncCaptor.getValue()).containsSequence("fetch", "--all", "--prune");
     }
 
     @Test
@@ -72,25 +75,29 @@ class GitRepositoryServiceTests {
                 .thenReturn(
                         new CommandResult(false, "fatal: ambiguous argument 'origin/hotfix/5.6.x'"),
                         new CommandResult(false, "fatal: ambiguous argument 'hotfix/5.6.x'"),
-                        new CommandResult(true, ""),
                         new CommandResult(false, "fatal: ambiguous argument 'origin/hotfix/5.6.x'"),
                         new CommandResult(false, "fatal: ambiguous argument 'hotfix/5.6.x'"),
                         new CommandResult(true, ""),
                         new CommandResult(true, "fedcba\n")
                 );
+        when(commandRunner.runAsync(any(), any(), any(), any()))
+                .thenReturn(new CommandResult(true, ""));
 
         String commitSha = service.commitSha(repositoryPath, "origin/hotfix/5.6.x");
 
         assertThat(commitSha).isEqualTo("fedcba");
-        ArgumentCaptor<List<String>> captor = ArgumentCaptor.forClass(List.class);
-        verify(commandRunner, times(7)).run(captor.capture(), any(), any());
-        assertThat(captor.getAllValues().get(5))
+        ArgumentCaptor<List<String>> runCaptor = ArgumentCaptor.forClass(List.class);
+        verify(commandRunner, times(6)).run(runCaptor.capture(), any(), any());
+        assertThat(runCaptor.getAllValues().get(4))
                 .containsSequence(
                         "fetch",
                         "origin",
                         "+refs/heads/hotfix/5.6.x:refs/remotes/origin/hotfix/5.6.x",
                         "--prune"
                 );
+        ArgumentCaptor<List<String>> asyncCaptor = ArgumentCaptor.forClass(List.class);
+        verify(commandRunner, times(1)).runAsync(asyncCaptor.capture(), any(), any(), any());
+        assertThat(asyncCaptor.getValue()).containsSequence("fetch", "--all", "--prune");
     }
 
     @Test
@@ -99,26 +106,30 @@ class GitRepositoryServiceTests {
                 .thenReturn(
                         new CommandResult(false, "fatal: ambiguous argument 'origin/hotfix/5.6.x'"),
                         new CommandResult(false, "fatal: ambiguous argument 'hotfix/5.6.x'"),
-                        new CommandResult(true, ""),
                         new CommandResult(false, "fatal: ambiguous argument 'origin/hotfix/5.6.x'"),
                         new CommandResult(false, "fatal: ambiguous argument 'hotfix/5.6.x'"),
                         new CommandResult(false, "fatal: couldn't find remote ref refs/heads/hotfix/5.6.x"),
                         new CommandResult(true, ""),
                         new CommandResult(true, "fedcba\n")
                 );
+        when(commandRunner.runAsync(any(), any(), any(), any()))
+                .thenReturn(new CommandResult(true, ""));
 
         String commitSha = service.commitSha(repositoryPath, "origin/hotfix/5.6.x");
 
         assertThat(commitSha).isEqualTo("fedcba");
-        ArgumentCaptor<List<String>> captor = ArgumentCaptor.forClass(List.class);
-        verify(commandRunner, times(8)).run(captor.capture(), any(), any());
-        assertThat(captor.getAllValues().get(6))
+        ArgumentCaptor<List<String>> runCaptor = ArgumentCaptor.forClass(List.class);
+        verify(commandRunner, times(7)).run(runCaptor.capture(), any(), any());
+        assertThat(runCaptor.getAllValues().get(5))
                 .containsSequence(
                         "fetch",
                         "origin",
                         "+refs/remotes/origin/hotfix/5.6.x:refs/remotes/origin/hotfix/5.6.x",
                         "--prune"
                 );
+        ArgumentCaptor<List<String>> asyncCaptor = ArgumentCaptor.forClass(List.class);
+        verify(commandRunner, times(1)).runAsync(asyncCaptor.capture(), any(), any(), any());
+        assertThat(asyncCaptor.getValue()).containsSequence("fetch", "--all", "--prune");
     }
 
     @Test
