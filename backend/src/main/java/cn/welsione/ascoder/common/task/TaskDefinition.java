@@ -5,6 +5,11 @@ package cn.welsione.ascoder.common.task;
  *
  * <p>实现类必须是 Spring Bean，由 {@link TaskEngine} 按类型发现和调度。</p>
  *
+ * <p><b>事务约定</b>：{@link #execute} 默认在无事务状态执行（由 {@link TaskEngine} 保证）。
+ * 长耗时操作（git 进程、CodeGraph CLI、LLM API）必须在事务外执行；需要事务的 DB 更新
+ * 通过注入的 {@link org.springframework.transaction.support.TransactionTemplate} 开启短事务，
+ * 禁止在 {@code execute} 上标注 {@code @Transactional} 包裹长耗时操作。</p>
+ *
  * @param <C> 任务上下文类型，携带业务参数
  */
 public interface TaskDefinition<C> {

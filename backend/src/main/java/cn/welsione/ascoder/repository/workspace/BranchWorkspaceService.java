@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.file.Path;
 import java.util.Date;
@@ -32,6 +33,7 @@ public class BranchWorkspaceService {
     private final RepositoryService repositoryService;
     private final GitRepositoryService gitRepositoryService;
     private final CodeGraphClient codeGraphClient;
+    private final TransactionTemplate transactionTemplate;
     private final Path worktreeRoot;
 
     private final String repoRoot;
@@ -41,6 +43,7 @@ public class BranchWorkspaceService {
             RepositoryService repositoryService,
             GitRepositoryService gitRepositoryService,
             CodeGraphClient codeGraphClient,
+            TransactionTemplate transactionTemplate,
             @Value("${ascoder.worktree-root:./data/worktrees}") String worktreeRoot,
             @Value("${ascoder.repo-root:./data/repos}") String repoRoot
     ) {
@@ -48,10 +51,15 @@ public class BranchWorkspaceService {
         this.repositoryService = repositoryService;
         this.gitRepositoryService = gitRepositoryService;
         this.codeGraphClient = codeGraphClient;
+        this.transactionTemplate = transactionTemplate;
         this.worktreeRoot = Path.of(worktreeRoot).toAbsolutePath().normalize();
         this.repoRoot = repoRoot;
     }
 
+    /**
+     * @deprecated 前端未接入分支 workspace 管理 UI，无调用方，预留 API 暂不维护。
+     */
+    @Deprecated
     @Transactional(readOnly = true)
     public List<BranchWorkspace> list(Long repositoryId) {
         return repositoryId == null
@@ -59,6 +67,10 @@ public class BranchWorkspaceService {
                 : repository.findByRepository_IdOrderByBranchNameAsc(repositoryId);
     }
 
+    /**
+     * @deprecated 前端未接入分支 workspace 管理 UI，无调用方，预留 API 暂不维护。
+     */
+    @Deprecated
     @Transactional(readOnly = true)
     public List<GitBranchResponse> listBranches(Long repositoryId) {
         CodeRepository codeRepo = repositoryService.getEntity(repositoryId);
@@ -79,12 +91,17 @@ public class BranchWorkspaceService {
                 .toList();
     }
 
-    @Transactional
     public BranchWorkspace prepare(Long repositoryId, CreateBranchWorkspaceRequest request) {
         return prepare(repositoryId, request, null);
     }
 
-    @Transactional
+    /**
+     * 为分支创建/复用 worktree 并标记 PREPARING，再于事务外执行 git worktree 创建，
+     * 最后短事务回写 READY/FAILED 状态。
+     *
+     * <p>事务边界：git worktree 创建（可能耗时）在事务外执行，避免长时间持有数据库连接；
+     * DB 状态流转通过 {@link TransactionTemplate} 短事务完成。</p>
+     */
     public BranchWorkspace prepare(Long repositoryId, CreateBranchWorkspaceRequest request, String selectedCommitSha) {
         CodeRepository codeRepo = repositoryService.getEntity(repositoryId);
         String branchName = request.getBranchName().trim();
@@ -92,7 +109,7 @@ public class BranchWorkspaceService {
                 .orElseGet(() -> createWorkspace(codeRepo, branchName, selectedCommitSha));
         workspace.setRepository(codeRepo);
         workspace.preparing();
-        repository.saveAndFlush(workspace);
+        transactionTemplate.executeWithoutResult(status -> repository.saveAndFlush(workspace));
 
         try {
             String commitSha = selectedCommitSha == null || selectedCommitSha.isBlank()
@@ -106,14 +123,20 @@ public class BranchWorkspaceService {
                     Path.of(workspace.resolveWorktreePath(worktreeRoot.toString()))
             );
             workspace.ready(commitSha, commitMessage);
-            return repository.save(workspace);
+            transactionTemplate.executeWithoutResult(status -> repository.save(workspace));
+            return workspace;
         } catch (RuntimeException ex) {
             workspace.fail(ex.getMessage());
-            repository.save(workspace);
+            transactionTemplate.executeWithoutResult(status -> repository.save(workspace));
             throw new ValidationException(ex.getMessage(), ex);
         }
     }
 
+    /**
+     * @deprecated 前端未接入分支 workspace 管理 UI，无调用方。且在事务内同步执行 CodeGraph 全量索引，
+     * 存在长时间持有数据库连接的隐患，因未触发故暂不修复，后续接入时需改为异步任务。
+     */
+    @Deprecated
     @Transactional
     public BranchWorkspace index(Long id) {
         BranchWorkspace workspace = getEntity(id);
@@ -152,12 +175,21 @@ public class BranchWorkspaceService {
         }
     }
 
+    /**
+     * @deprecated 前端未接入分支 workspace 管理 UI，无调用方，预留 API 暂不维护。
+     */
+    @Deprecated
     @Transactional(readOnly = true)
     public BranchWorkspace get(Long id) {
         return getEntity(id);
     }
 
-    @Transactional
+    /**
+     * 探测分支当前提交是否变化：变化则标记 STALE，否则 touch。
+     *
+     * <p>事务边界：git rev-parse/log（秒级）在事务外执行，状态回写用 {@link TransactionTemplate} 短事务。
+     * 此方法为只读新鲜度探测，保持同步以供调用方立即判断 STALE 状态。</p>
+     */
     public BranchWorkspace refresh(Long id) {
         BranchWorkspace workspace = getEntity(id);
         String commitSha = gitRepositoryService.commitSha(
@@ -171,9 +203,14 @@ public class BranchWorkspaceService {
         } else {
             workspace.touch();
         }
-        return repository.save(workspace);
+        transactionTemplate.executeWithoutResult(status -> repository.save(workspace));
+        return workspace;
     }
 
+    /**
+     * @deprecated 前端未接入分支 workspace 管理 UI，无调用方，预留 API 暂不维护。
+     */
+    @Deprecated
     @Transactional
     public void delete(Long id) {
         BranchWorkspace workspace = getEntity(id);
@@ -187,6 +224,10 @@ public class BranchWorkspaceService {
         repository.delete(workspace);
     }
 
+    /**
+     * @deprecated 前端未接入分支 workspace 管理 UI，无调用方，预留 API 暂不维护。
+     */
+    @Deprecated
     @Transactional(readOnly = true)
     public BranchWorkspace getReadyEntity(Long id, Long repositoryId) {
         BranchWorkspace workspace = getEntity(id);

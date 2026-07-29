@@ -150,6 +150,7 @@ Controller → Service → Repository
 - `@TransactionalEventListener` 方法不得同时标注 `@Transactional`（Spring 不允许）
 - 异步线程中需要事务时，使用 `TransactionTemplate` 编程式事务，不依赖 `@Transactional`（ThreadLocal 不跨线程）
 - 长耗时操作（如 Agent 调用）必须在事务外执行，避免长时间持有数据库连接
+- `@Transactional` 方法内禁止调用 git 进程、CodeGraph CLI、LLM API 等长耗时操作；这类操作移出事务边界，DB 更新用 `TransactionTemplate` 短事务
 
 ### 数据库
 

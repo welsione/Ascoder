@@ -94,7 +94,13 @@ public class ProjectSpaceService {
         return memberRepository.findByProjectSpace_IdOrderByCreatedAtAsc(projectSpaceId);
     }
 
-    @Transactional(readOnly = true)
+    /**
+     * 查询项目空间成员响应（含远端 commit 对比与最近提交）。
+     *
+     * <p>事务边界：{@link #members(Long)} 自带只读事务并通过 EntityGraph 抓取关联，
+     * 随后对每个成员的 git 查询（commitMessage/remoteCommitSha/recentCommits）在事务外执行，
+     * 避免只读事务期间占用数据库连接跑 N 次 git 进程。</p>
+     */
     public List<ProjectSpaceMemberResponse> memberResponses(Long projectSpaceId) {
         return members(projectSpaceId).stream()
                 .map(this::memberResponse)
@@ -199,7 +205,12 @@ public class ProjectSpaceService {
         return request;
     }
 
-    @Transactional
+    /**
+     * 刷新项目空间新鲜度：遍历成员检查分支提交是否变化，任一过期则标记 STALE。
+     *
+     * <p>事务边界：成员查询通过 EntityGraph 抓取关联，git 新鲜度探测（commitSha/commitMessage）
+     * 在事务外执行，状态回写用 {@link TransactionTemplate} 短事务。保持同步以供调用方立即判断 STALE。</p>
+     */
     public ProjectSpace refresh(Long id) {
         ProjectSpace space = getEntity(id);
         if (space.getStatus() == ProjectSpaceStatus.PREPARING || space.getStatus() == ProjectSpaceStatus.INDEXING) {
@@ -222,10 +233,11 @@ public class ProjectSpaceService {
 
         if (staleReasons.isEmpty()) {
             space.touch();
-            return repository.save(space);
+        } else {
+            space.stale(String.join("\n", staleReasons));
         }
-        space.stale(String.join("\n", staleReasons));
-        return repository.save(space);
+        transactionTemplate.executeWithoutResult(status -> repository.save(space));
+        return space;
     }
 
     /**
@@ -433,10 +445,6 @@ public class ProjectSpaceService {
                 .toList());
     }
 
-    private ProjectSpace refreshInTransaction(Long id) {
-        return transactionTemplate.execute(status -> refresh(id));
-    }
-
     /** fetch 完成事件防抖延迟：等待该时间内无新 fetch 完成，再执行一次 refresh。 */
     private static final long FETCH_COMPLETED_DEBOUNCE_MS = 2000;
 
@@ -467,7 +475,7 @@ public class ProjectSpaceService {
         ScheduledFuture<?> future = fetchRefreshScheduler.schedule(() -> {
             pendingRefreshBySpace.remove(projectSpaceId);
             try {
-                refreshInTransaction(projectSpaceId);
+                refresh(projectSpaceId);
                 log.info("fetch 完成后刷新项目空间，projectSpaceId={}", projectSpaceId);
             } catch (Exception ex) {
                 log.warn("fetch 完成后刷新项目空间失败，projectSpaceId={}：{}", projectSpaceId, ex.getMessage());
