@@ -1,6 +1,6 @@
 package cn.welsione.ascoder.repository.workspace;
 
-import cn.welsione.ascoder.common.TransactionalEntityUpdater;
+import cn.welsione.ascoder.common.transaction.TransactionalEntityUpdater;
 import cn.welsione.ascoder.common.FileUtil;
 import cn.welsione.ascoder.common.exception.ResourceNotFoundException;
 import cn.welsione.ascoder.common.exception.ValidationException;
@@ -56,6 +56,10 @@ public class BranchWorkspaceService {
      *
      * <p>事务边界：git worktree 创建（可能耗时）在事务外执行，避免长时间持有数据库连接；
      * DB 状态流转通过 {@link TransactionTemplate} 短事务完成。</p>
+     *
+     * <p><b>禁止标注 {@code @Transactional}</b>：本方法在事务外执行 git 操作，
+     * catch 块中先以独立短事务回写 FAILED 状态再抛出业务异常；
+     * 若标注 {@code @Transactional}，后续抛出的异常会触发外层事务回滚，导致 FAILED 状态丢失。</p>
      */
     public BranchWorkspace prepare(Long repositoryId, CreateBranchWorkspaceRequest request, String selectedCommitSha) {
         CodeRepository codeRepo = repositoryService.getEntity(repositoryId);
@@ -81,9 +85,13 @@ public class BranchWorkspaceService {
                     transactionTemplate, repository, workspace.getId(),
                     managed -> managed.ready(commitSha, commitMessage), ENTITY_NAME);
         } catch (RuntimeException ex) {
-            TransactionalEntityUpdater.updateById(
-                    transactionTemplate, repository, workspace.getId(),
-                    managed -> managed.fail(ex.getMessage()), ENTITY_NAME);
+            // 独立短事务回写 FAILED 状态：transactionTemplate.execute() 在无外层事务时
+            // 开启独立事务，回调正常返回即提交，后续抛出的 ValidationException 不会回滚已提交的状态
+            transactionTemplate.executeWithoutResult(status -> {
+                BranchWorkspace managed = repository.findById(workspace.getId())
+                        .orElseThrow(() -> new ResourceNotFoundException(ENTITY_NAME, workspace.getId()));
+                managed.fail(ex.getMessage());
+            });
             throw new ValidationException(ex.getMessage(), ex);
         }
     }
@@ -91,16 +99,18 @@ public class BranchWorkspaceService {
     /**
      * 探测分支当前提交是否变化：变化则标记 STALE，否则 touch。
      *
-     * <p>事务边界：git rev-parse/log（秒级）在事务外执行，状态回写用 {@link TransactionTemplate} 短事务。
+     * <p>事务边界：git rev-parse/log（秒级）在事务外执行，状态回写用独立短事务。
      * 此方法为只读新鲜度探测，保持同步以供调用方立即判断 STALE 状态。</p>
      */
     public BranchWorkspace refresh(Long id) {
         BranchWorkspace workspace = getEntity(id);
         Path repoPath = Path.of(workspace.getRepository().resolveLocalPath(repoRoot));
         String remoteCommitSha = gitRepositoryService.commitSha(repoPath, workspace.getBranchName());
-        String commitMessage = remoteCommitSha.equals(workspace.getCommitSha())
-                ? null
-                : gitRepositoryService.commitMessage(repoPath, remoteCommitSha);
+        // 仅当 commit 可能变化时才查询 commitMessage（避免不必要的 git log 调用）
+        boolean likelyChanged = !remoteCommitSha.equals(workspace.getCommitSha());
+        String commitMessage = likelyChanged
+                ? gitRepositoryService.commitMessage(repoPath, remoteCommitSha)
+                : null;
         return TransactionalEntityUpdater.updateById(
                 transactionTemplate, repository, id, managed -> {
                     if (!remoteCommitSha.equals(managed.getCommitSha())) {
