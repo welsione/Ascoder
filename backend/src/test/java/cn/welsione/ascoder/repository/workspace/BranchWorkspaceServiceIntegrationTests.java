@@ -9,12 +9,12 @@ import cn.welsione.ascoder.repository.CodeRepository;
 import cn.welsione.ascoder.repository.CodeRepositoryJpaRepository;
 import cn.welsione.ascoder.repository.RepositoryStatus;
 import cn.welsione.ascoder.repository.git.GitRepositoryService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -30,11 +30,10 @@ import static org.mockito.Mockito.when;
  * <p>通过 {@link MockExternalDependencies} mock {@link GitRepositoryService}，
  * 使 prepare 不触发真实 git CLI，聚焦状态流转与 DB 存储。</p>
  *
- * <p>BranchWorkspaceService 的 prepare 为同步方法（不经过 TaskEngine），
- * 因此使用 {@code @Transactional} 保证测试后自动回滚。</p>
+ * <p>不使用 {@code @Transactional} 回滚：prepare 方法入口断言无活跃事务，
+ * 若测试开启事务则断言失败；每个测试后通过 {@code @AfterEach} 手动清理数据。</p>
  */
 @Import(MockExternalDependencies.class)
-@Transactional
 class BranchWorkspaceServiceIntegrationTests extends AbstractIntegrationTest {
 
     @Autowired
@@ -56,6 +55,12 @@ class BranchWorkspaceServiceIntegrationTests extends AbstractIntegrationTest {
     void setUp() {
         Mockito.reset(gitRepositoryService);
         stubGitBasics();
+    }
+
+    @AfterEach
+    void tearDown() {
+        workspaceRepository.deleteAll();
+        codeRepositoryRepository.deleteAll();
     }
 
     /**

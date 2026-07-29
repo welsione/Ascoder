@@ -2,6 +2,7 @@ package cn.welsione.ascoder.repository.workspace;
 
 import cn.welsione.ascoder.common.transaction.TransactionalEntityUpdater;
 import cn.welsione.ascoder.common.FileUtil;
+import cn.welsione.ascoder.common.exception.InvalidStateException;
 import cn.welsione.ascoder.common.exception.ResourceNotFoundException;
 import cn.welsione.ascoder.common.exception.ValidationException;
 import cn.welsione.ascoder.repository.git.GitRepositoryService;
@@ -10,6 +11,7 @@ import cn.welsione.ascoder.repository.RepositoryService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.file.Path;
@@ -57,11 +59,15 @@ public class BranchWorkspaceService {
      * <p>事务边界：git worktree 创建（可能耗时）在事务外执行，避免长时间持有数据库连接；
      * DB 状态流转通过 {@link TransactionTemplate} 短事务完成。</p>
      *
-     * <p><b>禁止标注 {@code @Transactional}</b>：本方法在事务外执行 git 操作，
+     * <p><b>禁止在事务上下文中调用</b>：本方法在事务外执行 git 操作，
      * catch 块中先以独立短事务回写 FAILED 状态再抛出业务异常；
-     * 若标注 {@code @Transactional}，后续抛出的异常会触发外层事务回滚，导致 FAILED 状态丢失。</p>
+     * 若在 {@code @Transactional} 上下文中调用，后续抛出的异常会触发外层事务回滚，
+     * 导致 FAILED 状态丢失。方法入口通过 {@link TransactionSynchronizationManager} 断言无活跃事务。</p>
      */
     public BranchWorkspace prepare(Long repositoryId, CreateBranchWorkspaceRequest request, String selectedCommitSha) {
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            throw new InvalidStateException("prepare 禁止在事务上下文中调用，请移除调用方的 @Transactional");
+        }
         CodeRepository codeRepo = repositoryService.getEntity(repositoryId);
         String branchName = request.getBranchName().trim();
         BranchWorkspace workspace = repository.findByRepository_IdAndBranchName(repositoryId, branchName)

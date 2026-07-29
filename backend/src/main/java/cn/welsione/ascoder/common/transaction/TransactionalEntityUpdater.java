@@ -1,6 +1,8 @@
 package cn.welsione.ascoder.common.transaction;
 
 import cn.welsione.ascoder.common.exception.ResourceNotFoundException;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import org.springframework.data.repository.CrudRepository;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -21,10 +23,8 @@ import java.util.function.Consumer;
  *       否则外层事务回滚会丢失状态变更</li>
  * </ul>
  */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class TransactionalEntityUpdater {
-
-    private TransactionalEntityUpdater() {
-    }
 
     /**
      * 在短事务内按 id 重新加载受管实体并应用变更。
