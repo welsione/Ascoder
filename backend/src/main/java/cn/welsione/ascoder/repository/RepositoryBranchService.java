@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -16,6 +17,7 @@ import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -30,6 +32,7 @@ public class RepositoryBranchService {
     private final RepositoryBranchJpaRepository repository;
     private final CodeRepositoryJpaRepository codeRepositoryJpaRepository;
     private final GitRepositoryService gitRepositoryService;
+    private final TransactionTemplate transactionTemplate;
 
     @Value("${ascoder.repo-root:./data/repos}")
     private String repoRoot;
@@ -40,22 +43,47 @@ public class RepositoryBranchService {
         return repository.findByRepository_IdAndActiveTrueOrderByNameAscSourceKindAsc(repositoryId);
     }
 
-    @Transactional
-    public List<RepositoryBranch> refresh(Long repositoryId) {
-        return refresh(repositoryId, null);
+    /**
+     * 先 fetch 远程引用（事务外），再刷新分支（短事务）。
+     *
+     * <p>用于需要同时拉取远程更新并刷新分支的场景。fetch 在事务外执行，
+     * 避免长耗时 git 操作持有数据库行锁导致锁等待超时。
+     * DB 更新通过 {@link TransactionTemplate} 在短事务内执行，
+     * 绕过 Spring AOP 自调用限制。</p>
+     *
+     * <p>注意：{@link #ensureRepository(Long)} 内部的 DB 查询也在无事务状态下执行，
+     * 仅用于读取仓库元数据（路径、远程 URL），不涉及锁竞争，无需事务保护。</p>
+     *
+     * @param repositoryId 仓库 ID
+     * @param onLine fetch 阶段的行输出回调，可为 null
+     * @return 活跃分支列表
+     */
+    public List<RepositoryBranch> fetchAndRefresh(Long repositoryId, Consumer<String> onLine) {
+        CodeRepository repo = ensureRepository(repositoryId);
+        Path repositoryPath = Path.of(repo.resolveLocalPath(repoRoot));
+        if (repo.getRemoteUrl() != null && !repo.getRemoteUrl().isBlank()) {
+            gitRepositoryService.fetch(repositoryPath, onLine);
+        }
+        return transactionTemplate.execute(status -> doRefresh(repositoryId));
     }
 
     /**
-     * 刷新仓库分支，支持通过 onLine 回调实时接收 fetch 阶段的 git 输出。
+     * 刷新仓库分支：从 git 发现分支并更新 DB。
+     *
+     * <p>注意：此方法不再执行 git fetch，调用方需在调用前自行完成 fetch/pull。
+     * 事务通过 {@link TransactionTemplate} 控制，listRemoteHeads + listBranches 均在
+     * 该短事务内执行，这两者为快速操作（秒级），不会导致锁等待超时。</p>
      */
-    @Transactional
-    public List<RepositoryBranch> refresh(Long repositoryId, java.util.function.Consumer<String> onLine) {
+    public List<RepositoryBranch> refresh(Long repositoryId) {
+        return transactionTemplate.execute(status -> doRefresh(repositoryId));
+    }
+
+    private List<RepositoryBranch> doRefresh(Long repositoryId) {
         CodeRepository codeRepository = lockRepository(repositoryId);
         log.info("刷新仓库分支，repositoryId={}，name={}", repositoryId, codeRepository.getName());
 
         Path repositoryPath = Path.of(codeRepository.resolveLocalPath(repoRoot));
         if (codeRepository.getRemoteUrl() != null && !codeRepository.getRemoteUrl().isBlank()) {
-            gitRepositoryService.fetch(repositoryPath, onLine);
             codeRepository.pulled(new Date());
             codeRepositoryJpaRepository.save(codeRepository);
         }

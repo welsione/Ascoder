@@ -51,7 +51,7 @@ public class BranchRefreshTaskDefinition implements TaskDefinition<BranchRefresh
         log.info("开始刷新分支，repositoryId={}", repositoryId);
 
         progress.update(0, "正在 fetch 远程引用...");
-        repositoryBranchService.refresh(repositoryId, new GitProgressMapper(progress, 0, 90)::onLine);
+        repositoryBranchService.fetchAndRefresh(repositoryId, new GitProgressMapper(progress, 0, 90)::onLine);
 
         progress.update(100, "分支刷新完成");
         log.info("分支刷新完成，repositoryId={}", repositoryId);

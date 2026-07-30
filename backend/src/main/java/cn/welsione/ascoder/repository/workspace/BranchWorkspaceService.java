@@ -1,9 +1,7 @@
 package cn.welsione.ascoder.repository.workspace;
 
-import cn.welsione.ascoder.codegraph.port.CodeGraphClient;
-import cn.welsione.ascoder.codegraph.port.CodeGraphToolResult;
+import cn.welsione.ascoder.common.transaction.EntityUpdater;
 import cn.welsione.ascoder.common.FileUtil;
-import cn.welsione.ascoder.common.exception.InvalidStateException;
 import cn.welsione.ascoder.common.exception.ResourceNotFoundException;
 import cn.welsione.ascoder.common.exception.ValidationException;
 import cn.welsione.ascoder.repository.git.GitRepositoryService;
@@ -15,11 +13,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.file.Path;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
  * 管理仓库分支对应的独立 worktree，并维护该分支可复现分析所需的索引状态。
@@ -28,10 +21,12 @@ import java.util.stream.Collectors;
 @Service
 public class BranchWorkspaceService {
 
+    private static final String ENTITY_NAME = "分支工作区";
+
     private final BranchWorkspaceJpaRepository repository;
     private final RepositoryService repositoryService;
     private final GitRepositoryService gitRepositoryService;
-    private final CodeGraphClient codeGraphClient;
+    private final EntityUpdater entityUpdater;
     private final Path worktreeRoot;
 
     private final String repoRoot;
@@ -40,59 +35,54 @@ public class BranchWorkspaceService {
             BranchWorkspaceJpaRepository repository,
             RepositoryService repositoryService,
             GitRepositoryService gitRepositoryService,
-            CodeGraphClient codeGraphClient,
+            EntityUpdater entityUpdater,
             @Value("${ascoder.worktree-root:./data/worktrees}") String worktreeRoot,
             @Value("${ascoder.repo-root:./data/repos}") String repoRoot
     ) {
         this.repository = repository;
         this.repositoryService = repositoryService;
         this.gitRepositoryService = gitRepositoryService;
-        this.codeGraphClient = codeGraphClient;
+        this.entityUpdater = entityUpdater;
         this.worktreeRoot = Path.of(worktreeRoot).toAbsolutePath().normalize();
         this.repoRoot = repoRoot;
     }
 
-    @Transactional(readOnly = true)
-    public List<BranchWorkspace> list(Long repositoryId) {
-        return repositoryId == null
-                ? repository.findAllByOrderByCreatedAtDesc()
-                : repository.findByRepository_IdOrderByBranchNameAsc(repositoryId);
-    }
-
-    @Transactional(readOnly = true)
-    public List<GitBranchResponse> listBranches(Long repositoryId) {
-        CodeRepository codeRepo = repositoryService.getEntity(repositoryId);
-        Map<String, BranchWorkspace> workspaceByBranch = repository.findByRepository_IdOrderByBranchNameAsc(repositoryId)
-                .stream()
-                .collect(Collectors.toMap(BranchWorkspace::getBranchName, Function.identity()));
-
-        return gitRepositoryService.listBranches(Path.of(codeRepo.resolveLocalPath(repoRoot))).stream()
-                .map(branch -> {
-                    BranchWorkspace workspace = workspaceByBranch.get(branch.getBranchName());
-                    return new GitBranchResponse(
-                            branch.getBranchName(),
-                            branch.getCommitSha(),
-                            workspace == null ? null : workspace.getStatus(),
-                            workspace == null ? null : workspace.getId()
-                    );
-                })
-                .toList();
-    }
-
-    @Transactional
     public BranchWorkspace prepare(Long repositoryId, CreateBranchWorkspaceRequest request) {
         return prepare(repositoryId, request, null);
     }
 
-    @Transactional
+    /**
+     * 为分支创建/复用 worktree 并标记 PREPARING，再于事务外执行 git worktree 创建，
+     * 最后短事务回写 READY/FAILED 状态。
+     *
+     * <p>事务边界：git worktree 创建（可能耗时）在事务外执行，避免长时间持有数据库连接；
+     * DB 状态流转通过 {@link EntityUpdater} 独立短事务完成。</p>
+     *
+     * <p><b>禁止在 {@code @Transactional} 上下文中调用</b>：本方法在事务外执行 git 操作，
+     * catch 块中先以独立短事务回写 FAILED 状态再抛出业务异常。
+     * 方法入口通过 {@link EntityUpdater#requireNoTransaction()} 断言无活跃事务；
+     * {@link EntityUpdater} 使用 {@code PROPAGATION_REQUIRES_NEW} 确保回写独立提交，
+     * 不受外层事务回滚影响。</p>
+     *
+     * @throws ValidationException git worktree 创建失败
+     */
     public BranchWorkspace prepare(Long repositoryId, CreateBranchWorkspaceRequest request, String selectedCommitSha) {
+        entityUpdater.requireNoTransaction();
         CodeRepository codeRepo = repositoryService.getEntity(repositoryId);
         String branchName = request.getBranchName().trim();
-        BranchWorkspace workspace = repository.findByRepository_IdAndBranchName(repositoryId, branchName)
-                .orElseGet(() -> createWorkspace(codeRepo, branchName, selectedCommitSha));
-        workspace.setRepository(codeRepo);
-        workspace.preparing();
-        repository.saveAndFlush(workspace);
+        // find-or-create + preparing 在独立短事务内完成
+        // onCreated: 新建实体时设置关联 + 状态流转
+        // onExisting: 已存在实体时仅设置关联（复用已有 workspace）
+        BranchWorkspace workspace = entityUpdater.findOrSave(
+                () -> repository.findByRepository_IdAndBranchName(repositoryId, branchName),
+                () -> createWorkspace(codeRepo, branchName, selectedCommitSha),
+                repository::saveAndFlush,
+                managed -> {
+                    managed.setRepository(codeRepo);
+                    managed.preparing();
+                },
+                managed -> managed.setRepository(codeRepo)
+        );
 
         try {
             String commitSha = selectedCommitSha == null || selectedCommitSha.isBlank()
@@ -105,104 +95,54 @@ public class BranchWorkspaceService {
                     commitSha,
                     Path.of(workspace.resolveWorktreePath(worktreeRoot.toString()))
             );
-            workspace.ready(commitSha, commitMessage);
-            return repository.save(workspace);
+            return entityUpdater.updateById(
+                    repository::findById, repository::save, workspace.getId(),
+                    managed -> managed.ready(commitSha, commitMessage), ENTITY_NAME);
         } catch (RuntimeException ex) {
-            workspace.fail(ex.getMessage());
-            repository.save(workspace);
+            // 复用 EntityUpdater port 回写 FAILED 状态：PROPAGATION_REQUIRES_NEW 独立事务，
+            // 回调返回即提交，后续抛出的 ValidationException 不会回滚已提交的状态
+            entityUpdater.updateById(
+                    repository::findById, repository::save, workspace.getId(),
+                    managed -> managed.fail(ex.getMessage()), ENTITY_NAME);
             throw new ValidationException(ex.getMessage(), ex);
         }
     }
 
-    @Transactional
-    public BranchWorkspace index(Long id) {
-        BranchWorkspace workspace = getEntity(id);
-        if (workspace.getStatus() == BranchWorkspaceStatus.INDEXING) {
-            throw new InvalidStateException("分支 workspace 正在索引中");
-        }
-
-        workspace.indexing();
-        repository.saveAndFlush(workspace);
-        try {
-            String commitSha = gitRepositoryService.commitSha(
-                    Path.of(workspace.getRepository().resolveLocalPath(repoRoot)),
-                    workspace.getBranchName()
-            );
-            gitRepositoryService.upsertDetachedWorktree(
-                    Path.of(workspace.getRepository().resolveLocalPath(repoRoot)),
-                    workspace.getBranchName(),
-                    commitSha,
-                    Path.of(workspace.resolveWorktreePath(worktreeRoot.toString()))
-            );
-            Path worktreePath = Path.of(workspace.resolveWorktreePath(worktreeRoot.toString())).toAbsolutePath().normalize();
-            Path indexPath = effectiveCodegraphIndexPath(workspace);
-            CodeGraphToolResult result = codeGraphClient.index(worktreePath, indexPath, null);
-            if (result.isSuccess()) {
-                String commitMessage = gitRepositoryService.commitMessage(
-                        Path.of(workspace.getRepository().resolveLocalPath(repoRoot)), commitSha);
-                workspace.indexed(commitSha, commitMessage, new Date());
-            } else {
-                workspace.fail(result.getOutput());
-            }
-            return repository.save(workspace);
-        } catch (RuntimeException ex) {
-            workspace.fail(ex.getMessage());
-            repository.save(workspace);
-            throw ex;
-        }
-    }
-
-    @Transactional(readOnly = true)
-    public BranchWorkspace get(Long id) {
-        return getEntity(id);
-    }
-
-    @Transactional
+    /**
+     * 探测分支当前提交是否变化：变化则标记 STALE，否则 touch。
+     *
+     * <p>事务边界：git rev-parse/log（秒级）在事务外执行，状态回写用 {@link EntityUpdater} 独立短事务。
+     * 此方法为只读新鲜度探测，保持同步以供调用方立即判断 STALE 状态。</p>
+     *
+     * <p>并发说明：事务外读取的 {@code workspace.getCommitSha()} 与回调内重新加载的
+     * {@code managed.getCommitSha()} 可能因并发修改而不一致，回调内以 {@code managed} 为准做最终判断。
+     * commitMessage 在事务外按"可能变化"预查询，存在极小概率的并发窗口：
+     * 若预查询后 managed 的 commitSha 被并发改为与 remoteCommitSha 相同，则预查询的
+     * commitMessage 不会被使用（回调走 touch 分支）。这是可接受的权衡--避免在事务内调用 git log
+     * 带来的连接持有开销，commitMessage 作为辅助信息即使偶发丢弃也不影响 STALE 状态正确性。</p>
+     */
     public BranchWorkspace refresh(Long id) {
         BranchWorkspace workspace = getEntity(id);
-        String commitSha = gitRepositoryService.commitSha(
-                Path.of(workspace.getRepository().resolveLocalPath(repoRoot)),
-                workspace.getBranchName()
-        );
-        if (!commitSha.equals(workspace.getCommitSha())) {
-            String commitMessage = gitRepositoryService.commitMessage(
-                    Path.of(workspace.getRepository().resolveLocalPath(repoRoot)), commitSha);
-            workspace.stale(commitSha, commitMessage);
-        } else {
-            workspace.touch();
-        }
-        return repository.save(workspace);
-    }
-
-    @Transactional
-    public void delete(Long id) {
-        BranchWorkspace workspace = getEntity(id);
-        Path worktreePath = Path.of(workspace.resolveWorktreePath(worktreeRoot.toString())).toAbsolutePath().normalize();
-        Path codegraphIndexPath = effectiveCodegraphIndexPath(workspace);
-        FileUtil.ensureUnderRoot(worktreePath, worktreeRoot, "worktree");
-        FileUtil.ensureUnderRoot(codegraphIndexPath, worktreePath, "CodeGraph 索引");
-
-        gitRepositoryService.removeWorktree(Path.of(workspace.getRepository().resolveLocalPath(repoRoot)), worktreePath);
-        FileUtil.deleteDirectoryIfExists(codegraphIndexPath);
-        repository.delete(workspace);
-    }
-
-    @Transactional(readOnly = true)
-    public BranchWorkspace getReadyEntity(Long id, Long repositoryId) {
-        BranchWorkspace workspace = getEntity(id);
-        if (!workspace.getRepository().getId().equals(repositoryId)) {
-            throw new ValidationException("分支 workspace 不属于当前仓库");
-        }
-        if (workspace.getStatus() != BranchWorkspaceStatus.READY) {
-            throw new InvalidStateException("分支 workspace 未就绪，请先索引");
-        }
-        return workspace;
+        Path repoPath = Path.of(workspace.getRepository().resolveLocalPath(repoRoot));
+        String remoteCommitSha = gitRepositoryService.commitSha(repoPath, workspace.getBranchName());
+        // 仅当 commit 可能变化时才查询 commitMessage（避免不必要的 git log 调用）
+        String commitMessage = remoteCommitSha.equals(workspace.getCommitSha())
+                ? null
+                : gitRepositoryService.commitMessage(repoPath, remoteCommitSha);
+        return entityUpdater.updateById(
+                repository::findById, repository::save, id, managed -> {
+                    if (!remoteCommitSha.equals(managed.getCommitSha())) {
+                        managed.stale(remoteCommitSha, commitMessage);
+                    } else {
+                        managed.touch();
+                    }
+                }, ENTITY_NAME);
     }
 
     @Transactional(readOnly = true)
     public BranchWorkspace getEntity(Long id) {
         return repository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("分支 workspace", id));
+                .orElseThrow(() -> new ResourceNotFoundException(ENTITY_NAME, id));
     }
 
     private BranchWorkspace createWorkspace(CodeRepository codeRepo, String branchName) {
@@ -229,24 +169,8 @@ public class BranchWorkspaceService {
     }
 
     private Path worktreePath(CodeRepository codeRepo, String branchName) {
-        return worktreeRoot.resolve(FileUtil.safePathPart(codeRepo.getName())).resolve(FileUtil.safePathPart(branchName));
-    }
-
-    private Path codegraphIndexPath(Path worktreePath) {
-        return worktreePath.resolve(".codegraph").normalize();
-    }
-
-    private Path effectiveCodegraphIndexPath(BranchWorkspace workspace) {
-        Path worktreePath = Path.of(workspace.resolveWorktreePath(worktreeRoot.toString())).toAbsolutePath().normalize();
-        Path actualIndexPath = codegraphIndexPath(worktreePath);
-        Path storedIndexPath = workspace.getCodegraphIndexPath() == null || workspace.getCodegraphIndexPath().isBlank()
-                ? null
-                : Path.of(workspace.resolveCodegraphIndexPath(worktreeRoot.toString()));
-        if (!actualIndexPath.equals(storedIndexPath)) {
-            log.info("同步分支 workspace CodeGraph 索引路径，workspaceId={}，旧路径={}，新路径={}",
-                    workspace.getId(), workspace.getCodegraphIndexPath(), actualIndexPath);
-            workspace.setCodegraphIndexPath(actualIndexPath.toString());
-        }
-        return actualIndexPath;
+        return worktreeRoot
+                .resolve(FileUtil.safePathPart(codeRepo.getName()))
+                .resolve(FileUtil.safePathPart(branchName));
     }
 }

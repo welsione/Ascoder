@@ -6,6 +6,7 @@ import cn.welsione.ascoder.codegraph.infrastructure.cli.IndexProgressTracker;
 import cn.welsione.ascoder.codegraph.task.CodeGraphIndexContext;
 import cn.welsione.ascoder.codegraph.task.CodeGraphSyncContext;
 import cn.welsione.ascoder.common.FileUtil;
+import cn.welsione.ascoder.common.transaction.EntityUpdater;
 import cn.welsione.ascoder.common.exception.DuplicateException;
 import cn.welsione.ascoder.common.exception.InvalidStateException;
 import cn.welsione.ascoder.common.exception.ResourceNotFoundException;
@@ -56,6 +57,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ProjectSpaceService {
 
+    private static final String ENTITY_NAME = "项目空间";
+
     private final ProjectSpaceJpaRepository repository;
     private final ProjectSpaceMemberJpaRepository memberRepository;
     private final ProjectService projectService;
@@ -65,6 +68,7 @@ public class ProjectSpaceService {
     private final GitCredentialStore gitCredentialStore;
     private final IndexProgressTracker indexProgressTracker;
     private final ApplicationEventPublisher eventPublisher;
+    private final EntityUpdater entityUpdater;
     private final TransactionTemplate transactionTemplate;
     private final QuestionRunningGuard questionRunningGuard;
     private final TaskEngine taskEngine;
@@ -94,7 +98,13 @@ public class ProjectSpaceService {
         return memberRepository.findByProjectSpace_IdOrderByCreatedAtAsc(projectSpaceId);
     }
 
-    @Transactional(readOnly = true)
+    /**
+     * 查询项目空间成员响应（含远端 commit 对比与最近提交）。
+     *
+     * <p>事务边界：{@link #members(Long)} 自带只读事务并通过 EntityGraph 抓取关联，
+     * 随后对每个成员的 git 查询（commitMessage/remoteCommitSha/recentCommits）在事务外执行，
+     * 避免只读事务期间占用数据库连接跑 N 次 git 进程。</p>
+     */
     public List<ProjectSpaceMemberResponse> memberResponses(Long projectSpaceId) {
         return members(projectSpaceId).stream()
                 .map(this::memberResponse)
@@ -199,7 +209,18 @@ public class ProjectSpaceService {
         return request;
     }
 
-    @Transactional
+    /**
+     * 刷新项目空间新鲜度：遍历成员检查分支提交是否变化，任一过期则标记 STALE。
+     *
+     * <p><b>事务边界</b>：本方法无 {@code @Transactional}，由三段独立事务组成：</p>
+     * <ol>
+     *   <li>{@link #getEntity(Long)} 自带只读事务，仅覆盖实体加载与状态判断</li>
+     *   <li>成员查询与 git 新鲜度探测在事务外执行，避免只读事务期间占用连接跑 N 次 git 进程</li>
+     *   <li>状态回写通过 {@link EntityUpdater} 独立短事务完成</li>
+     * </ol>
+     * <p>禁止为本方法添加 {@code @Transactional}：会导致 git 探测期间长时间持有数据库连接，
+     * 且 catch 块回写状态可能被外层事务回滚。保持同步以供调用方立即判断 STALE。</p>
+     */
     public ProjectSpace refresh(Long id) {
         ProjectSpace space = getEntity(id);
         if (space.getStatus() == ProjectSpaceStatus.PREPARING || space.getStatus() == ProjectSpaceStatus.INDEXING) {
@@ -220,12 +241,14 @@ public class ProjectSpaceService {
             inspectMemberFreshness(member, rootPath, staleReasons);
         }
 
-        if (staleReasons.isEmpty()) {
-            space.touch();
-            return repository.save(space);
-        }
-        space.stale(String.join("\n", staleReasons));
-        return repository.save(space);
+        String staleReason = staleReasons.isEmpty() ? null : String.join("\n", staleReasons);
+        return entityUpdater.updateById(repository::findById, repository::save, id, managed -> {
+            if (staleReason == null) {
+                managed.touch();
+            } else {
+                managed.stale(staleReason);
+            }
+        }, ENTITY_NAME);
     }
 
     /**
@@ -301,7 +324,7 @@ public class ProjectSpaceService {
     @Transactional(readOnly = true)
     public ProjectSpace getEntity(Long id) {
         return repository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("项目空间", id));
+                .orElseThrow(() -> new ResourceNotFoundException(ENTITY_NAME, id));
     }
 
     private void createMembers(
@@ -433,10 +456,6 @@ public class ProjectSpaceService {
                 .toList());
     }
 
-    private ProjectSpace refreshInTransaction(Long id) {
-        return transactionTemplate.execute(status -> refresh(id));
-    }
-
     /** fetch 完成事件防抖延迟：等待该时间内无新 fetch 完成，再执行一次 refresh。 */
     private static final long FETCH_COMPLETED_DEBOUNCE_MS = 2000;
 
@@ -467,7 +486,7 @@ public class ProjectSpaceService {
         ScheduledFuture<?> future = fetchRefreshScheduler.schedule(() -> {
             pendingRefreshBySpace.remove(projectSpaceId);
             try {
-                refreshInTransaction(projectSpaceId);
+                refresh(projectSpaceId);
                 log.info("fetch 完成后刷新项目空间，projectSpaceId={}", projectSpaceId);
             } catch (Exception ex) {
                 log.warn("fetch 完成后刷新项目空间失败，projectSpaceId={}：{}", projectSpaceId, ex.getMessage());
