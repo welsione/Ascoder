@@ -212,8 +212,14 @@ public class ProjectSpaceService {
     /**
      * 刷新项目空间新鲜度：遍历成员检查分支提交是否变化，任一过期则标记 STALE。
      *
-     * <p>事务边界：成员查询通过 EntityGraph 抓取关联，git 新鲜度探测（commitSha/commitMessage）
-     * 在事务外执行，状态回写用 {@link TransactionTemplate} 短事务。保持同步以供调用方立即判断 STALE。</p>
+     * <p><b>事务边界</b>：本方法无 {@code @Transactional}，由三段独立事务组成：</p>
+     * <ol>
+     *   <li>{@link #getEntity(Long)} 自带只读事务，仅覆盖实体加载与状态判断</li>
+     *   <li>成员查询与 git 新鲜度探测在事务外执行，避免只读事务期间占用连接跑 N 次 git 进程</li>
+     *   <li>状态回写通过 {@link EntityUpdater} 独立短事务完成</li>
+     * </ol>
+     * <p>禁止为本方法添加 {@code @Transactional}：会导致 git 探测期间长时间持有数据库连接，
+     * 且 catch 块回写状态可能被外层事务回滚。保持同步以供调用方立即判断 STALE。</p>
      */
     public ProjectSpace refresh(Long id) {
         ProjectSpace space = getEntity(id);

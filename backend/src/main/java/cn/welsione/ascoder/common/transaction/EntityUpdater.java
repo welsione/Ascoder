@@ -25,7 +25,7 @@ public interface EntityUpdater {
     /**
      * 在短事务内按 id 重新加载受管实体并应用变更。
      *
-     * @param repository 实体仓库
+     * @param repository 实体仓库端口
      * @param id         实体 id
      * @param updater    对受管实体应用的变更
      * @param entityName 实体中文名，用于不存在时的异常信息
@@ -33,7 +33,7 @@ public interface EntityUpdater {
      * @return 回写后的受管实体
      * @throws cn.welsione.ascoder.common.exception.ResourceNotFoundException 实体不存在
      */
-    <T> T updateById(org.springframework.data.repository.CrudRepository<T, Long> repository,
+    <T> T updateById(EntityRepository<T> repository,
                      Long id,
                      Consumer<T> updater,
                      String entityName);

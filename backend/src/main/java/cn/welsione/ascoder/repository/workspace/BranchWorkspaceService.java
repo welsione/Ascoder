@@ -15,7 +15,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
-
 import java.nio.file.Path;
 
 /**
@@ -33,7 +32,6 @@ public class BranchWorkspaceService {
     private final GitRepositoryService gitRepositoryService;
     private final EntityUpdater entityUpdater;
     private final TransactionTemplate transactionTemplate;
-
     @Value("${ascoder.worktree-root:./data/worktrees}")
     private String worktreeRoot;
 
@@ -85,13 +83,11 @@ public class BranchWorkspaceService {
                     repository, workspace.getId(),
                     managed -> managed.ready(commitSha, commitMessage), ENTITY_NAME);
         } catch (RuntimeException ex) {
-            // 独立短事务回写 FAILED 状态：transactionTemplate.execute() 在无外层事务时
-            // 开启独立事务，回调正常返回即提交，后续抛出的 ValidationException 不会回滚已提交的状态
-            transactionTemplate.executeWithoutResult(status -> {
-                BranchWorkspace managed = repository.findById(workspace.getId())
-                        .orElseThrow(() -> new ResourceNotFoundException(ENTITY_NAME, workspace.getId()));
-                managed.fail(ex.getMessage());
-            });
+            // 复用 EntityUpdater port 回写 FAILED 状态：独立短事务回调返回即提交，
+            // 后续抛出的 ValidationException 不会回滚已提交的状态
+            entityUpdater.updateById(
+                    repository, workspace.getId(),
+                    managed -> managed.fail(ex.getMessage()), ENTITY_NAME);
             throw new ValidationException(ex.getMessage(), ex);
         }
     }
@@ -101,16 +97,19 @@ public class BranchWorkspaceService {
      *
      * <p>事务边界：git rev-parse/log（秒级）在事务外执行，状态回写用独立短事务。
      * 此方法为只读新鲜度探测，保持同步以供调用方立即判断 STALE 状态。</p>
+     *
+     * <p>并发说明：事务外读取的 {@code workspace.getCommitSha()} 与回调内重新加载的
+     * {@code managed.getCommitSha()} 可能因并发修改而不一致，回调内以 {@code managed} 为准做最终判断；
+     * commitMessage 在事务外按"可能变化"预查询，若并发导致实际未变化则 commitMessage 不会被使用。</p>
      */
     public BranchWorkspace refresh(Long id) {
         BranchWorkspace workspace = getEntity(id);
         Path repoPath = Path.of(workspace.getRepository().resolveLocalPath(repoRoot));
         String remoteCommitSha = gitRepositoryService.commitSha(repoPath, workspace.getBranchName());
         // 仅当 commit 可能变化时才查询 commitMessage（避免不必要的 git log 调用）
-        boolean likelyChanged = !remoteCommitSha.equals(workspace.getCommitSha());
-        String commitMessage = likelyChanged
-                ? gitRepositoryService.commitMessage(repoPath, remoteCommitSha)
-                : null;
+        String commitMessage = remoteCommitSha.equals(workspace.getCommitSha())
+                ? null
+                : gitRepositoryService.commitMessage(repoPath, remoteCommitSha);
         return entityUpdater.updateById(
                 repository, id, managed -> {
                     if (!remoteCommitSha.equals(managed.getCommitSha())) {

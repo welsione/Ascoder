@@ -2,7 +2,6 @@ package cn.welsione.ascoder.common.transaction;
 
 import cn.welsione.ascoder.common.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.repository.CrudRepository;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -21,7 +20,7 @@ public class TransactionTemplateEntityUpdater implements EntityUpdater {
     private final TransactionTemplate transactionTemplate;
 
     @Override
-    public <T> T updateById(CrudRepository<T, Long> repository,
+    public <T> T updateById(EntityRepository<T> repository,
                             Long id,
                             Consumer<T> updater,
                             String entityName) {

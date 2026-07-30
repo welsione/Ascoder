@@ -1,5 +1,6 @@
 package cn.welsione.ascoder.repository.projectspace;
 
+import cn.welsione.ascoder.common.transaction.EntityRepository;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -7,7 +8,7 @@ import java.util.List;
 import java.util.Optional;
 
 /** 项目空间实体的 JPA 仓库。 */
-public interface ProjectSpaceJpaRepository extends JpaRepository<ProjectSpace, Long> {
+public interface ProjectSpaceJpaRepository extends JpaRepository<ProjectSpace, Long>, EntityRepository<ProjectSpace> {
 
     @Override
     @EntityGraph(attributePaths = "project")
