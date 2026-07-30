@@ -158,6 +158,7 @@ class TaskEngineTests {
         savedTask.setId(1L);
         savedTask.setKind(TestTaskDefinition.KIND);
         when(taskRepository.save(any(AsyncTask.class))).thenReturn(savedTask);
+        when(taskRepository.findById(1L)).thenReturn(java.util.Optional.of(savedTask));
 
         // 线程池拒绝
         when(executorRegistry.getExecutor(any(TaskKind.class)))
