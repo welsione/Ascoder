@@ -8,13 +8,13 @@ import cn.welsione.ascoder.common.exception.ValidationException;
 import cn.welsione.ascoder.repository.git.GitRepositoryService;
 import cn.welsione.ascoder.repository.CodeRepository;
 import cn.welsione.ascoder.repository.RepositoryService;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
+
 import java.nio.file.Path;
 
 /**
@@ -22,7 +22,6 @@ import java.nio.file.Path;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class BranchWorkspaceService {
 
     private static final String ENTITY_NAME = "分支工作区";
@@ -32,11 +31,27 @@ public class BranchWorkspaceService {
     private final GitRepositoryService gitRepositoryService;
     private final EntityUpdater entityUpdater;
     private final TransactionTemplate transactionTemplate;
-    @Value("${ascoder.worktree-root:./data/worktrees}")
-    private String worktreeRoot;
+    private final Path worktreeRoot;
 
-    @Value("${ascoder.repo-root:./data/repos}")
-    private String repoRoot;
+    private final String repoRoot;
+
+    public BranchWorkspaceService(
+            BranchWorkspaceJpaRepository repository,
+            RepositoryService repositoryService,
+            GitRepositoryService gitRepositoryService,
+            EntityUpdater entityUpdater,
+            TransactionTemplate transactionTemplate,
+            @Value("${ascoder.worktree-root:./data/worktrees}") String worktreeRoot,
+            @Value("${ascoder.repo-root:./data/repos}") String repoRoot
+    ) {
+        this.repository = repository;
+        this.repositoryService = repositoryService;
+        this.gitRepositoryService = gitRepositoryService;
+        this.entityUpdater = entityUpdater;
+        this.transactionTemplate = transactionTemplate;
+        this.worktreeRoot = Path.of(worktreeRoot).toAbsolutePath().normalize();
+        this.repoRoot = repoRoot;
+    }
 
     public BranchWorkspace prepare(Long repositoryId, CreateBranchWorkspaceRequest request) {
         return prepare(repositoryId, request, null);
@@ -77,7 +92,7 @@ public class BranchWorkspaceService {
                     Path.of(codeRepo.resolveLocalPath(repoRoot)),
                     branchName,
                     commitSha,
-                    Path.of(workspace.resolveWorktreePath(worktreeRoot))
+                    Path.of(workspace.resolveWorktreePath(worktreeRoot.toString()))
             );
             return entityUpdater.updateById(
                     repository, workspace.getId(),
@@ -99,8 +114,10 @@ public class BranchWorkspaceService {
      * 此方法为只读新鲜度探测，保持同步以供调用方立即判断 STALE 状态。</p>
      *
      * <p>并发说明：事务外读取的 {@code workspace.getCommitSha()} 与回调内重新加载的
-     * {@code managed.getCommitSha()} 可能因并发修改而不一致，回调内以 {@code managed} 为准做最终判断；
-     * commitMessage 在事务外按"可能变化"预查询，若并发导致实际未变化则 commitMessage 不会被使用。</p>
+     * {@code managed.getCommitSha()} 可能因并发修改而不一致，回调内以 {@code managed} 为准做最终判断。
+     * commitMessage 在事务外按"可能变化"预查询，存在极小概率的并发窗口：
+     * 若预查询后 managed 的 commitSha 被并发改为与 remoteCommitSha 相同，则预查询的
+     * commitMessage 不会被使用（回调走 touch 分支）；这是可接受的妥协，避免在事务内调用 git log。</p>
      */
     public BranchWorkspace refresh(Long id) {
         BranchWorkspace workspace = getEntity(id);
@@ -142,8 +159,7 @@ public class BranchWorkspaceService {
         workspace.setCommitMessage(commitMessage);
         Path worktreePath = worktreePath(codeRepo, branchName);
         // 存储相对路径（repoName/branchName），运行时由 resolveWorktreePath() 拼接
-        String relativeWorktreePath = Path.of(worktreeRoot).toAbsolutePath().normalize()
-                .relativize(worktreePath).toString();
+        String relativeWorktreePath = worktreeRoot.relativize(worktreePath).toString();
         workspace.setWorktreePath(relativeWorktreePath);
         workspace.setCodegraphIndexPath(relativeWorktreePath + "/.codegraph");
         workspace.setStatus(BranchWorkspaceStatus.CREATED);
@@ -151,7 +167,7 @@ public class BranchWorkspaceService {
     }
 
     private Path worktreePath(CodeRepository codeRepo, String branchName) {
-        return Path.of(worktreeRoot).toAbsolutePath().normalize()
+        return worktreeRoot
                 .resolve(FileUtil.safePathPart(codeRepo.getName()))
                 .resolve(FileUtil.safePathPart(branchName));
     }

@@ -64,30 +64,17 @@ public class RepositoryBranchService {
         if (repo.getRemoteUrl() != null && !repo.getRemoteUrl().isBlank()) {
             gitRepositoryService.fetch(repositoryPath, onLine);
         }
-        return doRefreshInTransaction(repositoryId);
+        return transactionTemplate.execute(status -> doRefresh(repositoryId));
     }
 
     /**
      * 刷新仓库分支：从 git 发现分支并更新 DB。
      *
      * <p>注意：此方法不再执行 git fetch，调用方需在调用前自行完成 fetch/pull。
-     * 事务由 {@link #doRefreshInTransaction(Long)} 通过 {@link TransactionTemplate} 控制，
-     * listRemoteHeads + listBranches 均在该短事务内执行，这两者为快速操作（秒级），
-     * 不会导致锁等待超时。</p>
+     * 事务通过 {@link TransactionTemplate} 控制，listRemoteHeads + listBranches 均在
+     * 该短事务内执行，这两者为快速操作（秒级），不会导致锁等待超时。</p>
      */
     public List<RepositoryBranch> refresh(Long repositoryId) {
-        return doRefreshInTransaction(repositoryId);
-    }
-
-    /**
-     * 在短事务内执行分支发现与 DB 更新。
-     *
-     * <p>抽取自 {@link #refresh(Long)} 和 {@link #fetchAndRefresh(Long, Consumer)}，
-     * 消除重复代码。使用 {@link TransactionTemplate} 确保事务边界，
-     * 绕过 Spring AOP 自调用限制（{@code fetchAndRefresh} 调用 {@code this.refresh} 时
-     * {@code @Transactional} 不生效）。</p>
-     */
-    private List<RepositoryBranch> doRefreshInTransaction(Long repositoryId) {
         return transactionTemplate.execute(status -> doRefresh(repositoryId));
     }
 

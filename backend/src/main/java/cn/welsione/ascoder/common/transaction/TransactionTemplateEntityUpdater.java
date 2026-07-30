@@ -28,7 +28,8 @@ public class TransactionTemplateEntityUpdater implements EntityUpdater {
             T managed = repository.findById(id)
                     .orElseThrow(() -> new ResourceNotFoundException(entityName, id));
             updater.accept(managed);
-            return managed;
+            // 显式 save 确保状态立即写入，不依赖 JPA 隐式脏检查
+            return repository.save(managed);
         });
     }
 }
