@@ -1,9 +1,10 @@
 package cn.welsione.ascoder.common.transaction;
 
+import cn.welsione.ascoder.common.exception.InvalidStateException;
 import cn.welsione.ascoder.common.exception.ResourceNotFoundException;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.Optional;
@@ -24,6 +25,13 @@ public class TransactionTemplateEntityUpdater implements EntityUpdater {
     public TransactionTemplateEntityUpdater(PlatformTransactionManager transactionManager) {
         this.requiresNew = new TransactionTemplate(transactionManager);
         this.requiresNew.setPropagationBehavior(TransactionTemplate.PROPAGATION_REQUIRES_NEW);
+    }
+
+    @Override
+    public void requireNoTransaction() {
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            throw new InvalidStateException("当前方法禁止在事务上下文中调用，请移除调用方的 @Transactional");
+        }
     }
 
     @Override

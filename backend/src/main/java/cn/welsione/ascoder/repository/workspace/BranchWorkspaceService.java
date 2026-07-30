@@ -2,7 +2,6 @@ package cn.welsione.ascoder.repository.workspace;
 
 import cn.welsione.ascoder.common.transaction.EntityUpdater;
 import cn.welsione.ascoder.common.FileUtil;
-import cn.welsione.ascoder.common.exception.InvalidStateException;
 import cn.welsione.ascoder.common.exception.ResourceNotFoundException;
 import cn.welsione.ascoder.common.exception.ValidationException;
 import cn.welsione.ascoder.repository.git.GitRepositoryService;
@@ -12,7 +11,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.nio.file.Path;
 
@@ -62,16 +60,14 @@ public class BranchWorkspaceService {
      *
      * <p><b>禁止在 {@code @Transactional} 上下文中调用</b>：本方法在事务外执行 git 操作，
      * catch 块中先以独立短事务回写 FAILED 状态再抛出业务异常。
-     * 方法入口通过 {@link TransactionSynchronizationManager} 断言无活跃事务；
+     * 方法入口通过 {@link EntityUpdater#requireNoTransaction()} 断言无活跃事务；
      * {@link EntityUpdater} 使用 {@code PROPAGATION_REQUIRES_NEW} 确保回写独立提交，
      * 不受外层事务回滚影响。</p>
      *
      * @throws ValidationException git worktree 创建失败
      */
     public BranchWorkspace prepare(Long repositoryId, CreateBranchWorkspaceRequest request, String selectedCommitSha) {
-        if (TransactionSynchronizationManager.isActualTransactionActive()) {
-            throw new InvalidStateException("prepare 禁止在事务上下文中调用，请移除调用方的 @Transactional");
-        }
+        entityUpdater.requireNoTransaction();
         CodeRepository codeRepo = repositoryService.getEntity(repositoryId);
         String branchName = request.getBranchName().trim();
         // find-or-create + preparing 在独立短事务内原子完成，消除 find 与 save 间的竞态窗口

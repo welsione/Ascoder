@@ -21,6 +21,14 @@ import java.util.function.Function;
 public interface EntityUpdater {
 
     /**
+     * 断言当前无活跃事务，防止调用方误在 {@code @Transactional} 上下文中调用
+     * 需要事务外执行的编排方法。
+     *
+     * @throws cn.welsione.ascoder.common.exception.InvalidStateException 当前存在活跃事务
+     */
+    void requireNoTransaction();
+
+    /**
      * 在独立短事务内按 id 重新加载受管实体并应用变更。
      *
      * @param finder    按 id 加载实体的函数（通常为 repository::findById）
