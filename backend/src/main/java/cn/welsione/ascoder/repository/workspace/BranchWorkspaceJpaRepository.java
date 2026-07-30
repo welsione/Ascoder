@@ -1,13 +1,12 @@
 package cn.welsione.ascoder.repository.workspace;
 
-import cn.welsione.ascoder.common.transaction.EntityRepository;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 /** 分支工作区实体的 JPA 仓库。 */
-public interface BranchWorkspaceJpaRepository extends JpaRepository<BranchWorkspace, Long>, EntityRepository<BranchWorkspace> {
+public interface BranchWorkspaceJpaRepository extends JpaRepository<BranchWorkspace, Long> {
 
     @Override
     @EntityGraph(attributePaths = "repository")

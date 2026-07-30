@@ -13,7 +13,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.file.Path;
 
@@ -30,7 +29,6 @@ public class BranchWorkspaceService {
     private final RepositoryService repositoryService;
     private final GitRepositoryService gitRepositoryService;
     private final EntityUpdater entityUpdater;
-    private final TransactionTemplate transactionTemplate;
     private final Path worktreeRoot;
 
     private final String repoRoot;
@@ -40,7 +38,6 @@ public class BranchWorkspaceService {
             RepositoryService repositoryService,
             GitRepositoryService gitRepositoryService,
             EntityUpdater entityUpdater,
-            TransactionTemplate transactionTemplate,
             @Value("${ascoder.worktree-root:./data/worktrees}") String worktreeRoot,
             @Value("${ascoder.repo-root:./data/repos}") String repoRoot
     ) {
@@ -48,7 +45,6 @@ public class BranchWorkspaceService {
         this.repositoryService = repositoryService;
         this.gitRepositoryService = gitRepositoryService;
         this.entityUpdater = entityUpdater;
-        this.transactionTemplate = transactionTemplate;
         this.worktreeRoot = Path.of(worktreeRoot).toAbsolutePath().normalize();
         this.repoRoot = repoRoot;
     }
@@ -62,12 +58,13 @@ public class BranchWorkspaceService {
      * 最后短事务回写 READY/FAILED 状态。
      *
      * <p>事务边界：git worktree 创建（可能耗时）在事务外执行，避免长时间持有数据库连接；
-     * DB 状态流转通过 {@link EntityUpdater} 短事务完成。</p>
+     * DB 状态流转通过 {@link EntityUpdater} 独立短事务完成。</p>
      *
      * <p><b>禁止在事务上下文中调用</b>：本方法在事务外执行 git 操作，
-     * catch 块中先以独立短事务回写 FAILED 状态再抛出业务异常；
-     * 若在 {@code @Transactional} 上下文中调用，后续抛出的异常会触发外层事务回滚，
-     * 导致 FAILED 状态丢失。方法入口通过 {@link TransactionSynchronizationManager} 断言无活跃事务。</p>
+     * catch 块中先以独立短事务回写 FAILED 状态再抛出业务异常。
+     * 方法入口通过 {@link TransactionSynchronizationManager} 断言无活跃事务；
+     * {@link EntityUpdater} 使用 {@code PROPAGATION_REQUIRES_NEW} 确保回写独立提交，
+     * 不受外层事务回滚影响。</p>
      *
      * @throws ValidationException git worktree 创建失败，调用方禁止在事务上下文中捕获此异常
      */
@@ -81,7 +78,7 @@ public class BranchWorkspaceService {
                 .orElseGet(() -> createWorkspace(codeRepo, branchName, selectedCommitSha));
         workspace.setRepository(codeRepo);
         workspace.preparing();
-        transactionTemplate.executeWithoutResult(status -> repository.saveAndFlush(workspace));
+        entityUpdater.save(repository::saveAndFlush, workspace);
 
         try {
             String commitSha = selectedCommitSha == null || selectedCommitSha.isBlank()
@@ -95,13 +92,13 @@ public class BranchWorkspaceService {
                     Path.of(workspace.resolveWorktreePath(worktreeRoot.toString()))
             );
             return entityUpdater.updateById(
-                    repository, workspace.getId(),
+                    repository::findById, repository::save, workspace.getId(),
                     managed -> managed.ready(commitSha, commitMessage), ENTITY_NAME);
         } catch (RuntimeException ex) {
-            // 复用 EntityUpdater port 回写 FAILED 状态：独立短事务回调返回即提交，
-            // 后续抛出的 ValidationException 不会回滚已提交的状态
+            // 复用 EntityUpdater port 回写 FAILED 状态：PROPAGATION_REQUIRES_NEW 独立事务，
+            // 回调返回即提交，后续抛出的 ValidationException 不会回滚已提交的状态
             entityUpdater.updateById(
-                    repository, workspace.getId(),
+                    repository::findById, repository::save, workspace.getId(),
                     managed -> managed.fail(ex.getMessage()), ENTITY_NAME);
             throw new ValidationException(ex.getMessage(), ex);
         }
@@ -110,14 +107,15 @@ public class BranchWorkspaceService {
     /**
      * 探测分支当前提交是否变化：变化则标记 STALE，否则 touch。
      *
-     * <p>事务边界：git rev-parse/log（秒级）在事务外执行，状态回写用独立短事务。
+     * <p>事务边界：git rev-parse/log（秒级）在事务外执行，状态回写用 {@link EntityUpdater} 独立短事务。
      * 此方法为只读新鲜度探测，保持同步以供调用方立即判断 STALE 状态。</p>
      *
      * <p>并发说明：事务外读取的 {@code workspace.getCommitSha()} 与回调内重新加载的
      * {@code managed.getCommitSha()} 可能因并发修改而不一致，回调内以 {@code managed} 为准做最终判断。
      * commitMessage 在事务外按"可能变化"预查询，存在极小概率的并发窗口：
      * 若预查询后 managed 的 commitSha 被并发改为与 remoteCommitSha 相同，则预查询的
-     * commitMessage 不会被使用（回调走 touch 分支）；这是可接受的妥协，避免在事务内调用 git log。</p>
+     * commitMessage 不会被使用（回调走 touch 分支）。这是可接受的权衡--避免在事务内调用 git log
+     * 带来的连接持有开销，commitMessage 作为辅助信息即使偶发丢弃也不影响 STALE 状态正确性。</p>
      */
     public BranchWorkspace refresh(Long id) {
         BranchWorkspace workspace = getEntity(id);
@@ -128,7 +126,7 @@ public class BranchWorkspaceService {
                 ? null
                 : gitRepositoryService.commitMessage(repoPath, remoteCommitSha);
         return entityUpdater.updateById(
-                repository, id, managed -> {
+                repository::findById, repository::save, id, managed -> {
                     if (!remoteCommitSha.equals(managed.getCommitSha())) {
                         managed.stale(remoteCommitSha, commitMessage);
                     } else {

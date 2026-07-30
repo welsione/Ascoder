@@ -242,7 +242,7 @@ public class ProjectSpaceService {
         }
 
         String staleReason = staleReasons.isEmpty() ? null : String.join("\n", staleReasons);
-        return entityUpdater.updateById(repository, id, managed -> {
+        return entityUpdater.updateById(repository::findById, repository::save, id, managed -> {
             if (staleReason == null) {
                 managed.touch();
             } else {
