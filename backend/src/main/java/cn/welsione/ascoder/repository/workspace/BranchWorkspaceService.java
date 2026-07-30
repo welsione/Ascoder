@@ -60,13 +60,13 @@ public class BranchWorkspaceService {
      * <p>事务边界：git worktree 创建（可能耗时）在事务外执行，避免长时间持有数据库连接；
      * DB 状态流转通过 {@link EntityUpdater} 独立短事务完成。</p>
      *
-     * <p><b>禁止在事务上下文中调用</b>：本方法在事务外执行 git 操作，
+     * <p><b>禁止在 {@code @Transactional} 上下文中调用</b>：本方法在事务外执行 git 操作，
      * catch 块中先以独立短事务回写 FAILED 状态再抛出业务异常。
      * 方法入口通过 {@link TransactionSynchronizationManager} 断言无活跃事务；
      * {@link EntityUpdater} 使用 {@code PROPAGATION_REQUIRES_NEW} 确保回写独立提交，
      * 不受外层事务回滚影响。</p>
      *
-     * @throws ValidationException git worktree 创建失败，调用方禁止在事务上下文中捕获此异常
+     * @throws ValidationException git worktree 创建失败
      */
     public BranchWorkspace prepare(Long repositoryId, CreateBranchWorkspaceRequest request, String selectedCommitSha) {
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
@@ -74,11 +74,16 @@ public class BranchWorkspaceService {
         }
         CodeRepository codeRepo = repositoryService.getEntity(repositoryId);
         String branchName = request.getBranchName().trim();
-        BranchWorkspace workspace = repository.findByRepository_IdAndBranchName(repositoryId, branchName)
-                .orElseGet(() -> createWorkspace(codeRepo, branchName, selectedCommitSha));
-        workspace.setRepository(codeRepo);
-        workspace.preparing();
-        entityUpdater.save(repository::saveAndFlush, workspace);
+        // find-or-create + preparing 在独立短事务内原子完成，消除 find 与 save 间的竞态窗口
+        BranchWorkspace workspace = entityUpdater.findOrSave(
+                () -> repository.findByRepository_IdAndBranchName(repositoryId, branchName),
+                () -> createWorkspace(codeRepo, branchName, selectedCommitSha),
+                repository::saveAndFlush,
+                managed -> {
+                    managed.setRepository(codeRepo);
+                    managed.preparing();
+                }
+        );
 
         try {
             String commitSha = selectedCommitSha == null || selectedCommitSha.isBlank()

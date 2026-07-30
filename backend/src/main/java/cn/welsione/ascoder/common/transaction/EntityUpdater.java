@@ -39,12 +39,21 @@ public interface EntityUpdater {
                      String entityName);
 
     /**
-     * 在独立短事务内保存新建实体。
+     * 在独立短事务内查找或创建实体，并应用变更后保存。
      *
-     * @param saver 保存实体的函数（通常为 repository::saveAndFlush）
-     * @param entity 待保存实体
-     * @param <T>    实体类型
+     * <p>用于 find-or-create 场景：先按 finder 查找，不存在则用 creator 创建，
+     * 然后应用 updater 变更并保存。整个流程在短事务内原子完成，消除 find 与 save
+     * 之间的竞态窗口。</p>
+     *
+     * @param finder  查找现有实体的函数（返回 Optional）
+     * @param creator 实体不存在时创建新实体的函数
+     * @param saver   保存实体的函数（通常为 repository::saveAndFlush）
+     * @param updater 对实体应用的变更（如状态流转）
+     * @param <T>     实体类型
      * @return 保存后的实体
      */
-    <T> T save(Function<T, T> saver, T entity);
+    <T> T findOrSave(java.util.function.Supplier<Optional<T>> finder,
+                     java.util.function.Supplier<T> creator,
+                     Function<T, T> saver,
+                     Consumer<T> updater);
 }

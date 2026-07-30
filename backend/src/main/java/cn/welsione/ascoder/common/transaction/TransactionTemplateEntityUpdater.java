@@ -17,10 +17,14 @@ import java.util.function.Function;
  * 确保状态落盘。即使调用方在回写后抛出异常，已提交的状态也不会丢失。</p>
  */
 @Component
-@RequiredArgsConstructor
 public class TransactionTemplateEntityUpdater implements EntityUpdater {
 
-    private final PlatformTransactionManager transactionManager;
+    private final TransactionTemplate requiresNew;
+
+    public TransactionTemplateEntityUpdater(PlatformTransactionManager transactionManager) {
+        this.requiresNew = new TransactionTemplate(transactionManager);
+        this.requiresNew.setPropagationBehavior(TransactionTemplate.PROPAGATION_REQUIRES_NEW);
+    }
 
     @Override
     public <T> T updateById(Function<Long, Optional<T>> finder,
@@ -28,8 +32,6 @@ public class TransactionTemplateEntityUpdater implements EntityUpdater {
                             Long id,
                             Consumer<T> updater,
                             String entityName) {
-        TransactionTemplate requiresNew = new TransactionTemplate(transactionManager);
-        requiresNew.setPropagationBehavior(TransactionTemplate.PROPAGATION_REQUIRES_NEW);
         return requiresNew.execute(status -> {
             T managed = finder.apply(id)
                     .orElseThrow(() -> new ResourceNotFoundException(entityName, id));
@@ -40,9 +42,14 @@ public class TransactionTemplateEntityUpdater implements EntityUpdater {
     }
 
     @Override
-    public <T> T save(Function<T, T> saver, T entity) {
-        TransactionTemplate requiresNew = new TransactionTemplate(transactionManager);
-        requiresNew.setPropagationBehavior(TransactionTemplate.PROPAGATION_REQUIRES_NEW);
-        return requiresNew.execute(status -> saver.apply(entity));
+    public <T> T findOrSave(java.util.function.Supplier<Optional<T>> finder,
+                            java.util.function.Supplier<T> creator,
+                            Function<T, T> saver,
+                            Consumer<T> updater) {
+        return requiresNew.execute(status -> {
+            T entity = finder.get().orElseGet(creator);
+            updater.accept(entity);
+            return saver.apply(entity);
+        });
     }
 }
