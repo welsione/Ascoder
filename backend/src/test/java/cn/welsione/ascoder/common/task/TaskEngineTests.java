@@ -374,6 +374,22 @@ class TaskEngineTests {
         asyncExecutor.shutdown();
     }
 
+    @Test
+    void submitWithoutTransactionDispatchesImmediately() throws Exception {
+        TaskEngine engine = newEngine();
+        mockSaveAndFindById();
+        definition.behavior = ctx -> { /* 正常完成 */ };
+
+        // 确保无事务上下文
+        assertFalse(org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive());
+
+        engine.submit(submitRequest());
+
+        // 无事务：同步执行器立即执行，任务已完成
+        assertEquals(TaskStatus.SUCCEEDED, savedRef.get().getStatus());
+        verify(definition).execute(any(), any());
+    }
+
     // ==================== 测试辅助 ====================
 
     /** 同步执行器：submit 时立即运行。 */

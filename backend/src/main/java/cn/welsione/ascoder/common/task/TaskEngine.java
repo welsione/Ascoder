@@ -156,25 +156,53 @@ public class TaskEngine implements SmartInitializingSingleton {
         @SuppressWarnings("unchecked")
         TaskDefinition<Object> def = (TaskDefinition<Object>) (TaskDefinition<?>) definition;
 
+        dispatchWithTransactionAwareness(taskId, kind, def, request.getContext(), progress, cancelledFlag,
+                "提交异步任务", "taskId={}，kind={}，businessId={}", taskId, kind, request.getBusinessId());
+
+        return new TaskHandleImpl(task);
+    }
+
+    /**
+     * 事务感知调度：若当前处于活跃事务中，注册 afterCommit 钩子延迟提交线程池；
+     * 否则直接提交。确保工作线程总能读到已持久化的任务记录。
+     *
+     * @param taskId    任务 ID
+     * @param kind      任务类型
+     * @param definition 任务定义
+     * @param context   业务上下文
+     * @param progress  进度回调
+     * @param cancelledFlag 取消信号
+     * @param logLabel  日志标签（如"提交异步任务"、"重试任务"）
+     * @param logFormat 日志格式串
+     * @param logArgs   日志参数
+     */
+    private void dispatchWithTransactionAwareness(Long taskId, TaskKind kind,
+                                                  TaskDefinition<Object> definition, Object context,
+                                                  TaskProgressImpl progress, AtomicBoolean cancelledFlag,
+                                                  String logLabel, String logFormat, Object... logArgs) {
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
             // 调用方在事务中：注册 afterCommit 钩子，事务提交后再提交线程池
-            // 确保工作线程能读到已持久化的任务记录
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    dispatchToPool(taskId, kind, def, request.getContext(), progress, cancelledFlag, true);
+                    dispatchToPool(taskId, kind, definition, context, progress, cancelledFlag, true);
                 }
             });
-            log.info("提交异步任务（延迟调度，等待事务提交）：taskId={}，kind={}，businessId={}",
-                    taskId, kind, request.getBusinessId());
+            log.info("{}（延迟调度，等待事务提交）：" + logFormat,
+                    (Object[]) prependArg(logLabel, logArgs));
         } else {
             // 无事务：直接提交线程池
-            dispatchToPool(taskId, kind, def, request.getContext(), progress, cancelledFlag, false);
-            log.info("提交异步任务：taskId={}，kind={}，businessId={}，timeoutMs={}",
-                    taskId, kind, request.getBusinessId(), request.getTimeoutMs());
+            dispatchToPool(taskId, kind, definition, context, progress, cancelledFlag, false);
+            log.info("{}：" + logFormat, (Object[]) prependArg(logLabel, logArgs));
         }
+    }
 
-        return new TaskHandleImpl(task);
+    /** 将 value 添加到 args 数组头部，用于日志参数拼接。 */
+    private Object[] prependArg(Object value, Object[] args) {
+        Object[] result = new Object[args.length + 1];
+        result[0] = value;
+        System.arraycopy(args, 0, result, 1, args.length);
+        return result;
     }
 
     /**
@@ -358,19 +386,8 @@ public class TaskEngine implements SmartInitializingSingleton {
         AtomicBoolean cancelledFlag = new AtomicBoolean(false);
         TaskProgressImpl progress = new TaskProgressImpl(retryTaskId, progressPublisher, cancelledFlag);
 
-        if (TransactionSynchronizationManager.isActualTransactionActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    dispatchToPool(retryTaskId, retryTaskKind, definition, null, progress, cancelledFlag, true);
-                }
-            });
-            log.info("重试任务（延迟调度，等待事务提交）：taskId={}，kind={}，retryCount={}",
-                    retryTaskId, retryTaskKind, task.getRetryCount());
-        } else {
-            dispatchToPool(retryTaskId, retryTaskKind, definition, null, progress, cancelledFlag, false);
-            log.info("重试任务：taskId={}，kind={}，retryCount={}", retryTaskId, retryTaskKind, task.getRetryCount());
-        }
+        dispatchWithTransactionAwareness(retryTaskId, retryTaskKind, definition, null, progress, cancelledFlag,
+                "重试任务", "taskId={}，kind={}，retryCount={}", retryTaskId, retryTaskKind, task.getRetryCount());
 
         return new TaskHandleImpl(task);
     }
@@ -408,7 +425,8 @@ public class TaskEngine implements SmartInitializingSingleton {
 
             AtomicBoolean cancelledFlag = new AtomicBoolean(false);
             TaskProgressImpl prog = new TaskProgressImpl(taskId, progressPublisher, cancelledFlag);
-            // recoverTasks 在启动时调用，无事务上下文，直接提交
+            // 启动阶段由 SmartInitializingSingleton 回调触发，确定无活跃事务包裹，
+            // 无需事务感知调度，直接提交线程池
             dispatchToPool(taskId, taskKind, def, null, prog, cancelledFlag, false);
         }
     }
@@ -532,7 +550,12 @@ public class TaskEngine implements SmartInitializingSingleton {
         });
     }
 
-    /** 标记任务失败。 */
+    /**
+     * 标记任务失败。
+     *
+     * <p>通过 {@code findById} 重新获取最新实体后再修改保存，避免覆盖并发场景下已提交的状态变更。
+     * 独立事务执行，确保即使被 afterCommit 钩子等非事务上下文调用，状态也能正确持久化。</p>
+     */
     private void markFailed(Long taskId, String errorMsg) {
         txTemplate.executeWithoutResult(status -> {
             taskRepository.findById(taskId).ifPresent(t -> {
