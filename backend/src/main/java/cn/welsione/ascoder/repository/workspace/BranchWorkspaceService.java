@@ -70,7 +70,9 @@ public class BranchWorkspaceService {
         entityUpdater.requireNoTransaction();
         CodeRepository codeRepo = repositoryService.getEntity(repositoryId);
         String branchName = request.getBranchName().trim();
-        // find-or-create + preparing 在独立短事务内原子完成，消除 find 与 save 间的竞态窗口
+        // find-or-create + preparing 在独立短事务内完成
+        // onCreated: 新建实体时设置关联 + 状态流转
+        // onExisting: 已存在实体时仅设置关联（复用已有 workspace）
         BranchWorkspace workspace = entityUpdater.findOrSave(
                 () -> repository.findByRepository_IdAndBranchName(repositoryId, branchName),
                 () -> createWorkspace(codeRepo, branchName, selectedCommitSha),
@@ -78,7 +80,8 @@ public class BranchWorkspaceService {
                 managed -> {
                     managed.setRepository(codeRepo);
                     managed.preparing();
-                }
+                },
+                managed -> managed.setRepository(codeRepo)
         );
 
         try {

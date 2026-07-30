@@ -47,21 +47,28 @@ public interface EntityUpdater {
                      String entityName);
 
     /**
-     * 在独立短事务内查找或创建实体，并应用变更后保存。
+     * 在独立短事务内查找或创建实体，分别对新建和已存在实体应用不同变更后保存。
      *
-     * <p>用于 find-or-create 场景：先按 finder 查找，不存在则用 creator 创建，
-     * 然后应用 updater 变更并保存。整个流程在短事务内原子完成，消除 find 与 save
-     * 之间的竞态窗口。</p>
+     * <p>用于 find-or-create 场景：先按 finder 查找，不存在则用 creator 创建
+     * 并应用 {@code onCreated} 变更；已存在则应用 {@code onExisting} 变更。
+     * 两者分开避免对已存在实体误执行仅适用于新建实体的状态流转（如 PREPARING）。</p>
      *
-     * @param finder  查找现有实体的函数（返回 Optional）
-     * @param creator 实体不存在时创建新实体的函数
-     * @param saver   保存实体的函数（通常为 repository::saveAndFlush）
-     * @param updater 对实体应用的变更（如状态流转）
-     * @param <T>     实体类型
+     * <p><b>并发说明</b>：{@code finder.get().orElseGet(creator)} 是 check-then-act 模式，
+     * {@code REQUIRES_NEW} 仅保证独立事务，不提供数据库级排他锁。并发调用同一不存在的实体
+     * 可能两次通过 finder 并尝试创建，由数据库唯一约束兜底拒绝重复插入。
+     * 调用方须确保实体表存在唯一约束（如 repositoryId + branchName）。</p>
+     *
+     * @param finder     查找现有实体的函数（返回 Optional）
+     * @param creator    实体不存在时创建新实体的函数
+     * @param saver      保存实体的函数（通常为 repository::saveAndFlush）
+     * @param onCreated  对新建实体应用的变更（如设置关联 + 状态流转）
+     * @param onExisting 对已存在实体应用的变更（如状态流转或 touch）
+     * @param <T>        实体类型
      * @return 保存后的实体
      */
     <T> T findOrSave(java.util.function.Supplier<Optional<T>> finder,
                      java.util.function.Supplier<T> creator,
                      Function<T, T> saver,
-                     Consumer<T> updater);
+                     Consumer<T> onCreated,
+                     Consumer<T> onExisting);
 }

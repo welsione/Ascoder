@@ -53,10 +53,17 @@ public class TransactionTemplateEntityUpdater implements EntityUpdater {
     public <T> T findOrSave(java.util.function.Supplier<Optional<T>> finder,
                             java.util.function.Supplier<T> creator,
                             Function<T, T> saver,
-                            Consumer<T> updater) {
+                            Consumer<T> onCreated,
+                            Consumer<T> onExisting) {
         return requiresNew.execute(status -> {
-            T entity = finder.get().orElseGet(creator);
-            updater.accept(entity);
+            Optional<T> existing = finder.get();
+            if (existing.isPresent()) {
+                T entity = existing.get();
+                onExisting.accept(entity);
+                return saver.apply(entity);
+            }
+            T entity = creator.get();
+            onCreated.accept(entity);
             return saver.apply(entity);
         });
     }
