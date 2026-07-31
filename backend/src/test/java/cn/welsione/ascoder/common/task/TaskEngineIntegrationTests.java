@@ -34,6 +34,9 @@ class TaskEngineIntegrationTests extends cn.welsione.ascoder.AbstractIntegration
     @Autowired
     private NoopTaskDefinition noopDefinition;
 
+    @Autowired
+    private org.springframework.transaction.PlatformTransactionManager transactionManager;
+
     @AfterEach
     void cleanup() throws InterruptedException {
         // 取消并等待所有未完成任务终态，避免 deleteAll 后异步 save 抛乐观锁异常
@@ -233,6 +236,29 @@ class TaskEngineIntegrationTests extends cn.welsione.ascoder.AbstractIntegration
         List<AsyncTask> all = taskRepository.findAll();
         assertEquals(5, all.size());
         assertTrue(all.stream().allMatch(t -> t.getStatus() == TaskStatus.SUCCEEDED));
+    }
+
+    @Test
+    void submitInTransactionDispatchesAfterCommit() throws Exception {
+        // 验证：在事务内调用 submit 时，任务延迟到事务提交后才执行
+        // 这是本次修复的核心场景：调用方事务提交前，工作线程不应读到未提交的 DB 记录
+        noopDefinition.behavior = ctx -> {};
+
+        org.springframework.transaction.support.TransactionTemplate txTemplate =
+                new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+
+        java.util.concurrent.atomic.AtomicReference<Long> taskIdRef = new java.util.concurrent.atomic.AtomicReference<>();
+
+        // 事务内 submit -> 注册 afterCommit 钩子 -> 事务提交 -> 钩子触发 -> 任务执行
+        txTemplate.executeWithoutResult(status -> {
+            TaskHandle handle = taskEngine.submit(newRequest());
+            taskIdRef.set(handle.getTaskId());
+        });
+
+        // 事务提交后：afterCommit 钩子触发，任务应执行完成
+        awaitTerminal(taskIdRef.get());
+        AsyncTask task = taskRepository.findById(taskIdRef.get()).orElseThrow();
+        assertEquals(TaskStatus.SUCCEEDED, task.getStatus());
     }
 
     // ==================== 辅助方法 ====================

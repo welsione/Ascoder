@@ -8,6 +8,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.Date;
@@ -20,6 +22,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 统一异步任务引擎，负责任务的提交、调度、执行、取消和恢复。
@@ -107,9 +110,15 @@ public class TaskEngine implements SmartInitializingSingleton {
     /**
      * 提交异步任务。
      *
+     * <p>事务可见性保证：若调用方处于活跃事务中，DB 写入参与调用方事务，线程池提交延迟到
+     * 事务提交后（通过 {@link TransactionSynchronization#afterCommit} 钩子），确保工作线程
+     * 能读到已持久化的任务记录。若调用方无事务，DB 写入与线程池提交同步执行。</p>
+     *
+     * <p>事务回滚时钩子不触发，任务不会执行，避免"DB 回滚但任务在跑"的不一致。</p>
+     *
      * @return 任务句柄
      * @throws TaskAlreadyRunningException 同 kind + businessId 已有运行中任务
-     * @throws TaskQueueFullException 对应 kind 的线程池队列已满
+     * @throws TaskQueueFullException 对应 kind 的线程池队列已满（仅无事务路径可抛出）
      */
     @SuppressWarnings("unchecked")
     public <C> TaskHandle submit(TaskSubmitRequest<C> request) {
@@ -132,7 +141,7 @@ public class TaskEngine implements SmartInitializingSingleton {
         // 序列化上下文
         String contextJson = definition.serializeContext(request.getContext());
 
-        // DB 插入
+        // DB 插入（参与调用方事务，或无事务时自动提交）
         AsyncTask task = new AsyncTask();
         task.setKind(kind);
         task.setBusinessId(request.getBusinessId());
@@ -142,26 +151,85 @@ public class TaskEngine implements SmartInitializingSingleton {
         task = taskRepository.save(task);
 
         Long taskId = task.getId();
+        AtomicBoolean cancelledFlag = new AtomicBoolean(false);
+        TaskProgressImpl progress = new TaskProgressImpl(taskId, progressPublisher, cancelledFlag);
+        @SuppressWarnings("unchecked")
+        TaskDefinition<Object> def = (TaskDefinition<Object>) (TaskDefinition<?>) definition;
 
-        // 提交线程池
-        try {
-            java.util.concurrent.atomic.AtomicBoolean cancelledFlag = new java.util.concurrent.atomic.AtomicBoolean(false);
-            TaskProgressImpl progress = new TaskProgressImpl(taskId, progressPublisher, cancelledFlag);
-            @SuppressWarnings("unchecked")
-            TaskDefinition<Object> def = (TaskDefinition<Object>) (TaskDefinition<?>) definition;
-            Future<?> future = executorRegistry.getExecutor(kind).submit(() -> executeTask(taskId, def, progress, cancelledFlag));
-            // 记录运行时上下文（含 Future 引用，用于取消）
-            runningTasks.put(taskId, new RunningTaskContext(future, def, request.getContext(), progress));
-        } catch (RejectedExecutionException e) {
-            // 队列满，标记失败
-            task.fail("任务队列已满");
-            taskRepository.save(task);
-            throw new TaskQueueFullException(kind);
-        }
+        dispatchWithTransactionAwareness(taskId, kind, def, request.getContext(), progress, cancelledFlag,
+                "提交异步任务", "taskId={}，kind={}，businessId={}", taskId, kind, request.getBusinessId());
 
-        log.info("提交异步任务：taskId={}，kind={}，businessId={}，timeoutMs={}",
-                taskId, kind, request.getBusinessId(), request.getTimeoutMs());
         return new TaskHandleImpl(task);
+    }
+
+    /**
+     * 事务感知调度：若当前处于活跃事务中，注册 afterCommit 钩子延迟提交线程池；
+     * 否则直接提交。确保工作线程总能读到已持久化的任务记录。
+     *
+     * @param taskId    任务 ID
+     * @param kind      任务类型
+     * @param definition 任务定义
+     * @param context   业务上下文
+     * @param progress  进度回调
+     * @param cancelledFlag 取消信号
+     * @param logLabel  日志标签（如"提交异步任务"、"重试任务"）
+     * @param logFormat 日志格式串
+     * @param logArgs   日志参数
+     */
+    private void dispatchWithTransactionAwareness(Long taskId, TaskKind kind,
+                                                  TaskDefinition<Object> definition, Object context,
+                                                  TaskProgressImpl progress, AtomicBoolean cancelledFlag,
+                                                  String logLabel, String logFormat, Object... logArgs) {
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            // 调用方在事务中：注册 afterCommit 钩子，事务提交后再提交线程池
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    dispatchToPool(taskId, kind, definition, context, progress, cancelledFlag, true);
+                }
+            });
+            log.info("{}（延迟调度，等待事务提交）：" + logFormat,
+                    (Object[]) prependArg(logLabel, logArgs));
+        } else {
+            // 无事务：直接提交线程池
+            dispatchToPool(taskId, kind, definition, context, progress, cancelledFlag, false);
+            log.info("{}：" + logFormat, (Object[]) prependArg(logLabel, logArgs));
+        }
+    }
+
+    /** 将 value 添加到 args 数组头部，用于日志参数拼接。 */
+    private Object[] prependArg(Object value, Object[] args) {
+        Object[] result = new Object[args.length + 1];
+        result[0] = value;
+        System.arraycopy(args, 0, result, 1, args.length);
+        return result;
+    }
+
+    /**
+     * 将任务提交到线程池执行。
+     *
+     * <p>由 {@link #submit} 直接调用（无事务路径）或通过 afterCommit 钩子调用（事务路径）。</p>
+     *
+     * @param afterCommitHook 是否在 afterCommit 钩子中调用。钩子中异常无法传播到调用方，
+     *                        队列满时仅 markFailed + 日志；非钩子路径则抛出 TaskQueueFullException
+     */
+    private void dispatchToPool(Long taskId, TaskKind kind, TaskDefinition<Object> definition,
+                                Object context, TaskProgressImpl progress, AtomicBoolean cancelledFlag,
+                                boolean afterCommitHook) {
+        try {
+            Future<?> future = executorRegistry.getExecutor(kind)
+                    .submit(() -> executeTask(taskId, definition, progress, cancelledFlag));
+            runningTasks.put(taskId, new RunningTaskContext(future, definition, context, progress));
+        } catch (RejectedExecutionException e) {
+            // 队列满，标记失败并持久化到 DB
+            markFailed(taskId, "任务队列已满");
+            log.error("任务队列已满，taskId={}，kind={}", taskId, kind);
+            if (!afterCommitHook) {
+                // 非钩子路径：异常可传播到调用方
+                throw new TaskQueueFullException(kind);
+            }
+            // 钩子路径：异常无法传播，已通过 markFailed 记录到 DB
+        }
     }
 
     /**
@@ -272,6 +340,9 @@ public class TaskEngine implements SmartInitializingSingleton {
 
     /**
      * 重试失败任务：将 FAILED/CANCELLED 任务重置为 QUEUED 并重新提交。
+     *
+     * <p>与 {@link #submit} 相同的事务可见性保证：若调用方处于活跃事务中，
+     * 线程池提交延迟到事务提交后。</p>
      */
     @SuppressWarnings("unchecked")
     public TaskHandle retry(Long taskId) {
@@ -303,7 +374,6 @@ public class TaskEngine implements SmartInitializingSingleton {
         task.setUpdatedAt(new Date());
         task = taskRepository.save(task);
 
-        // 重新提交
         Long retryTaskId = task.getId();
         TaskKind retryTaskKind = task.getKind();
         TaskDefinition<Object> definition = (TaskDefinition<Object>) definitions.get(retryTaskKind);
@@ -313,19 +383,12 @@ public class TaskEngine implements SmartInitializingSingleton {
             throw new IllegalArgumentException("未注册的任务定义: " + retryTaskKind);
         }
 
-        try {
-            java.util.concurrent.atomic.AtomicBoolean cancelledFlag = new java.util.concurrent.atomic.AtomicBoolean(false);
-            TaskProgressImpl progress = new TaskProgressImpl(retryTaskId, progressPublisher, cancelledFlag);
-            Future<?> future = executorRegistry.getExecutor(retryTaskKind)
-                    .submit(() -> executeTask(retryTaskId, definition, progress, cancelledFlag));
-            runningTasks.put(retryTaskId, new RunningTaskContext(future, definition, null, progress));
-        } catch (RejectedExecutionException e) {
-            task.fail("任务队列已满");
-            taskRepository.save(task);
-            throw new TaskQueueFullException(retryTaskKind);
-        }
+        AtomicBoolean cancelledFlag = new AtomicBoolean(false);
+        TaskProgressImpl progress = new TaskProgressImpl(retryTaskId, progressPublisher, cancelledFlag);
 
-        log.info("重试任务：taskId={}，kind={}，retryCount={}", retryTaskId, retryTaskKind, task.getRetryCount());
+        dispatchWithTransactionAwareness(retryTaskId, retryTaskKind, definition, null, progress, cancelledFlag,
+                "重试任务", "taskId={}，kind={}，retryCount={}", retryTaskId, retryTaskKind, task.getRetryCount());
+
         return new TaskHandleImpl(task);
     }
 
@@ -349,17 +412,22 @@ public class TaskEngine implements SmartInitializingSingleton {
                 taskRepository.save(task);
             }
             // 重新提交（延迟执行，等所有 Bean 初始化完毕）
-            try {
-                java.util.concurrent.atomic.AtomicBoolean cancelledFlag = new java.util.concurrent.atomic.AtomicBoolean(false);
-                @SuppressWarnings("unchecked")
-                TaskDefinition<Object> def = (TaskDefinition<Object>) definitions.get(task.getKind());
-                TaskProgressImpl prog = new TaskProgressImpl(task.getId(), progressPublisher, cancelledFlag);
-                executorRegistry.getExecutor(task.getKind()).submit(() -> executeTask(task.getId(), def, prog, cancelledFlag));
-            } catch (Exception e) {
-                log.error("恢复任务失败，taskId={}，错误={}", task.getId(), e.getMessage());
-                task.fail("恢复失败: " + e.getMessage());
+            Long taskId = task.getId();
+            TaskKind taskKind = task.getKind();
+            @SuppressWarnings("unchecked")
+            TaskDefinition<Object> def = (TaskDefinition<Object>) definitions.get(taskKind);
+            if (def == null) {
+                log.error("恢复任务失败，taskId={}，未注册的任务定义: {}", taskId, taskKind);
+                task.fail("恢复失败: 未注册的任务定义 " + taskKind);
                 taskRepository.save(task);
+                continue;
             }
+
+            AtomicBoolean cancelledFlag = new AtomicBoolean(false);
+            TaskProgressImpl prog = new TaskProgressImpl(taskId, progressPublisher, cancelledFlag);
+            // 启动阶段由 SmartInitializingSingleton 回调触发，确定无活跃事务包裹，
+            // 无需事务感知调度，直接提交线程池
+            dispatchToPool(taskId, taskKind, def, null, prog, cancelledFlag, false);
         }
     }
 
@@ -482,7 +550,12 @@ public class TaskEngine implements SmartInitializingSingleton {
         });
     }
 
-    /** 标记任务失败。 */
+    /**
+     * 标记任务失败。
+     *
+     * <p>通过 {@code findById} 重新获取最新实体后再修改保存，避免覆盖并发场景下已提交的状态变更。
+     * 独立事务执行，确保即使被 afterCommit 钩子等非事务上下文调用，状态也能正确持久化。</p>
+     */
     private void markFailed(Long taskId, String errorMsg) {
         txTemplate.executeWithoutResult(status -> {
             taskRepository.findById(taskId).ifPresent(t -> {

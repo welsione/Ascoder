@@ -10,6 +10,10 @@ package cn.welsione.ascoder.common.task;
  * 通过注入的 {@link org.springframework.transaction.support.TransactionTemplate} 开启短事务，
  * 禁止在 {@code execute} 上标注 {@code @Transactional} 包裹长耗时操作。</p>
  *
+ * <p><b>提交约定</b>：调用方无需关心事务边界——{@link TaskEngine#submit} 会自动检测
+ * 调用方事务上下文，若在事务中则延迟到事务提交后再调度线程池，确保工作线程能读到
+ * 已持久化的任务记录。调用方仍可正常使用 {@code @Transactional}，无需手动拆分事务。</p>
+ *
  * @param <C> 任务上下文类型，携带业务参数
  */
 public interface TaskDefinition<C> {

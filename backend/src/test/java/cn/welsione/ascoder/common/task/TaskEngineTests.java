@@ -158,6 +158,7 @@ class TaskEngineTests {
         savedTask.setId(1L);
         savedTask.setKind(TestTaskDefinition.KIND);
         when(taskRepository.save(any(AsyncTask.class))).thenReturn(savedTask);
+        when(taskRepository.findById(1L)).thenReturn(java.util.Optional.of(savedTask));
 
         // 线程池拒绝
         when(executorRegistry.getExecutor(any(TaskKind.class)))
@@ -371,6 +372,22 @@ class TaskEngineTests {
         awaitCondition(() -> savedRef.get().isTerminal(), 3000);
         assertEquals(TaskStatus.SUCCEEDED, savedRef.get().getStatus());
         asyncExecutor.shutdown();
+    }
+
+    @Test
+    void submitWithoutTransactionDispatchesImmediately() throws Exception {
+        TaskEngine engine = newEngine();
+        mockSaveAndFindById();
+        definition.behavior = ctx -> { /* 正常完成 */ };
+
+        // 确保无事务上下文
+        assertFalse(org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive());
+
+        engine.submit(submitRequest());
+
+        // 无事务：同步执行器立即执行，任务已完成
+        assertEquals(TaskStatus.SUCCEEDED, savedRef.get().getStatus());
+        verify(definition).execute(any(), any());
     }
 
     // ==================== 测试辅助 ====================
