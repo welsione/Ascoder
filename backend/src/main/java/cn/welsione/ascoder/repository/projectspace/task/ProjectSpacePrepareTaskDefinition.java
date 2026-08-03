@@ -5,6 +5,9 @@ import cn.welsione.ascoder.common.task.TaskDefinition;
 import cn.welsione.ascoder.common.task.TaskKind;
 import cn.welsione.ascoder.common.task.TaskProgress;
 import cn.welsione.ascoder.common.task.TaskContextSerializer;
+import cn.welsione.ascoder.repository.CodeRepository;
+import cn.welsione.ascoder.repository.RepositoryService;
+import cn.welsione.ascoder.repository.git.GitRepositoryService;
 import cn.welsione.ascoder.repository.projectspace.ProjectSpace;
 import cn.welsione.ascoder.repository.projectspace.ProjectSpaceJpaRepository;
 import cn.welsione.ascoder.repository.projectspace.ProjectSpaceMember;
@@ -39,11 +42,16 @@ public class ProjectSpacePrepareTaskDefinition implements TaskDefinition<Project
     private final ProjectSpaceJpaRepository projectSpaceJpaRepository;
     private final ProjectSpaceMemberJpaRepository memberJpaRepository;
     private final BranchWorkspaceService branchWorkspaceService;
+    private final GitRepositoryService gitRepositoryService;
+    private final RepositoryService repositoryService;
     private final TransactionTemplate transactionTemplate;
     private final ObjectMapper objectMapper;
 
     @Value("${ascoder.project-space-root:./data/project-spaces}")
     private String projectSpaceRoot;
+
+    @Value("${ascoder.repo-root:./data/repos}")
+    private String repoRoot;
 
     @Value("${ascoder.worktree-root:./data/worktrees}")
     private String worktreeRoot;
@@ -68,8 +76,9 @@ public class ProjectSpacePrepareTaskDefinition implements TaskDefinition<Project
     @Override
     public void execute(ProjectSpacePrepareContext context, TaskProgress progress) throws Exception {
         Long projectSpaceId = context.getProjectSpaceId();
+        boolean advanceToRemote = context.isAdvanceToRemote();
 
-        log.info("开始项目空间准备任务，projectSpaceId={}", projectSpaceId);
+        log.info("开始项目空间准备任务，projectSpaceId={}，advanceToRemote={}", projectSpaceId, advanceToRemote);
 
         // 在事务内读取项目空间及成员快照
         PrepareSnapshot snapshot = readSnapshot(projectSpaceId);
@@ -88,7 +97,7 @@ public class ProjectSpacePrepareTaskDefinition implements TaskDefinition<Project
             progress.update(percent, "准备成员 " + (i + 1) + "/" + total + "：" + member.alias);
 
             try {
-                prepareMember(snapshot.projectSpaceId, rootPath, member);
+                prepareMember(snapshot.projectSpaceId, rootPath, member, advanceToRemote);
             } catch (Exception ex) {
                 String errorMessage = "准备成员 " + member.alias + " 失败：" + ex.getMessage();
                 log.error("项目空间准备任务失败，projectSpaceId={}，member={}", projectSpaceId, member.alias, ex);
@@ -144,12 +153,28 @@ public class ProjectSpacePrepareTaskDefinition implements TaskDefinition<Project
 
     /**
      * 准备单个成员：创建/更新分支 worktree 并建立符号链接。
+     *
+     * @param advanceToRemote true 时将 worktree 推进到 {@code origin/<branch>} 最新 commit
+     *                         （拉取更新场景）；false 时 checkout 到 {@code member.commitSha}（创建/重新准备场景）
      */
-    private void prepareMember(Long projectSpaceId, Path rootPath, MemberSnapshot member) throws Exception {
+    private void prepareMember(Long projectSpaceId, Path rootPath, MemberSnapshot member, boolean advanceToRemote)
+            throws Exception {
+        String selectedCommitSha = member.commitSha;
+        if (advanceToRemote) {
+            CodeRepository repo = repositoryService.getEntity(member.repositoryId);
+            Path repoPath = Path.of(repo.resolveLocalPath(repoRoot));
+            String remoteSha = gitRepositoryService.remoteCommitSha(repoPath, member.branchName);
+            if (remoteSha != null && !remoteSha.isBlank()) {
+                selectedCommitSha = remoteSha;
+            } else {
+                log.warn("远端分支 {} 无对应引用，回退到成员 commit，member={}", member.branchName, member.alias);
+            }
+        }
+
         BranchWorkspace branchWorkspace = branchWorkspaceService.prepare(
                 member.repositoryId,
                 new CreateBranchWorkspaceRequest(member.branchName),
-                member.commitSha
+                selectedCommitSha
         );
 
         Path linkPath = rootPath.resolve(member.alias).normalize();

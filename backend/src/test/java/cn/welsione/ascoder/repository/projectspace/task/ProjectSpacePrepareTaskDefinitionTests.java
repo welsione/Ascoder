@@ -38,6 +38,8 @@ class ProjectSpacePrepareTaskDefinitionTests {
     private ProjectSpaceJpaRepository projectSpaceJpaRepository;
     private ProjectSpaceMemberJpaRepository memberJpaRepository;
     private BranchWorkspaceService branchWorkspaceService;
+    private cn.welsione.ascoder.repository.git.GitRepositoryService gitRepositoryService;
+    private cn.welsione.ascoder.repository.RepositoryService repositoryService;
     private TransactionTemplate transactionTemplate;
     private ObjectMapper objectMapper;
     private ProjectSpacePrepareTaskDefinition definition;
@@ -51,6 +53,8 @@ class ProjectSpacePrepareTaskDefinitionTests {
         projectSpaceJpaRepository = mock(ProjectSpaceJpaRepository.class);
         memberJpaRepository = mock(ProjectSpaceMemberJpaRepository.class);
         branchWorkspaceService = mock(BranchWorkspaceService.class);
+        gitRepositoryService = mock(cn.welsione.ascoder.repository.git.GitRepositoryService.class);
+        repositoryService = mock(cn.welsione.ascoder.repository.RepositoryService.class);
         transactionTemplate = mock(TransactionTemplate.class);
         objectMapper = new ObjectMapper();
         progress = mock(TaskProgress.class);
@@ -76,11 +80,13 @@ class ProjectSpacePrepareTaskDefinitionTests {
 
         definition = new ProjectSpacePrepareTaskDefinition(
                 projectSpaceJpaRepository, memberJpaRepository,
-                branchWorkspaceService, transactionTemplate, objectMapper);
+                branchWorkspaceService, gitRepositoryService, repositoryService,
+                transactionTemplate, objectMapper);
 
         // 注入 @Value 字段
         ReflectionTestUtils.setField(definition, "projectSpaceRoot", projectSpaceRoot.toString());
         ReflectionTestUtils.setField(definition, "worktreeRoot", worktreeRoot.toString());
+        ReflectionTestUtils.setField(definition, "repoRoot", tempDir.resolve("repos").toString());
     }
 
     @Test
@@ -129,7 +135,7 @@ class ProjectSpacePrepareTaskDefinitionTests {
         when(branchWorkspaceService.prepare(eq(10L), any(CreateBranchWorkspaceRequest.class), eq("abc123")))
                 .thenReturn(workspace);
 
-        ProjectSpacePrepareContext context = new ProjectSpacePrepareContext(1L);
+        ProjectSpacePrepareContext context = new ProjectSpacePrepareContext(1L, false);
 
         definition.execute(context, progress);
 
@@ -168,7 +174,7 @@ class ProjectSpacePrepareTaskDefinitionTests {
         when(memberJpaRepository.findByProjectSpace_IdOrderByCreatedAtAsc(1L))
                 .thenReturn(List.of());
 
-        ProjectSpacePrepareContext context = new ProjectSpacePrepareContext(1L);
+        ProjectSpacePrepareContext context = new ProjectSpacePrepareContext(1L, false);
 
         definition.execute(context, progress);
 
@@ -203,7 +209,7 @@ class ProjectSpacePrepareTaskDefinitionTests {
         when(branchWorkspaceService.prepare(eq(10L), any(CreateBranchWorkspaceRequest.class), eq("abc123")))
                 .thenThrow(new RuntimeException("git fetch 失败"));
 
-        ProjectSpacePrepareContext context = new ProjectSpacePrepareContext(1L);
+        ProjectSpacePrepareContext context = new ProjectSpacePrepareContext(1L, false);
 
         RuntimeException ex = assertThrows(RuntimeException.class,
                 () -> definition.execute(context, progress));
@@ -222,7 +228,7 @@ class ProjectSpacePrepareTaskDefinitionTests {
 
     @Test
     void serializeAndDeserializeContextRoundTrip() {
-        ProjectSpacePrepareContext context = new ProjectSpacePrepareContext(1L);
+        ProjectSpacePrepareContext context = new ProjectSpacePrepareContext(1L, false);
 
         String json = definition.serializeContext(context);
         ProjectSpacePrepareContext deserialized = definition.deserializeContext(json);

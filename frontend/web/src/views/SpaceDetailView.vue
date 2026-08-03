@@ -297,7 +297,7 @@ async function pullSpace() {
   if (!space.value) return
   const updated = await projectSpaceStore.pullRemote(space.value.id)
   if (updated) {
-    ElMessage.info('拉取任务已提交，fetch 完成后请点击刷新按钮查看最新提交记录')
+    ElMessage.info('拉取任务已提交，fetch 完成后将自动更新 worktree 并刷新提交记录')
   }
 }
 

@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { onScopeDispose, reactive, ref } from 'vue'
 import * as api from '../services/projectSpaceApi'
+import * as taskApi from '../services/asyncTaskApi'
 import type { ProjectRepositoryMember } from '../types/project'
 import type { ProjectSpace, ProjectSpaceMember, ProjectSpaceStatus } from '../types/projectSpace'
 import { useCrudStore } from '../composables/useCrudStore'
@@ -48,6 +49,8 @@ export const useProjectSpaceStore = defineStore('projectSpace', () => {
   let indexProgressTimer: ReturnType<typeof setInterval> | null = null
   let indexProgressAbortController: AbortController | null = null
   let indexingResetTimer: ReturnType<typeof setTimeout> | null = null
+  let pullPollingTimer: ReturnType<typeof setInterval> | null = null
+  const pullPollingSpaceId = ref<number | null>(null)
 
   /** 将更新后的空间替换到列表中对应位置。 */
   function upsertItem(updated: ProjectSpace) {
@@ -223,9 +226,53 @@ export const useProjectSpaceStore = defineStore('projectSpace', () => {
     }
   }
 
+  /**
+   * 拉取后轮询项目空间的活跃异步任务（GIT_FETCH + PROJECT_SPACE_PREPARE），
+   * 全部完成后刷新成员与空间状态，使 behindRemote / commit 列表即时更新。
+   *
+   * <p>后端 fetch 完成后会自动探测落后并提交 prepare 任务推进 worktree，
+   * 因此需同时等待两类任务结束。最长轮询 5 分钟，避免无限等待。</p>
+   */
+  function startPullPolling(projectSpaceId: number) {
+    stopPullPolling()
+    pullPollingSpaceId.value = projectSpaceId
+    const startedAt = Date.now()
+    const MAX_POLL_MS = 5 * 60 * 1000
+    pullPollingTimer = setInterval(async () => {
+      if (Date.now() - startedAt > MAX_POLL_MS) {
+        stopPullPolling()
+        return
+      }
+      try {
+        const page = await taskApi.list({
+          businessId: projectSpaceId,
+          status: ['QUEUED', 'RUNNING'],
+          size: 20,
+        })
+        const active = page.content ?? []
+        if (active.length === 0) {
+          stopPullPolling()
+          await fetch()
+          await fetchMembers(projectSpaceId)
+        }
+      } catch {
+        // 忽略单次轮询错误，下个 tick 重试
+      }
+    }, 2000)
+  }
+
+  function stopPullPolling() {
+    if (pullPollingTimer) {
+      clearInterval(pullPollingTimer)
+      pullPollingTimer = null
+    }
+    pullPollingSpaceId.value = null
+  }
+
   onScopeDispose(() => {
     stopIndexProgressPolling()
     clearIndexingResetTimer()
+    stopPullPolling()
   })
 
   async function prepareAndIndex(projectSpaceId: number) {
@@ -248,11 +295,12 @@ export const useProjectSpaceStore = defineStore('projectSpace', () => {
 
   async function pullRemote(projectSpaceId: number) {
     return runPull(projectSpaceId, () => api.pull(projectSpaceId), '拉取项目空间代码失败',
-      (updated) => {
+      async (updated) => {
         upsertItem(updated)
         crud.selectedId.value = projectSpaceId
-        // 不在此处 fetchMembers：异步 fetch 任务尚未完成，提交记录仍是旧数据
-        // 用户点击刷新按钮时 fetchMembers 会获取最新数据
+        // 拉取触发 fetch + 自动 prepare（推进 worktree 到远端最新 commit），
+        // 轮询任务状态，全部完成后刷新成员与空间状态，使 behindRemote / commit 列表即时更新
+        startPullPolling(projectSpaceId)
       })
   }
 
