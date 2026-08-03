@@ -1,6 +1,7 @@
 package cn.welsione.ascoder.selflearning;
 
 import cn.welsione.ascoder.question.application.QuestionAnsweredEvent;
+import cn.welsione.ascoder.repository.RepositoryDeletedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -12,6 +13,9 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * <p>
  * 独立成 bean 以便跨 bean 调用 {@link InsightService#createCandidateFromAnswer}，
  * 保证其 {@code @Transactional} 声明在事件回调上下文中正常生效。
+ * <p>
+ * 同时监听仓库删除事件，解除经验 / 原始记录 / 洞察对已删除仓库的 nullable 引用，
+ * 保留自学习历史数据。
  */
 @Slf4j
 @Component
@@ -19,6 +23,9 @@ import org.springframework.transaction.event.TransactionalEventListener;
 public class SelfLearningEventListener {
 
     private final InsightService insightService;
+    private final LearningExperienceJpaRepository experienceRepository;
+    private final LearningRawEventJpaRepository rawEventRepository;
+    private final LearningInsightJpaRepository insightRepository;
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onQuestionAnswered(QuestionAnsweredEvent event) {
@@ -28,5 +35,14 @@ public class SelfLearningEventListener {
             log.warn("事件驱动沉淀自学习候选经验失败，questionId={}，错误={}",
                     event.getQuestionId(), ex.getMessage());
         }
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
+    public void onRepositoryDeleted(RepositoryDeletedEvent event) {
+        log.info("仓库删除事件：解除自学习数据对 repositoryId={} 的引用", event.getRepositoryId());
+        int experiences = experienceRepository.detachFromRepository(event.getRepositoryId());
+        int rawEvents = rawEventRepository.detachFromRepository(event.getRepositoryId());
+        int insights = insightRepository.detachFromRepository(event.getRepositoryId());
+        log.info("自学习解绑完成：{} 条经验, {} 条原始记录, {} 条洞察", experiences, rawEvents, insights);
     }
 }

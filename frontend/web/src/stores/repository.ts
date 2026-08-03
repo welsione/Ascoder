@@ -30,6 +30,8 @@ export const useRepositoryStore = defineStore('repository', () => {
   const { activeId: indexingId, run: runIndex } = useAsyncAction(crud.error)
   const { activeId: syncingId, run: runSync } = useAsyncAction(crud.error)
   const { activeId: branchRefreshingId, run: runBranchRefresh } = useAsyncAction(crud.error)
+  const { activeId: deletingId, run: runDelete } = useAsyncAction(crud.error)
+  const { activeId: renamingId, run: runRename } = useAsyncAction(crud.error)
   const branchLoadingId = ref<number | null>(null)
 
   const readyRepositories = computed(() =>
@@ -132,6 +134,24 @@ export const useRepositoryStore = defineStore('repository', () => {
     }
   }
 
+  async function rename(repositoryId: number, name: string) {
+    const trimmed = name.trim()
+    if (!trimmed) {
+      crud.error.value = '请填写仓库名称'
+      return null
+    }
+    return runRename(repositoryId, () => api.rename(repositoryId, trimmed), '重命名仓库失败',
+      (updated) => updateRepository(updated)) as Promise<CodeRepository | null>
+  }
+
+  async function remove(repositoryId: number) {
+    const result = await runDelete(repositoryId, () => api.remove(repositoryId), '删除仓库失败')
+    if (result === null) return false
+    crud.items.value = crud.items.value.filter((r) => r.id !== repositoryId)
+    delete branchesByRepository.value[repositoryId]
+    return true
+  }
+
   async function fetchIndexStatus(repositoryId: number) {
     try {
       const updated = await api.getIndexStatus(repositoryId)
@@ -188,6 +208,8 @@ export const useRepositoryStore = defineStore('repository', () => {
     syncingId,
     branchLoadingId,
     branchRefreshingId,
+    deletingId,
+    renamingId,
     form: crud.form,
     readyRepositories,
     statusType,
@@ -200,6 +222,8 @@ export const useRepositoryStore = defineStore('repository', () => {
     fetchRemote,
     pullRemote,
     updateCredentials,
+    rename,
+    remove,
     fetchIndexStatus,
     fetchBranches,
     refreshBranches,

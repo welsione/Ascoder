@@ -14,4 +14,6 @@ public interface ProjectRepositoryJpaRepository extends JpaRepository<ProjectRep
     boolean existsByProject_IdAndRepository_Id(Long projectId, Long repositoryId);
 
     boolean existsByProject_IdAndAlias(Long projectId, String alias);
+
+    boolean existsByRepository_Id(Long repositoryId);
 }

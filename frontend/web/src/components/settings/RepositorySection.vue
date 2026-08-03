@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { ElMessage } from 'element-plus'
-import { GitBranch, KeyRound, Plus, RefreshCw } from 'lucide-vue-next'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { GitBranch, KeyRound, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-vue-next'
 import { useRepositoryStore } from '../../stores/repository'
 import { formatTime } from '../../utils/format'
 import type { CodeRepository } from '../../types/repository'
@@ -15,6 +15,11 @@ const credentialDialogVisible = ref(false)
 const credentialRepository = ref<CodeRepository | null>(null)
 const credentialUsername = ref('')
 const credentialPassword = ref('')
+
+// 重命名对话框状态
+const renameDialogVisible = ref(false)
+const renameRepository = ref<CodeRepository | null>(null)
+const renameName = ref('')
 
 function repositoryBranchCount(repositoryId: number) {
   return repositoryStore.branchesByRepository[repositoryId]?.filter((branch) => branch.active).length ?? null
@@ -86,6 +91,36 @@ async function saveCredentials() {
     credentialDialogVisible.value = false
     ElMessage.success('凭据已更新')
   }
+}
+
+function openRenameDialog(repository: CodeRepository) {
+  renameRepository.value = repository
+  renameName.value = repository.name
+  renameDialogVisible.value = true
+}
+
+async function saveRename() {
+  if (!renameRepository.value) return
+  const updated = await repositoryStore.rename(renameRepository.value.id, renameName.value)
+  if (updated) {
+    renameDialogVisible.value = false
+    ElMessage.success('仓库已重命名')
+  }
+}
+
+async function deleteRepository(repository: CodeRepository) {
+  try {
+    await ElMessageBox.confirm(
+      `确认删除仓库「${repository.name}」？将同时删除本地克隆目录与 worktree，此操作不可恢复。若仓库已被项目或项目空间引用将无法删除。`,
+      '删除确认',
+      { confirmButtonText: '确认删除', cancelButtonText: '取消', type: 'warning' }
+    )
+  } catch {
+    // 用户取消
+    return
+  }
+  const ok = await repositoryStore.remove(repository.id)
+  if (ok) ElMessage.success('仓库已删除')
 }
 </script>
 
@@ -160,7 +195,7 @@ async function saveCredentials() {
           {{ formatTime(row.lastPulledAt, '未同步') }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="168" fixed="right">
+      <el-table-column label="操作" width="232" fixed="right">
         <template #default="{ row }">
           <div class="table-actions">
             <el-tooltip content="同步代码" placement="top" :show-after="300">
@@ -196,6 +231,29 @@ async function saveCredentials() {
                 @click="openCredentialDialog(row)"
               >
                 <KeyRound aria-hidden="true" :size="15" :stroke-width="1.8" />
+              </el-button>
+            </el-tooltip>
+            <el-tooltip content="重命名" placement="top" :show-after="300">
+              <el-button
+                size="small"
+                circle
+                :loading="repositoryStore.renamingId === row.id"
+                aria-label="重命名"
+                @click="openRenameDialog(row)"
+              >
+                <Pencil aria-hidden="true" :size="15" :stroke-width="1.8" />
+              </el-button>
+            </el-tooltip>
+            <el-tooltip content="删除仓库" placement="top" :show-after="300">
+              <el-button
+                size="small"
+                circle
+                type="danger"
+                :loading="repositoryStore.deletingId === row.id"
+                aria-label="删除仓库"
+                @click="deleteRepository(row)"
+              >
+                <Trash2 aria-hidden="true" :size="15" :stroke-width="1.8" />
               </el-button>
             </el-tooltip>
           </div>
@@ -313,6 +371,29 @@ async function saveCredentials() {
     <template #footer>
       <el-button @click="credentialDialogVisible = false">取消</el-button>
       <el-button type="primary" @click="saveCredentials">保存</el-button>
+    </template>
+  </el-dialog>
+
+  <el-dialog
+    v-model="renameDialogVisible"
+    title="重命名仓库"
+    width="440px"
+    destroy-on-close
+  >
+    <p class="credential-dialog-hint">
+      修改仓库「<strong>{{ renameRepository?.name }}</strong>」的名称。仅影响仓库显示名，不会改动本地路径与远程地址。
+    </p>
+    <div class="credential-dialog-form">
+      <div>
+        <label class="field-label">仓库名称</label>
+        <el-input v-model="renameName" placeholder="请输入新的仓库名称" maxlength="120" clearable show-word-limit />
+      </div>
+    </div>
+    <template #footer>
+      <el-button @click="renameDialogVisible = false">取消</el-button>
+      <el-button type="primary" :loading="repositoryStore.renamingId === renameRepository?.id" @click="saveRename">
+        保存
+      </el-button>
     </template>
   </el-dialog>
 </template>

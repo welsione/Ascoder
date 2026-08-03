@@ -32,6 +32,13 @@ public interface QuestionJpaRepository extends JpaRepository<Question, Long> {
     int detachFromProjectSpace(@Param("projectSpaceId") Long projectSpaceId);
 
     /**
+     * 批量解除对指定仓库的引用，用于仓库删除时清理（保留历史问答）。
+     */
+    @Modifying
+    @Query("update Question q set q.repositoryId = null where q.repositoryId = :repositoryId")
+    int detachFromRepository(@Param("repositoryId") Long repositoryId);
+
+    /**
      * 删除指定会话下的所有问题。
      */
     @Modifying

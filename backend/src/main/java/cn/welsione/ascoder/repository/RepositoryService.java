@@ -16,6 +16,7 @@ import cn.welsione.ascoder.repository.task.GitCloneContext;
 import cn.welsione.ascoder.repository.task.GitFetchContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,8 +36,12 @@ public class RepositoryService {
     private final GitRepositoryService gitRepositoryService;
     private final GitCredentialStore gitCredentialStore;
     private final TaskEngine taskEngine;
+    private final RepositoryDeletionGuard deletionGuard;
+    private final ApplicationEventPublisher eventPublisher;
+    private final RepositoryBranchJpaRepository branchRepository;
 
     private final Path repoRoot;
+    private final Path worktreeRoot;
 
     public RepositoryService(
             CodeRepositoryJpaRepository repository,
@@ -44,14 +49,22 @@ public class RepositoryService {
             GitRepositoryService gitRepositoryService,
             GitCredentialStore gitCredentialStore,
             TaskEngine taskEngine,
-            @Value("${ascoder.repo-root}") String repoRoot
+            RepositoryDeletionGuard deletionGuard,
+            ApplicationEventPublisher eventPublisher,
+            RepositoryBranchJpaRepository branchRepository,
+            @Value("${ascoder.repo-root}") String repoRoot,
+            @Value("${ascoder.worktree-root:./data/worktrees}") String worktreeRoot
     ) {
         this.repository = repository;
         this.pathValidator = pathValidator;
         this.gitRepositoryService = gitRepositoryService;
         this.gitCredentialStore = gitCredentialStore;
         this.taskEngine = taskEngine;
+        this.deletionGuard = deletionGuard;
+        this.eventPublisher = eventPublisher;
+        this.branchRepository = branchRepository;
         this.repoRoot = pathValidator.normalizeRepoRoot(repoRoot);
+        this.worktreeRoot = Path.of(worktreeRoot).toAbsolutePath().normalize();
     }
 
     @Transactional(readOnly = true)
@@ -231,6 +244,87 @@ public class RepositoryService {
         entity.setAuthPassword(trimToNull(request.getAuthPassword()));
         upsertCredentials(entity);
         return repository.save(entity);
+    }
+
+    /**
+     * 重命名仓库。仅修改名称，不影响本地路径与远程地址。
+     *
+     * @throws DuplicateException 名称已被其他仓库占用
+     */
+    @Transactional
+    public CodeRepository rename(Long id, RenameRepositoryRequest request) {
+        String newName = request.getName().trim();
+        log.info("重命名仓库，id={}，newName={}", id, newName);
+
+        CodeRepository entity = getEntity(id);
+        if (entity.getName().equals(newName)) {
+            return entity;
+        }
+        if (repository.existsByName(newName)) {
+            throw new DuplicateException("仓库名称已存在");
+        }
+        entity.setName(newName);
+        try {
+            return repository.saveAndFlush(entity);
+        } catch (DataIntegrityViolationException ex) {
+            throw new DuplicateException("仓库名称已存在", ex);
+        }
+    }
+
+    /**
+     * 删除仓库及其本地克隆目录与 worktree。
+     *
+     * <p>删除前进行强关联引用检查（项目仓库成员、项目空间成员、分支工作区、分支引用），
+     * 存在引用时拒绝删除。questions / conversations / 自学习等 nullable 引用由
+     * {@link RepositoryDeletedEvent} 监听器在删除时置 null，保留历史数据。</p>
+     *
+     * <p>事务边界：引用检查与 DB 删除在事务内，磁盘清理在事务内先行执行
+     * （参考 {@code ProjectSpaceService.delete}），失败则事务回滚。</p>
+     *
+     * @throws InvalidStateException 仓库正在处理中或被强关联引用
+     */
+    @Transactional
+    public void delete(Long id) {
+        CodeRepository entity = getEntity(id);
+        log.info("删除仓库，id={}，name={}", id, entity.getName());
+
+        if (entity.getStatus() == RepositoryStatus.CLONING
+                || entity.getStatus() == RepositoryStatus.SYNCING
+                || entity.getStatus() == RepositoryStatus.INDEXING) {
+            throw new InvalidStateException("仓库正在处理中，无法删除");
+        }
+
+        String blockingReason = deletionGuard.checkBlocking(id);
+        if (blockingReason != null) {
+            throw new InvalidStateException(blockingReason);
+        }
+
+        // 先清理磁盘：本地克隆目录与 worktree 目录，均校验在托管根目录下
+        deleteLocalFiles(entity);
+
+        // 发布事件，由 question / selflearning 聚合监听器解除 nullable 引用（BEFORE_COMMIT）
+        eventPublisher.publishEvent(new RepositoryDeletedEvent(id));
+
+        // 删除仓库分支引用记录（同聚合强关联，NOT NULL）
+        branchRepository.deleteAll(branchRepository.findByRepository_IdOrderByNameAscSourceKindAsc(id));
+        repository.delete(entity);
+        log.info("仓库已删除，id={}，name={}", id, entity.getName());
+    }
+
+    /**
+     * 删除仓库的本地克隆目录与 worktree 目录。
+     *
+     * <p>两处路径均通过 {@link FileUtil#ensureUnderRoot} 校验在托管根目录下，
+     * 避免误删根目录之外的文件。worktree 目录以仓库名为子目录。</p>
+     */
+    private void deleteLocalFiles(CodeRepository entity) {
+        Path clonePath = Path.of(entity.resolveLocalPath(repoRoot.toString()));
+        FileUtil.ensureUnderRoot(clonePath, repoRoot, "仓库克隆目录");
+        FileUtil.deleteDirectoryIfExists(clonePath);
+
+        Path worktreeRepoPath = worktreeRoot.resolve(FileUtil.safePathPart(entity.getName()));
+        FileUtil.ensureUnderRoot(worktreeRepoPath, worktreeRoot, "仓库 worktree 目录");
+        FileUtil.deleteDirectoryIfExists(worktreeRepoPath);
     }
 
     private Path resolveRepositoryPath(CreateRepositoryRequest request) {
