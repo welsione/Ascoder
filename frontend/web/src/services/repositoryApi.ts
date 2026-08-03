@@ -35,6 +35,20 @@ export function updateCredentials(
   })
 }
 
+export function rename(repositoryId: number, name: string) {
+  return request<CodeRepository>(`/api/repositories/${repositoryId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  })
+}
+
+export function remove(repositoryId: number) {
+  return request<void>(`/api/repositories/${repositoryId}`, {
+    method: 'DELETE',
+  })
+}
+
 export function triggerIndex(repositoryId: number) {
   return request<CodeRepository>(`/api/repositories/${repositoryId}/index`, {
     method: 'POST',

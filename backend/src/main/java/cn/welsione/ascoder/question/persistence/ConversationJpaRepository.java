@@ -15,4 +15,11 @@ public interface ConversationJpaRepository extends JpaRepository<Conversation, L
     @Modifying
     @Query("update Conversation c set c.projectSpaceId = null where c.projectSpaceId = :projectSpaceId")
     int detachFromProjectSpace(@Param("projectSpaceId") Long projectSpaceId);
+
+    /**
+     * 批量解除对指定仓库的引用，用于仓库删除时清理（保留历史会话）。
+     */
+    @Modifying
+    @Query("update Conversation c set c.repositoryId = null where c.repositoryId = :repositoryId")
+    int detachFromRepository(@Param("repositoryId") Long repositoryId);
 }

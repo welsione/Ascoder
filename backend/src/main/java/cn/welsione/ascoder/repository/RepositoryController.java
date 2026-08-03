@@ -3,6 +3,7 @@ package cn.welsione.ascoder.repository;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -61,6 +62,19 @@ public class RepositoryController {
             @PathVariable Long id,
             @Valid @RequestBody UpdateRepositoryCredentialsRequest request) {
         return repositoryService.updateCredentials(id, request);
+    }
+
+    @PatchMapping("/{id}")
+    public CodeRepository rename(
+            @PathVariable Long id,
+            @Valid @RequestBody RenameRepositoryRequest request) {
+        return repositoryService.rename(id, request);
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable Long id) {
+        repositoryService.delete(id);
     }
 
     @GetMapping("/{id}/index-status")

@@ -10,4 +10,6 @@ public interface ProjectSpaceMemberJpaRepository extends JpaRepository<ProjectSp
 
     @EntityGraph(attributePaths = {"projectSpace", "projectSpace.project", "repository", "branchWorkspace"})
     List<ProjectSpaceMember> findByProjectSpace_IdOrderByCreatedAtAsc(Long projectSpaceId);
+
+    boolean existsByRepository_Id(Long repositoryId);
 }

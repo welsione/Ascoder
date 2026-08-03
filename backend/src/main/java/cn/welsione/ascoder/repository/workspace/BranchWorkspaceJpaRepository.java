@@ -19,4 +19,6 @@ public interface BranchWorkspaceJpaRepository extends JpaRepository<BranchWorksp
     List<BranchWorkspace> findByRepository_IdOrderByBranchNameAsc(Long repositoryId);
 
     Optional<BranchWorkspace> findByRepository_IdAndBranchName(Long repositoryId, String branchName);
+
+    boolean existsByRepository_Id(Long repositoryId);
 }

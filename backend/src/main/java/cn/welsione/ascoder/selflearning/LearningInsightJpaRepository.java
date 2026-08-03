@@ -1,6 +1,9 @@
 package cn.welsione.ascoder.selflearning;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
@@ -14,4 +17,11 @@ public interface LearningInsightJpaRepository extends JpaRepository<LearningInsi
     Optional<LearningInsight> findByIdAndProjectSpace_Id(Long id, Long projectSpaceId);
 
     long countByProjectSpace_IdAndStatus(Long projectSpaceId, LearningInsightStatus status);
+
+    /**
+     * 批量解除对指定仓库的引用，用于仓库删除时清理。
+     */
+    @Modifying
+    @Query("update LearningInsight e set e.repository = null where e.repository.id = :repositoryId")
+    int detachFromRepository(@Param("repositoryId") Long repositoryId);
 }

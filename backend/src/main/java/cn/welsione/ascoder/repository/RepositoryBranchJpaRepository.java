@@ -15,4 +15,6 @@ public interface RepositoryBranchJpaRepository extends JpaRepository<RepositoryB
     List<RepositoryBranch> findByRepository_IdAndActiveTrueOrderByNameAscSourceKindAsc(Long repositoryId);
 
     Optional<RepositoryBranch> findByRepository_IdAndRefName(Long repositoryId, String refName);
+
+    boolean existsByRepository_Id(Long repositoryId);
 }
