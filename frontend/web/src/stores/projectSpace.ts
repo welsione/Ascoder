@@ -7,6 +7,11 @@ import type { ProjectSpace, ProjectSpaceMember, ProjectSpaceStatus } from '../ty
 import { useCrudStore } from '../composables/useCrudStore'
 import { useAsyncAction } from '../composables/useAsyncAction'
 
+/** 拉取后轮询活跃任务的间隔（毫秒） */
+const PULL_POLL_INTERVAL_MS = 2000
+/** 拉取轮询最长持续时间（毫秒），避免无限等待 */
+const PULL_POLL_MAX_MS = 5 * 60 * 1000
+
 interface MemberBranch {
   repositoryId: number
   repositoryName: string
@@ -237,9 +242,8 @@ export const useProjectSpaceStore = defineStore('projectSpace', () => {
     stopPullPolling()
     pullPollingSpaceId.value = projectSpaceId
     const startedAt = Date.now()
-    const MAX_POLL_MS = 5 * 60 * 1000
     pullPollingTimer = setInterval(async () => {
-      if (Date.now() - startedAt > MAX_POLL_MS) {
+      if (Date.now() - startedAt > PULL_POLL_MAX_MS) {
         stopPullPolling()
         return
       }
@@ -255,10 +259,11 @@ export const useProjectSpaceStore = defineStore('projectSpace', () => {
           await fetch()
           await fetchMembers(projectSpaceId)
         }
-      } catch {
-        // 忽略单次轮询错误，下个 tick 重试
+      } catch (err) {
+        // 忽略单次轮询错误，下个 tick 重试；记录日志便于排查网络故障
+        console.warn('拉取轮询查询任务失败，projectSpaceId=', projectSpaceId, err)
       }
-    }, 2000)
+    }, PULL_POLL_INTERVAL_MS)
   }
 
   function stopPullPolling() {
