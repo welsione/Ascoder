@@ -116,6 +116,7 @@ async function deleteRepository(repository: CodeRepository) {
       { confirmButtonText: '确认删除', cancelButtonText: '取消', type: 'warning' }
     )
   } catch {
+    // 用户取消
     return
   }
   const ok = await repositoryStore.remove(repository.id)

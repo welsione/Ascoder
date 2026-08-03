@@ -46,4 +46,3 @@ public class SelfLearningEventListener {
         log.info("自学习解绑完成：{} 条经验, {} 条原始记录, {} 条洞察", experiences, rawEvents, insights);
     }
 }
-
