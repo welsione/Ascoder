@@ -111,7 +111,8 @@ class SelfLearningServiceTests {
                 insightAgent,
                 insightFieldTruncator,
                 transactionTemplate());
-        eventListener = new SelfLearningEventListener(insightService);
+        eventListener = new SelfLearningEventListener(
+                insightService, experienceRepository, rawEventRepository, insightRepository);
         // truncator mock：透传输入值（lenient：部分测试不使用 truncator）
         lenient().when(insightFieldTruncator.truncateTitle(any())).thenAnswer(inv -> inv.getArgument(0));
         lenient().when(insightFieldTruncator.truncateSummary(any())).thenAnswer(inv -> inv.getArgument(0));
