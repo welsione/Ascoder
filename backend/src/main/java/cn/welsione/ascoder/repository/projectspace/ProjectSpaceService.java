@@ -143,7 +143,7 @@ public class ProjectSpaceService {
     public ProjectSpace prepare(Long id) {
         ProjectSpacePrepareSnapshot snapshot = beginPrepare(id);
 
-        ProjectSpacePrepareContext context = new ProjectSpacePrepareContext(id);
+        ProjectSpacePrepareContext context = new ProjectSpacePrepareContext(id, false);
         TaskSubmitRequest<ProjectSpacePrepareContext> request = new TaskSubmitRequest<>();
         request.setKind(TaskKind.PROJECT_SPACE_PREPARE);
         request.setContext(context);
@@ -470,11 +470,14 @@ public class ProjectSpaceService {
     private final ConcurrentHashMap<Long, ScheduledFuture<?>> pendingRefreshBySpace = new ConcurrentHashMap<>();
 
     /**
-     * 监听项目空间关联仓库 fetch 完成事件，防抖刷新项目空间状态。
+     * 监听项目空间关联仓库 fetch 完成事件，防抖后尝试将 worktree 推进到远端最新 commit。
      *
      * <p>项目空间拉取会为每个成员仓库提交独立的 fetch 任务，N 个任务完成会触发 N 次事件。
-     * 通过防抖（debounce）合并为最后一次事件后的单次 refresh，避免对每个成员重复执行 git 命令
-     * 读取远端 commit。fetch 完成后本地 git 数据已更新，此时刷新可正确读取最新的 commitSha 和提交记录。</p>
+     * 通过防抖（debounce）合并为最后一次事件后的单次处理，避免重复执行 git 命令。</p>
+     *
+     * <p>fetch 完成后本地 {@code origin/<branch>} 已更新。先 refresh 探测各成员 worktree 是否落后远端：
+     * 若落后（空间进入 STALE），提交 {@code advanceToRemote=true} 的准备任务，将各成员 worktree
+     * checkout 到远端最新 commit 并更新 member.commitSha；若无落后，仅 touch 保持 READY。</p>
      */
     @EventListener
     public void onFetchCompleted(ProjectSpaceFetchCompletedEvent event) {
@@ -486,13 +489,46 @@ public class ProjectSpaceService {
         ScheduledFuture<?> future = fetchRefreshScheduler.schedule(() -> {
             pendingRefreshBySpace.remove(projectSpaceId);
             try {
-                refresh(projectSpaceId);
-                log.info("fetch 完成后刷新项目空间，projectSpaceId={}", projectSpaceId);
+                advanceToRemoteIfStale(projectSpaceId);
             } catch (Exception ex) {
-                log.warn("fetch 完成后刷新项目空间失败，projectSpaceId={}：{}", projectSpaceId, ex.getMessage());
+                log.warn("fetch 完成后推进项目空间 worktree 失败，projectSpaceId={}：{}", projectSpaceId, ex.getMessage());
             }
         }, FETCH_COMPLETED_DEBOUNCE_MS, TimeUnit.MILLISECONDS);
         pendingRefreshBySpace.put(projectSpaceId, future);
+    }
+
+    /**
+     * refresh 探测成员是否落后远端，落后则提交准备任务将 worktree 推进到远端最新 commit。
+     *
+     * <p>仅在空间处于 READY / STALE / READY_TO_INDEX 时推进；PREPARING / INDEXING / FAILED / CREATED
+     * 状态只 refresh，避免打断进行中的流程。推进后空间状态变为 READY_TO_INDEX，
+     * 由用户手动触发增量索引（index 方法会根据 lastIndexedAt 自动选增量同步）。</p>
+     */
+    private void advanceToRemoteIfStale(Long projectSpaceId) {
+        ProjectSpace space = getEntity(projectSpaceId);
+        ProjectSpaceStatus status = space.getStatus();
+        if (status != ProjectSpaceStatus.READY
+                && status != ProjectSpaceStatus.STALE
+                && status != ProjectSpaceStatus.READY_TO_INDEX) {
+            log.info("项目空间状态为 {}，仅刷新不推进 worktree，projectSpaceId={}", status, projectSpaceId);
+            refresh(projectSpaceId);
+            return;
+        }
+
+        ProjectSpace refreshed = refresh(projectSpaceId);
+        if (refreshed.getStatus() != ProjectSpaceStatus.STALE) {
+            log.info("项目空间无成员落后远端，无需推进 worktree，projectSpaceId={}", projectSpaceId);
+            return;
+        }
+
+        ProjectSpacePrepareSnapshot snapshot = beginPrepare(projectSpaceId);
+        ProjectSpacePrepareContext context = new ProjectSpacePrepareContext(projectSpaceId, true);
+        TaskSubmitRequest<ProjectSpacePrepareContext> request = new TaskSubmitRequest<>();
+        request.setKind(TaskKind.PROJECT_SPACE_PREPARE);
+        request.setContext(context);
+        request.setBusinessId(projectSpaceId);
+        taskEngine.submit(request);
+        log.info("检测到成员落后远端，已提交 worktree 推进任务，projectSpaceId={}", projectSpaceId);
     }
 
     @PreDestroy

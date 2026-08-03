@@ -7,12 +7,14 @@ export function list(params: {
   sort?: string
   kind?: TaskKind
   status?: TaskStatus[]
+  businessId?: number
 }) {
   const query = new URLSearchParams()
   if (params.page !== undefined) query.set('page', String(params.page))
   if (params.size !== undefined) query.set('size', String(params.size))
   if (params.sort) query.set('sort', params.sort)
   if (params.kind) query.set('kind', params.kind)
+  if (params.businessId !== undefined) query.set('businessId', String(params.businessId))
   if (params.status?.length) {
     for (const s of params.status) query.append('status', s)
   }
