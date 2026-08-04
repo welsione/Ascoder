@@ -157,7 +157,8 @@ const staleMembers = computed(() =>
   projectSpaceStore.members.filter((member) => member.behindRemote)
 )
 const indexableSpaceStatuses = new Set<ProjectSpaceStatus>(['READY_TO_INDEX', 'READY', 'STALE'])
-// 增量索引仅对已索引过的空间可用（READY/STALE）
+// 增量索引对已索引过的空间可用：READY/STALE 直接放行；
+// READY_TO_INDEX 仅在拉取更新后（lastIndexedAt 存在）放行，首次准备未索引过时只能全量索引
 const incrementalIndexableStatuses = new Set<ProjectSpaceStatus>(['READY', 'STALE'])
 // 重新索引作为恢复路径，额外放行 FAILED
 const reindexableSpaceStatuses = new Set<ProjectSpaceStatus>([
@@ -237,7 +238,11 @@ function canIndexSpace(status: ProjectSpaceStatus) {
 }
 
 function canIncrementalIndex(status: ProjectSpaceStatus) {
-  return incrementalIndexableStatuses.has(status)
+  if (incrementalIndexableStatuses.has(status)) {
+    return true
+  }
+  // 拉取更新后状态为 READY_TO_INDEX，但 lastIndexedAt 存在表示之前已索引过，可走增量同步
+  return status === 'READY_TO_INDEX' && space.value?.lastIndexedAt != null
 }
 
 function canReindexSpace(status: ProjectSpaceStatus) {
