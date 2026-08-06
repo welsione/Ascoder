@@ -5,6 +5,8 @@ import cn.welsione.ascoder.question.domain.QueryPlan;
 import cn.welsione.ascoder.repository.projectspace.ProjectSpace;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -31,6 +33,8 @@ public class AgentRunService {
 
     private static final int DEFAULT_AGENT_RUN_LIMIT = 12;
     private static final int MAX_AGENT_RUN_LIMIT = 30;
+    private static final int RECENT_RAW_EVENT_WINDOW = 50;
+    private static final int MAX_RAW_EVENT_FAILURES = 3;
     private static final Pattern CODE_SYMBOL_PATTERN = Pattern.compile(
             "\\b[A-Z][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)*(?:\\(\\))?\\b"
     );
@@ -45,6 +49,32 @@ public class AgentRunService {
     private final SelfLearningInsightAgent insightAgent;
     private final InsightFieldTruncator insightFieldTruncator;
     private final TransactionTemplate transactionTemplate;
+
+    /**
+     * 应用就绪后将残留的非终态运行记录（重启前未完成）标记为失败，
+     * 避免前端永远显示运行中，也防止重启后新旧运行并发整理同一批原始记录。
+     *
+     * <p>在 {@link ApplicationReadyEvent} 后执行（而非 {@code @PostConstruct}），
+     * 应用启动完成后再访问数据库；异常时仅告警降级，不影响启动。</p>
+     */
+    @EventListener(ApplicationReadyEvent.class)
+    public void repairInterruptedRuns() {
+        try {
+            List<LearningAgentRun> dangling = entityLoader.activeAgentRuns();
+            if (dangling.isEmpty()) {
+                return;
+            }
+            log.warn("发现 {} 条未完成的 Self Learning Agent 运行记录，修正为失败状态", dangling.size());
+            transactionTemplate.executeWithoutResult(status -> {
+                for (LearningAgentRun run : dangling) {
+                    run.interrupt("应用重启前未正常结束，已修正为失败状态。");
+                }
+                entityLoader.saveAgentRuns(dangling);
+            });
+        } catch (Exception ex) {
+            log.warn("修复未完成的 Self Learning Agent 运行记录失败（降级跳过）：{}", ex.getMessage());
+        }
+    }
 
     public SelfLearningAgentRunResponse runSelfLearningAgent(Long projectSpaceId, Integer limit) {
         return runSelfLearningAgent(projectSpaceId, limit, null);
@@ -81,6 +111,7 @@ public class AgentRunService {
                 failedCount++;
                 failures.add(conversationFailureJson(rawEventIdsJson, ex.getMessage()));
                 updateAgentRunProgress(runId, createdCount, consumedCount, failedCount, rawEventIdsJson, SelfLearningTextUtil.toJsonArrayText(failures));
+                markRawEventsFailed(rawEventIdsJson);
                 log.warn("Self Learning Agent conversation 整理失败，projectSpaceId={}，rawEventIds={}，error={}",
                         projectSpaceId, rawEventIdsJson, ex.getMessage());
             }
@@ -259,6 +290,23 @@ public class AgentRunService {
         });
     }
 
+    /**
+     * 整理失败的原始记录累计失败次数，达到 {@link #MAX_RAW_EVENT_FAILURES} 后不再选中，
+     * 避免 LLM 持续失败时反复重试消耗 token。
+     */
+    private void markRawEventsFailed(String rawEventIdsJson) {
+        List<Long> rawEventIds = conversationRecordHelper.parseJsonIds(rawEventIdsJson);
+        if (rawEventIds.isEmpty()) {
+            return;
+        }
+        transactionTemplate.executeWithoutResult(status -> {
+            for (LearningRawEvent event : entityLoader.rawEventsByIds(rawEventIds)) {
+                event.incrementFailedCount();
+                entityLoader.saveRawEvent(event);
+            }
+        });
+    }
+
     private LearningAgentRunStatus agentRunStatus(int createdCount, int failedCount) {
         if (failedCount > 0 && createdCount == 0) {
             return LearningAgentRunStatus.FAILED;
@@ -307,10 +355,11 @@ public class AgentRunService {
                 );
             }
             Set<Long> usedRawEventIds = usedRawEventIds(projectSpaceId);
-            List<LearningRawEvent> recentRawEvents = entityLoader.recentRawEvents(projectSpaceId, 50);
+            List<LearningRawEvent> recentRawEvents = entityLoader.recentRawEvents(projectSpaceId, RECENT_RAW_EVENT_WINDOW);
             List<LearningRawEvent> candidates = recentRawEvents.stream()
                     .filter(item -> item.getId() != null && !usedRawEventIds.contains(item.getId()))
                     .filter(item -> item.getSummary() != null && !item.getSummary().isBlank())
+                    .filter(item -> item.getFailedCount() < MAX_RAW_EVENT_FAILURES)
                     .limit(normalizedLimit)
                     .toList();
             List<List<LearningRawEvent>> groups = groupRawEvents(candidates);

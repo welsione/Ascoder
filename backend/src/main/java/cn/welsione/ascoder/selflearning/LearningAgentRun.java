@@ -105,6 +105,17 @@ public class LearningAgentRun {
         touch();
     }
 
+    /**
+     * 标记进程中断导致的非终态运行（应用重启时兜底）。
+     */
+    public void interrupt(String error) {
+        status = LearningAgentRunStatus.FAILED;
+        errorMessage = error;
+        message = "应用重启前未正常结束，已修正为失败状态。";
+        finishedAt = new Date();
+        touch();
+    }
+
     public void touch() {
         updatedAt = new Date();
     }

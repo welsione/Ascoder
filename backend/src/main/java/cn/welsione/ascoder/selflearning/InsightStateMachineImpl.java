@@ -16,7 +16,9 @@ import java.util.Set;
 public class InsightStateMachineImpl implements InsightStateMachine {
 
     private static final Map<LearningInsightStatus, Set<LearningInsightStatus>> TRANSITIONS = Map.of(
-            LearningInsightStatus.PENDING_REVIEW, Set.of(LearningInsightStatus.APPROVED, LearningInsightStatus.REJECTED),
+            LearningInsightStatus.DRAFT, Set.of(LearningInsightStatus.PENDING_REVIEW),
+            LearningInsightStatus.PENDING_REVIEW, Set.of(LearningInsightStatus.APPROVED, LearningInsightStatus.REJECTED, LearningInsightStatus.DRAFT),
+            LearningInsightStatus.REJECTED, Set.of(LearningInsightStatus.DRAFT),
             LearningInsightStatus.APPROVED, Set.of(LearningInsightStatus.MERGED)
     );
 

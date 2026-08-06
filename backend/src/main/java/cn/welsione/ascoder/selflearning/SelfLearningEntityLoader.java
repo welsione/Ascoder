@@ -9,6 +9,7 @@ import cn.welsione.ascoder.repository.RepositoryQueryPort;
 import cn.welsione.ascoder.repository.projectspace.ProjectSpace;
 import cn.welsione.ascoder.repository.projectspace.ProjectSpaceService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -21,6 +22,9 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 public class SelfLearningEntityLoader {
+
+    /** 启动恢复一次性处理的最大非终态运行记录数。 */
+    private static final int ACTIVE_AGENT_RUN_LIMIT = 100;
 
     private final ProjectSpaceService projectSpaceService;
     private final SelfLearningSettingsJpaRepository settingsRepository;
@@ -132,7 +136,7 @@ public class SelfLearningEntityLoader {
     }
 
     public List<LearningRawEvent> recentRawEvents(Long projectSpaceId, int limit) {
-        return rawEventRepository.findTop50ByProjectSpace_IdOrderByCreatedAtDesc(projectSpaceId);
+        return rawEventRepository.findByProjectSpace_IdOrderByCreatedAtDesc(projectSpaceId, PageRequest.of(0, limit));
     }
 
     public List<LearningRawEvent> rawEventsByIds(List<Long> ids) {
@@ -163,6 +167,21 @@ public class SelfLearningEntityLoader {
 
     public LearningAgentRun saveAgentRun(LearningAgentRun run) {
         return agentRunRepository.save(run);
+    }
+
+    public List<LearningAgentRun> saveAgentRuns(List<LearningAgentRun> runs) {
+        return agentRunRepository.saveAll(runs);
+    }
+
+    /** 查询所有非终态（QUEUED / RUNNING）的运行记录，用于启动恢复（最多 100 条）。 */
+    public List<LearningAgentRun> activeAgentRuns() {
+        return agentRunRepository.findByStatusIn(
+                List.of(
+                        LearningAgentRunStatus.QUEUED,
+                        LearningAgentRunStatus.RUNNING
+                ),
+                PageRequest.of(0, ACTIVE_AGENT_RUN_LIMIT)
+        );
     }
 
     // ---------- 经验 / 术语 / 纠正 ----------
