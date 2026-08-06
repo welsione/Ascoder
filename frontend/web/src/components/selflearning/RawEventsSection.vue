@@ -78,8 +78,8 @@ watch(() => props.refreshToken, loadRawEvents)
   <div v-loading="loading" class="raw-events-section">
     <div class="section-heading">
       <div>
-        <p class="kicker">原始记录</p>
-        <h2>Raw Events</h2>
+        <p class="kicker">Raw Events</p>
+        <h2>原始记录</h2>
         <p>只做事实留痕，不直接参与回答召回。历史聊天可手动导入，重复导入会自动跳过。</p>
       </div>
       <div class="section-actions">

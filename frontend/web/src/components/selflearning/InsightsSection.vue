@@ -294,8 +294,8 @@ watch(() => props.refreshToken, loadInsights)
   <div v-loading="loading" class="insights-section">
     <div class="section-heading">
       <div>
-        <p class="kicker">待审核洞察</p>
-        <h2>Learning Insights</h2>
+        <p class="kicker">Learning Insights</p>
+        <h2>候选洞察</h2>
         <p>候选洞察需要管理员审核，通过后才会归纳为正式知识。</p>
       </div>
       <div class="section-actions">
@@ -538,7 +538,7 @@ watch(() => props.refreshToken, loadInsights)
       </article>
     </div>
     <div v-else class="empty-box compact-empty">
-      <p>暂无候选洞察。点击页面顶部「后台整理」从原始记录生成，或在右上角手动新建。</p>
+      <p>暂无候选洞察。点击页面顶部「后台整理」可自动生成，或点击右上角「新建洞察」手动添加。</p>
     </div>
 
     <el-dialog v-model="insightDialogVisible" :title="editingInsightId ? '编辑候选洞察' : '新建候选洞察'" width="720px">
@@ -667,6 +667,10 @@ watch(() => props.refreshToken, loadInsights)
 </template>
 
 <style scoped>
+.insights-section .section-actions .el-select {
+  width: 130px;
+}
+
 .review-workbench {
   display: grid;
   grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);

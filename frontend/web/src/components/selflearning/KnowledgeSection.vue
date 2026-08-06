@@ -185,8 +185,8 @@ watch(() => props.refreshToken, loadKnowledgeItems)
   <div v-loading="loading" class="knowledge-section">
     <div class="section-heading">
       <div>
-        <p class="kicker">正式知识</p>
-        <h2>Knowledge Items</h2>
+        <p class="kicker">Knowledge Items</p>
+        <h2>正式知识</h2>
         <p>只有 active / verified 正式知识会作为回答线索召回。</p>
       </div>
       <div class="section-actions">

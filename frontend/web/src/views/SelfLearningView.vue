@@ -209,19 +209,19 @@ onMounted(loadAll)
         <DatabaseZap :size="20" :stroke-width="2" />
         <span>原始记录</span>
         <strong>{{ summary?.rawEventCount ?? 0 }}</strong>
-        <p>问答、工具调用、反馈和证据留痕</p>
+        <p>问答、工具与反馈留痕</p>
       </article>
       <article class="metric-card" :class="{ highlight: (summary?.pendingInsightCount ?? 0) > 0 }">
         <Sparkles :size="20" :stroke-width="2" />
         <span>待审核洞察</span>
         <strong>{{ summary?.pendingInsightCount ?? 0 }}</strong>
-        <p>Self Learning Agent 整理后的草稿</p>
+        <p>Agent 整理后的草稿</p>
       </article>
       <article class="metric-card">
         <FileCheck2 :size="20" :stroke-width="2" />
         <span>正式知识</span>
         <strong>{{ summary?.knowledgeItemCount ?? 0 }}</strong>
-        <p>{{ activeKnowledgeCount }} 条可作为回答线索</p>
+        <p>{{ activeKnowledgeCount }} 条参与回答召回</p>
       </article>
       <article class="metric-card">
         <ShieldCheck :size="20" :stroke-width="2" />
@@ -345,7 +345,7 @@ onMounted(loadAll)
   display: grid;
   grid-template-columns: minmax(0, 1fr) 280px;
   gap: var(--spacing-6);
-  align-items: stretch;
+  align-items: center;
   padding: var(--spacing-7);
   border: 1px solid rgba(79, 110, 247, 0.14);
   border-radius: var(--radius-xl);
