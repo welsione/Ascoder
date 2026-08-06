@@ -3,6 +3,7 @@ package cn.welsione.ascoder.runtime.application;
 import cn.welsione.ascoder.agent.AgentProperties;
 import cn.welsione.ascoder.codegraph.CodeGraphProperties;
 import cn.welsione.ascoder.common.exception.ValidationException;
+import cn.welsione.ascoder.common.task.TaskExecutorProperties;
 import cn.welsione.ascoder.repository.git.GitProperties;
 import cn.welsione.ascoder.runtime.domain.RuntimeSettingsChangedEvent;
 import cn.welsione.ascoder.runtime.domain.SettingValueType;
@@ -43,12 +44,13 @@ public class RuntimeSettingsService {
     private final AgentProperties agentProperties;
     private final CodeGraphProperties codegraphProperties;
     private final GitProperties gitProperties;
+    private final TaskExecutorProperties taskExecutorProperties;
 
     private Map<String, RuntimeSettingCatalog.Meta> catalog;
 
     @PostConstruct
     void initCatalog() {
-        this.catalog = RuntimeSettingCatalog.buildCatalog(agentProperties, codegraphProperties, gitProperties);
+        this.catalog = RuntimeSettingCatalog.buildCatalog(agentProperties, codegraphProperties, gitProperties, taskExecutorProperties);
         log.info("运行时配置白名单初始化完成，共 {} 项", catalog.size());
     }
 
@@ -172,7 +174,8 @@ public class RuntimeSettingsService {
         List<String> allowed = List.of(
                 RuntimeSettingCatalog.CATEGORY_AGENT,
                 RuntimeSettingCatalog.CATEGORY_CODEGRAPH,
-                RuntimeSettingCatalog.CATEGORY_GIT);
+                RuntimeSettingCatalog.CATEGORY_GIT,
+                RuntimeSettingCatalog.CATEGORY_TASK);
         if (category == null || !allowed.contains(category)) {
             throw new ValidationException("category", "未知分类: " + category);
         }

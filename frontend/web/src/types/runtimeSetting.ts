@@ -1,6 +1,6 @@
 export type RuntimeSettingValueType = 'INT' | 'LONG' | 'BOOLEAN' | 'STRING' | 'DOUBLE'
 
-export type RuntimeSettingCategory = 'agent' | 'codegraph' | 'git'
+export type RuntimeSettingCategory = 'agent' | 'codegraph' | 'git' | 'task'
 
 export type RuntimeSetting = {
   key: string

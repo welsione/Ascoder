@@ -2,6 +2,7 @@ package cn.welsione.ascoder.config;
 
 import cn.welsione.ascoder.agent.AgentProperties;
 import cn.welsione.ascoder.codegraph.CodeGraphProperties;
+import cn.welsione.ascoder.common.task.TaskExecutorProperties;
 import cn.welsione.ascoder.repository.git.GitProperties;
 import lombok.Getter;
 import lombok.Setter;
@@ -21,6 +22,7 @@ import org.springframework.context.annotation.Configuration;
         AgentProperties.class,
         CodeGraphProperties.class,
         GitProperties.class,
+        TaskExecutorProperties.class,
 })
 @Getter
 @Setter
