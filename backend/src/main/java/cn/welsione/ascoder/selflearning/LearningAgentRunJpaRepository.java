@@ -2,6 +2,7 @@ package cn.welsione.ascoder.selflearning;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -9,4 +10,6 @@ import java.util.List;
  */
 public interface LearningAgentRunJpaRepository extends JpaRepository<LearningAgentRun, Long> {
     List<LearningAgentRun> findTop20ByProjectSpace_IdOrderByCreatedAtDesc(Long projectSpaceId);
+
+    List<LearningAgentRun> findByStatusIn(Collection<LearningAgentRunStatus> statuses);
 }

@@ -3,6 +3,7 @@ package cn.welsione.ascoder.selflearning;
 import cn.welsione.ascoder.question.domain.Question;
 import cn.welsione.ascoder.question.domain.QueryPlan;
 import cn.welsione.ascoder.repository.projectspace.ProjectSpace;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -45,6 +46,25 @@ public class AgentRunService {
     private final SelfLearningInsightAgent insightAgent;
     private final InsightFieldTruncator insightFieldTruncator;
     private final TransactionTemplate transactionTemplate;
+
+    /**
+     * 启动时将残留的非终态运行记录（应用重启前未完成）标记为失败，
+     * 避免前端永远显示运行中，也防止重启后新旧运行并发整理同一批原始记录。
+     */
+    @PostConstruct
+    public void repairInterruptedRuns() {
+        List<LearningAgentRun> dangling = entityLoader.activeAgentRuns();
+        if (dangling.isEmpty()) {
+            return;
+        }
+        log.warn("发现 {} 条未完成的 Self Learning Agent 运行记录，修正为失败状态", dangling.size());
+        transactionTemplate.executeWithoutResult(status -> {
+            for (LearningAgentRun run : dangling) {
+                run.interrupt("应用重启前未正常结束，已修正为失败状态。");
+            }
+            entityLoader.saveAgentRuns(dangling);
+        });
+    }
 
     public SelfLearningAgentRunResponse runSelfLearningAgent(Long projectSpaceId, Integer limit) {
         return runSelfLearningAgent(projectSpaceId, limit, null);

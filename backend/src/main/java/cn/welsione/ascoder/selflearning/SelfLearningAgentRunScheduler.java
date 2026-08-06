@@ -35,8 +35,16 @@ public class SelfLearningAgentRunScheduler {
                     "Self Learning Agent 正在后台整理该项目空间，请稍后刷新待审核洞察。"
             );
         }
-        LearningAgentRun run = service.createAgentRun(projectSpaceId, limit);
-        executor.submit(() -> run(run.getId(), projectSpaceId, limit));
+        LearningAgentRun run;
+        try {
+            run = service.createAgentRun(projectSpaceId, limit);
+            executor.submit(() -> run(run.getId(), projectSpaceId, limit));
+        } catch (RuntimeException ex) {
+            // 创建运行记录或提交线程池失败时清理去重标记，避免该项目空间永久无法再次提交
+            runningProjectSpaceIds.remove(projectSpaceId);
+            log.error("提交 Self Learning Agent 后台整理失败，projectSpaceId={}，error={}", projectSpaceId, ex.getMessage());
+            throw ex;
+        }
         return new SelfLearningAgentRunResponse(
                 run.getId(),
                 LearningAgentRunStatus.QUEUED,
