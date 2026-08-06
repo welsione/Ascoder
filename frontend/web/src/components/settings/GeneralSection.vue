@@ -14,6 +14,7 @@ const categoryMeta: { key: RuntimeSettingCategory; title: string; description: s
   { key: 'agent', title: 'Agent 行为调参', description: '迭代次数、超时、规划与查询规划阈值。修改后立即对新建任务生效。', restartHint: true },
   { key: 'codegraph', title: 'CodeGraph', description: 'CLI 命令超时。executable 需重启后生效。' },
   { key: 'git', title: 'Git', description: 'git 命令超时。修改后立即对下一次 git 命令生效。' },
+  { key: 'task', title: '异步任务线程池', description: 'Git / CodeGraph 等异步任务的线程池参数。修改后需重启进程生效。', restartHint: true },
 ]
 
 const savingKey = ref<string | null>(null)
@@ -40,7 +41,7 @@ function formatValue(s: RuntimeSetting): string {
 }
 
 const groupedSettings = computed(() => {
-  const map: Record<string, RuntimeSetting[]> = { agent: [], codegraph: [], git: [] }
+  const map: Record<string, RuntimeSetting[]> = { agent: [], codegraph: [], git: [], task: [] }
   for (const s of store.settings) {
     if (map[s.category]) map[s.category].push(s)
   }

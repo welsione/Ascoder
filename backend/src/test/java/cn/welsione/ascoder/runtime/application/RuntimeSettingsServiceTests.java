@@ -3,6 +3,7 @@ package cn.welsione.ascoder.runtime.application;
 import cn.welsione.ascoder.agent.AgentProperties;
 import cn.welsione.ascoder.codegraph.CodeGraphProperties;
 import cn.welsione.ascoder.common.exception.ValidationException;
+import cn.welsione.ascoder.common.task.TaskExecutorProperties;
 import cn.welsione.ascoder.repository.git.GitProperties;
 import cn.welsione.ascoder.runtime.domain.RuntimeSettingsChangedEvent;
 import cn.welsione.ascoder.runtime.domain.SystemSetting;
@@ -39,7 +40,8 @@ class RuntimeSettingsServiceTests {
         AgentProperties agent = new AgentProperties();
         CodeGraphProperties codegraph = new CodeGraphProperties();
         GitProperties git = new GitProperties();
-        service = new RuntimeSettingsService(repository, cache, eventPublisher, agent, codegraph, git);
+        TaskExecutorProperties taskExecutor = new TaskExecutorProperties();
+        service = new RuntimeSettingsService(repository, cache, eventPublisher, agent, codegraph, git, taskExecutor);
         // 触发 @PostConstruct（手动调用 initCatalog）
         invokeInitCatalog();
     }
@@ -106,6 +108,37 @@ class RuntimeSettingsServiceTests {
     }
 
     @Test
+    void writeRejectsTaskPoolCoreBelowOne() {
+        assertThrows(ValidationException.class,
+                () -> service.write("task.git-fetch-core-threads", "0"));
+    }
+
+    @Test
+    void writeRejectsTaskPoolQueueBelowOne() {
+        assertThrows(ValidationException.class,
+                () -> service.write("task.git-fetch-queue-capacity", "0"));
+    }
+
+    @Test
+    void writeRejectsTaskPoolMaxBelowCurrentCore() {
+        // core 默认 2，max 写 1 应拒绝
+        assertThrows(ValidationException.class,
+                () -> service.write("task.git-fetch-max-threads", "1"));
+    }
+
+    @Test
+    void writeAcceptsTaskPoolMaxNotBelowCurrentCore() {
+        when(repository.findById("task.git-fetch-max-threads")).thenReturn(Optional.empty());
+        when(repository.save(any(SystemSetting.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.write("task.git-fetch-max-threads", "3");
+
+        ArgumentCaptor<SystemSetting> captor = ArgumentCaptor.forClass(SystemSetting.class);
+        verify(repository).save(captor.capture());
+        assertEquals("3", captor.getValue().getValue());
+    }
+
+    @Test
     void resetRejectsUnknownCategory() {
         assertThrows(ValidationException.class, () -> service.reset("not-a-category"));
     }
@@ -130,8 +163,8 @@ class RuntimeSettingsServiceTests {
         when(repository.findAll()).thenReturn(new ArrayList<>());
 
         List<RuntimeSettingsService.SettingView> views = service.listAll();
-        // 白名单共 21 项（17 agent + 3 codegraph + 1 git）
-        assertEquals(21, views.size());
+        // 白名单共 39 项（17 agent + 3 codegraph + 1 git + 18 task）
+        assertEquals(39, views.size());
         RuntimeSettingsService.SettingView any = views.stream()
                 .filter(v -> v.getKey().equals("agent.max-iters"))
                 .findFirst()
@@ -148,5 +181,30 @@ class RuntimeSettingsServiceTests {
         List<RuntimeSettingsService.SettingView> views = service.listByCategory("codegraph");
         assertTrue(views.stream().allMatch(v -> "codegraph".equals(v.getCategory())));
         assertEquals(3, views.size());
+    }
+
+    @Test
+    void listByTaskCategoryReturnsPoolSettings() {
+        when(repository.findAll()).thenReturn(new ArrayList<>());
+
+        List<RuntimeSettingsService.SettingView> views = service.listByCategory("task");
+        assertEquals(18, views.size());
+        assertTrue(views.stream().allMatch(v -> "task".equals(v.getCategory())));
+        RuntimeSettingsService.SettingView core = views.stream()
+                .filter(v -> v.getKey().equals("task.git-fetch-core-threads"))
+                .findFirst()
+                .orElseThrow();
+        assertEquals("2", core.getDefaultValue());
+    }
+
+    @Test
+    void resetTaskCategoryDeletesAndPublishes() {
+        service.reset("task");
+
+        verify(repository).deleteByCategory("task");
+        ArgumentCaptor<RuntimeSettingsChangedEvent> eventCaptor = ArgumentCaptor.forClass(RuntimeSettingsChangedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        assertEquals(RuntimeSettingsChangedEvent.Action.RESET, eventCaptor.getValue().getAction());
+        assertEquals("task", eventCaptor.getValue().getCategory());
     }
 }

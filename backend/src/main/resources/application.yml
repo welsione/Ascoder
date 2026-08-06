@@ -65,6 +65,26 @@ ascoder:
     index-timeout-seconds: ${CODEGRAPH_INDEX_TIMEOUT_SECONDS:3600}
   git:
     timeout-seconds: ${GIT_TIMEOUT_SECONDS:120}
+  task-executor:
+    # 异步任务线程池默认值；运行时可通过设置页（/api/settings）修改，需重启进程生效。
+    git-clone-core-threads: ${TASK_GIT_CLONE_CORE_THREADS:1}
+    git-clone-max-threads: ${TASK_GIT_CLONE_MAX_THREADS:2}
+    git-clone-queue-capacity: ${TASK_GIT_CLONE_QUEUE_CAPACITY:4}
+    git-fetch-core-threads: ${TASK_GIT_FETCH_CORE_THREADS:2}
+    git-fetch-max-threads: ${TASK_GIT_FETCH_MAX_THREADS:4}
+    git-fetch-queue-capacity: ${TASK_GIT_FETCH_QUEUE_CAPACITY:8}
+    codegraph-index-core-threads: ${TASK_CODEGRAPH_INDEX_CORE_THREADS:1}
+    codegraph-index-max-threads: ${TASK_CODEGRAPH_INDEX_MAX_THREADS:1}
+    codegraph-index-queue-capacity: ${TASK_CODEGRAPH_INDEX_QUEUE_CAPACITY:2}
+    codegraph-sync-core-threads: ${TASK_CODEGRAPH_SYNC_CORE_THREADS:1}
+    codegraph-sync-max-threads: ${TASK_CODEGRAPH_SYNC_MAX_THREADS:2}
+    codegraph-sync-queue-capacity: ${TASK_CODEGRAPH_SYNC_QUEUE_CAPACITY:4}
+    project-space-prepare-core-threads: ${TASK_PROJECT_SPACE_PREPARE_CORE_THREADS:1}
+    project-space-prepare-max-threads: ${TASK_PROJECT_SPACE_PREPARE_MAX_THREADS:2}
+    project-space-prepare-queue-capacity: ${TASK_PROJECT_SPACE_PREPARE_QUEUE_CAPACITY:4}
+    branch-refresh-core-threads: ${TASK_BRANCH_REFRESH_CORE_THREADS:1}
+    branch-refresh-max-threads: ${TASK_BRANCH_REFRESH_MAX_THREADS:2}
+    branch-refresh-queue-capacity: ${TASK_BRANCH_REFRESH_QUEUE_CAPACITY:8}
   log-analysis:
     storage-root: ${LOG_ANALYSIS_STORAGE_ROOT:./data/log-analysis}
     max-file-bytes: ${LOG_ANALYSIS_MAX_FILE_BYTES:104857600}

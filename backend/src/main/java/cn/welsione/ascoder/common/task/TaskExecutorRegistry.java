@@ -16,23 +16,28 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * 任务线程池注册表，按 TaskKind 隔离线程池。
  *
- * <p>每种 TaskKind 拥有独立的 ThreadPoolExecutor，配置来自硬编码默认值
- * （后续可接入 RuntimeSettings 热改）。</p>
+ * <p>每种 TaskKind 拥有独立的 ThreadPoolExecutor，参数由 {@link TaskPoolConfigPort}
+ * 提供（基于运行时设置，可在设置页修改，修改需重启进程生效）。
+ * 参数合法性（core≥1、max≥core、queue≥1）由端口实现负责校验，非法配置在启动时快速失败。</p>
  */
 @Slf4j
 @Component
 public class TaskExecutorRegistry {
 
+    private final TaskPoolConfigPort poolConfig;
+
+    public TaskExecutorRegistry(TaskPoolConfigPort poolConfig) {
+        this.poolConfig = poolConfig;
+    }
+
     private final Map<TaskKind, ThreadPoolExecutor> executors = new EnumMap<>(TaskKind.class);
 
     @PostConstruct
     void initExecutors() {
-        register(TaskKind.GIT_CLONE, 1, 2, 4);
-        register(TaskKind.GIT_FETCH, 2, 4, 8);
-        register(TaskKind.CODEGRAPH_INDEX, 1, 1, 2);
-        register(TaskKind.CODEGRAPH_SYNC, 1, 2, 4);
-        register(TaskKind.PROJECT_SPACE_PREPARE, 1, 2, 4);
-        register(TaskKind.BRANCH_REFRESH, 1, 2, 8);
+        for (TaskKind kind : TaskKind.values()) {
+            TaskPoolParams params = poolConfig.resolve(kind);
+            register(kind, params.getCoreThreads(), params.getMaxThreads(), params.getQueueCapacity());
+        }
         log.info("异步任务线程池初始化完成，共 {} 种", executors.size());
     }
 

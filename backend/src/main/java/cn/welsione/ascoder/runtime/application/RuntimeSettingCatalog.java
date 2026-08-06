@@ -2,6 +2,7 @@ package cn.welsione.ascoder.runtime.application;
 
 import cn.welsione.ascoder.agent.AgentProperties;
 import cn.welsione.ascoder.codegraph.CodeGraphProperties;
+import cn.welsione.ascoder.common.task.TaskExecutorProperties;
 import cn.welsione.ascoder.runtime.domain.SettingValueType;
 import cn.welsione.ascoder.runtime.domain.SystemSetting;
 import lombok.AllArgsConstructor;
@@ -25,6 +26,8 @@ public final class RuntimeSettingCatalog {
     public static final String CATEGORY_CODEGRAPH = "codegraph";
     /** Git 操作调参 */
     public static final String CATEGORY_GIT = "git";
+    /** 异步任务线程池调参 */
+    public static final String CATEGORY_TASK = "task";
 
     private RuntimeSettingCatalog() {
     }
@@ -35,7 +38,8 @@ public final class RuntimeSettingCatalog {
     public static Map<String, Meta> buildCatalog(
             AgentProperties agent,
             CodeGraphProperties codegraph,
-            cn.welsione.ascoder.repository.git.GitProperties git) {
+            cn.welsione.ascoder.repository.git.GitProperties git,
+            TaskExecutorProperties taskExecutor) {
         Map<String, Meta> map = new LinkedHashMap<>();
         // Agent
         map.put("agent.max-iters", new Meta("agent.max-iters", agent.getMaxIters(), SettingValueType.INT, CATEGORY_AGENT, "Agent 主循环最大迭代次数"));
@@ -64,7 +68,27 @@ public final class RuntimeSettingCatalog {
         // Git
         map.put("git.timeout-seconds", new Meta("git.timeout-seconds", git.getTimeoutSeconds(), SettingValueType.LONG, CATEGORY_GIT, "Git 命令超时（秒）"));
 
+        // 异步任务线程池（修改需重启进程生效）
+        putTaskPool(map, "git-clone", taskExecutor.getGitCloneCoreThreads(), taskExecutor.getGitCloneMaxThreads(), taskExecutor.getGitCloneQueueCapacity(), "Git 克隆");
+        putTaskPool(map, "git-fetch", taskExecutor.getGitFetchCoreThreads(), taskExecutor.getGitFetchMaxThreads(), taskExecutor.getGitFetchQueueCapacity(), "Git 同步");
+        putTaskPool(map, "codegraph-index", taskExecutor.getCodegraphIndexCoreThreads(), taskExecutor.getCodegraphIndexMaxThreads(), taskExecutor.getCodegraphIndexQueueCapacity(), "CodeGraph 索引");
+        putTaskPool(map, "codegraph-sync", taskExecutor.getCodegraphSyncCoreThreads(), taskExecutor.getCodegraphSyncMaxThreads(), taskExecutor.getCodegraphSyncQueueCapacity(), "CodeGraph 同步");
+        putTaskPool(map, "project-space-prepare", taskExecutor.getProjectSpacePrepareCoreThreads(), taskExecutor.getProjectSpacePrepareMaxThreads(), taskExecutor.getProjectSpacePrepareQueueCapacity(), "项目空间准备");
+        putTaskPool(map, "branch-refresh", taskExecutor.getBranchRefreshCoreThreads(), taskExecutor.getBranchRefreshMaxThreads(), taskExecutor.getBranchRefreshQueueCapacity(), "分支刷新");
+
         return map;
+    }
+
+    /**
+     * 为指定任务类型注册 core / max / queue 三项线程池配置。
+     */
+    private static void putTaskPool(Map<String, Meta> map, String kindKey, int core, int max, int queue, String label) {
+        map.put("task." + kindKey + "-core-threads",
+                new Meta("task." + kindKey + "-core-threads", core, SettingValueType.INT, CATEGORY_TASK, label + "核心线程数（重启生效）"));
+        map.put("task." + kindKey + "-max-threads",
+                new Meta("task." + kindKey + "-max-threads", max, SettingValueType.INT, CATEGORY_TASK, label + "最大线程数（重启生效）"));
+        map.put("task." + kindKey + "-queue-capacity",
+                new Meta("task." + kindKey + "-queue-capacity", queue, SettingValueType.INT, CATEGORY_TASK, label + "队列容量（重启生效）"));
     }
 
     @Getter
@@ -77,7 +101,7 @@ public final class RuntimeSettingCatalog {
         private final String description;
 
         public List<String> allowedCategories() {
-            return List.of(CATEGORY_AGENT, CATEGORY_CODEGRAPH, CATEGORY_GIT);
+            return List.of(CATEGORY_AGENT, CATEGORY_CODEGRAPH, CATEGORY_GIT, CATEGORY_TASK);
         }
     }
 }
