@@ -467,6 +467,8 @@ onMounted(loadAll)
   align-items: center;
   justify-content: space-between;
   gap: var(--spacing-3);
+  min-width: 0;
+  overflow: hidden;
   padding: var(--spacing-3) var(--spacing-4);
   border: 1px solid var(--stroke);
   border-radius: var(--radius-md);
@@ -474,6 +476,9 @@ onMounted(loadAll)
 }
 
 .policy-switches label > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
