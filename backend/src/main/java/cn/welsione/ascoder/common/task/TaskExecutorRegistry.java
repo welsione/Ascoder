@@ -17,7 +17,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  * 任务线程池注册表，按 TaskKind 隔离线程池。
  *
  * <p>每种 TaskKind 拥有独立的 ThreadPoolExecutor，参数由 {@link TaskPoolConfigPort}
- * 提供（基于运行时设置，可在设置页修改，修改需重启进程生效）。</p>
+ * 提供（基于运行时设置，可在设置页修改，修改需重启进程生效）。
+ * 参数合法性（core≥1、max≥core、queue≥1）由端口实现负责校验，非法配置在启动时快速失败。</p>
  */
 @Slf4j
 @Component
@@ -35,22 +36,9 @@ public class TaskExecutorRegistry {
     void initExecutors() {
         for (TaskKind kind : TaskKind.values()) {
             TaskPoolParams params = poolConfig.resolve(kind);
-            validateParams(kind, params);
             register(kind, params.getCoreThreads(), params.getMaxThreads(), params.getQueueCapacity());
         }
         log.info("异步任务线程池初始化完成，共 {} 种", executors.size());
-    }
-
-    /**
-     * 校验线程池参数：核心线程数至少 1，最大线程数不小于核心线程数，队列容量至少 1。
-     */
-    private void validateParams(TaskKind kind, TaskPoolParams params) {
-        if (params.getCoreThreads() < 1 || params.getMaxThreads() < params.getCoreThreads() || params.getQueueCapacity() < 1) {
-            throw new IllegalArgumentException("异步任务线程池配置非法，kind=" + kind
-                    + "，core=" + params.getCoreThreads()
-                    + "，max=" + params.getMaxThreads()
-                    + "，queue=" + params.getQueueCapacity());
-        }
     }
 
     ExecutorService getExecutor(TaskKind kind) {

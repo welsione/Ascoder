@@ -3,6 +3,7 @@ package cn.welsione.ascoder.runtime.application;
 import cn.welsione.ascoder.common.task.TaskKind;
 import cn.welsione.ascoder.common.task.TaskPoolConfigPort;
 import cn.welsione.ascoder.common.task.TaskPoolParams;
+import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -13,8 +14,10 @@ import java.util.Map;
  * 基于运行时设置的异步任务线程池参数提供者。
  *
  * <p>从 {@link RuntimeSettingsService} 白名单读取 {@code task.<kind>-core-threads / -max-threads / -queue-capacity}，
- * 实现 {@link TaskPoolConfigPort} 供 common 模块的任务引擎消费。</p>
+ * 读取后校验参数合法性（core ≥ 1、max ≥ core、queue ≥ 1），非法配置抛 {@link IllegalStateException} 并记录清晰日志，
+ * 使非法配置在启动时快速失败。实现 {@link TaskPoolConfigPort} 供 common 模块的任务引擎消费。</p>
  */
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class RuntimeTaskPoolConfigProvider implements TaskPoolConfigPort {
@@ -38,11 +41,24 @@ public class RuntimeTaskPoolConfigProvider implements TaskPoolConfigPort {
 
     @Override
     public TaskPoolParams resolve(TaskKind kind) {
-        String prefix = KEY_PREFIX + kindKey(kind);
-        int core = runtimeSettings.readInt(prefix + CORE_SUFFIX);
-        int max = runtimeSettings.readInt(prefix + MAX_SUFFIX);
-        int queue = runtimeSettings.readInt(prefix + QUEUE_SUFFIX);
+        String coreKey = key(kind, CORE_SUFFIX);
+        String maxKey = key(kind, MAX_SUFFIX);
+        String queueKey = key(kind, QUEUE_SUFFIX);
+        int core = runtimeSettings.readInt(coreKey);
+        int max = runtimeSettings.readInt(maxKey);
+        int queue = runtimeSettings.readInt(queueKey);
+        if (core < 1 || max < core || queue < 1) {
+            log.error("异步任务线程池配置非法，kind={}，core-threads={}（key={}），max-threads={}（key={}），queue-capacity={}（key={}），"
+                            + "要求 core≥1 且 max≥core 且 queue≥1，请检查设置页或环境变量",
+                    kind, core, coreKey, max, maxKey, queue, queueKey);
+            throw new IllegalStateException("异步任务线程池配置非法，kind=" + kind
+                    + "，core=" + core + "，max=" + max + "，queue=" + queue);
+        }
         return new TaskPoolParams(core, max, queue);
+    }
+
+    private String key(TaskKind kind, String suffix) {
+        return KEY_PREFIX + kindKey(kind) + suffix;
     }
 
     /**

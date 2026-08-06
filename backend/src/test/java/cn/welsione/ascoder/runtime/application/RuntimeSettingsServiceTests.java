@@ -108,6 +108,37 @@ class RuntimeSettingsServiceTests {
     }
 
     @Test
+    void writeRejectsTaskPoolCoreBelowOne() {
+        assertThrows(ValidationException.class,
+                () -> service.write("task.git-fetch-core-threads", "0"));
+    }
+
+    @Test
+    void writeRejectsTaskPoolQueueBelowOne() {
+        assertThrows(ValidationException.class,
+                () -> service.write("task.git-fetch-queue-capacity", "0"));
+    }
+
+    @Test
+    void writeRejectsTaskPoolMaxBelowCurrentCore() {
+        // core 默认 2，max 写 1 应拒绝
+        assertThrows(ValidationException.class,
+                () -> service.write("task.git-fetch-max-threads", "1"));
+    }
+
+    @Test
+    void writeAcceptsTaskPoolMaxNotBelowCurrentCore() {
+        when(repository.findById("task.git-fetch-max-threads")).thenReturn(Optional.empty());
+        when(repository.save(any(SystemSetting.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.write("task.git-fetch-max-threads", "3");
+
+        ArgumentCaptor<SystemSetting> captor = ArgumentCaptor.forClass(SystemSetting.class);
+        verify(repository).save(captor.capture());
+        assertEquals("3", captor.getValue().getValue());
+    }
+
+    @Test
     void resetRejectsUnknownCategory() {
         assertThrows(ValidationException.class, () -> service.reset("not-a-category"));
     }

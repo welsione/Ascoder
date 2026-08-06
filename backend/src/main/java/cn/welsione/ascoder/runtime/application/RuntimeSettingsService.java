@@ -38,6 +38,11 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class RuntimeSettingsService {
 
+    private static final String TASK_POOL_KEY_PREFIX = "task.";
+    private static final String TASK_CORE_SUFFIX = "-core-threads";
+    private static final String TASK_MAX_SUFFIX = "-max-threads";
+    private static final String TASK_QUEUE_SUFFIX = "-queue-capacity";
+
     private final SystemSettingJpaRepository repository;
     private final RuntimeSettingsCache cache;
     private final ApplicationEventPublisher eventPublisher;
@@ -99,6 +104,9 @@ public class RuntimeSettingsService {
             throw new ValidationException("key", "未知配置项: " + key);
         }
         Object coerced = coerceValue(rawValue, meta.getValueType());
+        if (coerced instanceof Integer intValue) {
+            validateTaskPoolValue(key, intValue);
+        }
         String normalized = String.valueOf(coerced);
 
         SystemSetting setting = repository.findById(key).orElseGet(() -> {
@@ -178,6 +186,39 @@ public class RuntimeSettingsService {
                 RuntimeSettingCatalog.CATEGORY_TASK);
         if (category == null || !allowed.contains(category)) {
             throw new ValidationException("category", "未知分类: " + category);
+        }
+    }
+
+    /**
+     * 校验异步任务线程池参数的写入值：core / max / queue 均需 ≥ 1，且 max 不小于当前生效的 core，
+     * 避免非法值落库后到重启时才暴露。
+     */
+    private void validateTaskPoolValue(String key, int value) {
+        if (!key.startsWith(TASK_POOL_KEY_PREFIX)) {
+            return;
+        }
+        String suffix = null;
+        if (key.endsWith(TASK_CORE_SUFFIX)) {
+            suffix = TASK_CORE_SUFFIX;
+        } else if (key.endsWith(TASK_MAX_SUFFIX)) {
+            suffix = TASK_MAX_SUFFIX;
+        } else if (key.endsWith(TASK_QUEUE_SUFFIX)) {
+            suffix = TASK_QUEUE_SUFFIX;
+        }
+        if (suffix == null) {
+            return;
+        }
+        String kindKey = key.substring(TASK_POOL_KEY_PREFIX.length(), key.length() - suffix.length());
+        if (value < 1) {
+            throw new ValidationException("value", key + " 必须 ≥ 1");
+        }
+        if (key.endsWith(TASK_MAX_SUFFIX)) {
+            Object currentCore = readRaw(TASK_POOL_KEY_PREFIX + kindKey + TASK_CORE_SUFFIX);
+            int core = currentCore instanceof Number n ? n.intValue() : Integer.parseInt(String.valueOf(currentCore));
+            if (value < core) {
+                throw new ValidationException("value",
+                        key + " 必须不小于当前核心线程数（" + core + "），请先调低核心线程数");
+            }
         }
     }
 
