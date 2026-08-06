@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -28,6 +29,7 @@ public class InsightService {
     private final ConversationRecordHelper conversationRecordHelper;
     private final InsightStateMachine insightStateMachine;
     private final SelfLearningInsightReviewAgent insightReviewAgent;
+    private final TransactionTemplate transactionTemplate;
     private final InsightFieldTruncator insightFieldTruncator;
 
     @Transactional(readOnly = true)
@@ -80,38 +82,68 @@ public class InsightService {
         return LearningInsightResponse.from(entityLoader.saveInsight(insight));
     }
 
-    @Transactional(readOnly = true)
+    /**
+     * 复核候选洞察。
+     *
+     * <p>数据加载在短事务内完成（含关联初始化），LLM 复核在事务外执行，
+     * 避免长耗时调用持有数据库连接（违反 @Transactional 内禁止 LLM 调用规范）。</p>
+     */
     public LearningInsightVerificationResponse verifyInsight(Long projectSpaceId, Long insightId) {
-        ProjectSpace space = entityLoader.projectSpace(projectSpaceId);
-        LearningInsight insight = entityLoader.insight(projectSpaceId, insightId);
-        List<LearningRawEvent> rawEvents = sourceRawEvents(projectSpaceId, insight);
+        ReviewWork work = loadReviewWork(projectSpaceId, insightId);
         log.info("复核候选洞察，projectSpaceId={}，insightId={}，rawEventCount={}",
-                projectSpaceId, insightId, rawEvents.size());
-        SelfLearningInsightVerification verification = insightReviewAgent.verify(space, insight, rawEvents);
+                projectSpaceId, insightId, work.getRawEvents().size());
+        SelfLearningInsightVerification verification = insightReviewAgent.verify(
+                work.getProjectSpace(), work.getInsight(), work.getRawEvents());
         return LearningInsightVerificationResponse.from(insightId, verification);
     }
 
-    @Transactional(readOnly = true)
+    /**
+     * 微调候选洞察。
+     *
+     * <p>数据加载在短事务内完成，LLM 微调在事务外执行（同 {@link #verifyInsight}）。</p>
+     */
     public RefineLearningInsightResponse refineInsight(
             Long projectSpaceId,
             Long insightId,
             RefineLearningInsightRequest request
     ) {
-        ProjectSpace space = entityLoader.projectSpace(projectSpaceId);
-        LearningInsight insight = entityLoader.insight(projectSpaceId, insightId);
-        List<LearningRawEvent> rawEvents = sourceRawEvents(projectSpaceId, insight);
         String instruction = SelfLearningTextUtil.trimToNull(request == null ? null : request.getInstruction());
         if (instruction == null) {
             throw new ValidationException("微调指令不能为空。");
         }
+        ReviewWork work = loadReviewWork(projectSpaceId, insightId);
         log.info("微调候选洞察，projectSpaceId={}，insightId={}，rawEventCount={}",
-                projectSpaceId, insightId, rawEvents.size());
-        SelfLearningInsightDraft draft = insightReviewAgent.refine(space, insight, rawEvents, instruction);
+                projectSpaceId, insightId, work.getRawEvents().size());
+        SelfLearningInsightDraft draft = insightReviewAgent.refine(
+                work.getProjectSpace(), work.getInsight(), work.getRawEvents(), instruction);
         return new RefineLearningInsightResponse(
                 insightId,
-                saveRequestFromDraft(insight, draft),
+                saveRequestFromDraft(work.getInsight(), draft),
                 "Insight Refine Agent 已生成可应用到编辑表单的建议稿，保存前请继续人工审核。"
         );
+    }
+
+    /**
+     * 在短事务内加载复核/微调所需数据并初始化待访问的关联，供事务外调用 LLM 使用。
+     */
+    private ReviewWork loadReviewWork(Long projectSpaceId, Long insightId) {
+        return transactionTemplate.execute(status -> {
+            ProjectSpace space = entityLoader.projectSpace(projectSpaceId);
+            LearningInsight insight = entityLoader.insight(projectSpaceId, insightId);
+            List<LearningRawEvent> rawEvents = sourceRawEvents(projectSpaceId, insight);
+            if (insight.getRepository() != null) {
+                insight.getRepository().getId();
+            }
+            for (LearningRawEvent event : rawEvents) {
+                if (event.getRepository() != null) {
+                    event.getRepository().getId();
+                }
+                if (event.getQuestion() != null) {
+                    event.getQuestion().getId();
+                }
+            }
+            return new ReviewWork(space, insight, rawEvents);
+        });
     }
 
     @Transactional
@@ -312,5 +344,15 @@ public class InsightService {
         request.setTags(SelfLearningTextUtil.firstNonBlank(SelfLearningTextUtil.trimToNull(draft.getTags()), insight.getTags()));
         request.setConfidence(draft.getConfidence() == null ? insight.getConfidence() : SelfLearningTextUtil.normalizeAgentConfidence(draft.getConfidence()));
         return request;
+    }
+
+    /**
+     * 复核/微调加载的数据集合（在短事务内加载后供事务外 LLM 调用使用）。
+     */
+    @lombok.Value
+    private static class ReviewWork {
+        ProjectSpace projectSpace;
+        LearningInsight insight;
+        List<LearningRawEvent> rawEvents;
     }
 }
