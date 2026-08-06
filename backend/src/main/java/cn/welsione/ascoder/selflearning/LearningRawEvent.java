@@ -76,7 +76,7 @@ public class LearningRawEvent {
     private Date sourceCreatedAt;
 
     /** 被 Self Learning Agent 整理失败的累计次数，达到上限后跳过（避免反复重试消耗 token）。 */
-    @Column(nullable = false)
+    @Column(name = "failedCount", nullable = false)
     private int failedCount;
 
     @Column(nullable = false)

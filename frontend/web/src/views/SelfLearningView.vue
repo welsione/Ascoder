@@ -1,17 +1,16 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, Bot, BrainCircuit, DatabaseZap, FileCheck2, History, ShieldCheck, Sparkles, Trash2 } from 'lucide-vue-next'
 import * as api from '../services/selfLearningApi'
 import { useProjectSpaceStore } from '../stores/projectSpace'
+import { useAgentRunPolling } from '../composables/useAgentRunPolling'
 import { agentRunStatusLabel, agentRunStatusType, compactText } from '../utils/selfLearningRender'
 import RawEventsSection from '../components/selflearning/RawEventsSection.vue'
 import InsightsSection from '../components/selflearning/InsightsSection.vue'
 import KnowledgeSection from '../components/selflearning/KnowledgeSection.vue'
 import type {
-  LearningAgentRunRecord,
-  LearningAgentRunStatus,
   SelfLearningAgentRun,
   SelfLearningSettings,
   SelfLearningSummary,
@@ -32,10 +31,11 @@ const cleaningLegacyInsights = ref(false)
 const activeTab = ref<TabName>('insights')
 const summary = ref<SelfLearningSummary | null>(null)
 const settings = ref<SelfLearningSettings | null>(null)
-const agentRuns = ref<LearningAgentRunRecord[]>([])
 const lastAgentRun = ref<SelfLearningAgentRun | null>(null)
 const activeKnowledgeCount = ref(0)
 const refreshToken = ref(0)
+
+const { agentRuns, fetchRuns, startPolling } = useAgentRunPolling()
 
 async function loadAll() {
   if (!projectSpaceId.value || Number.isNaN(projectSpaceId.value)) return
@@ -44,14 +44,13 @@ async function loadAll() {
     if (!projectSpaceStore.spaces.length) {
       await projectSpaceStore.fetch()
     }
-    const [nextSummary, nextAgentRuns, knowledgeItems] = await Promise.all([
+    const [nextSummary, knowledgeItems] = await Promise.all([
       api.getSummary(projectSpaceId.value),
-      api.listAgentRuns(projectSpaceId.value),
       api.listKnowledgeItems(projectSpaceId.value),
     ])
     summary.value = nextSummary
     settings.value = nextSummary.settings
-    agentRuns.value = nextAgentRuns
+    await fetchRuns(projectSpaceId.value)
     activeKnowledgeCount.value = knowledgeItems.filter(
       (item) => item.status === 'ACTIVE' || item.status === 'VERIFIED',
     ).length
@@ -101,63 +100,15 @@ async function runAgent() {
     await reloadSummary()
     ElMessage.success(lastAgentRun.value.message)
     if (lastAgentRun.value.status === 'QUEUED' || lastAgentRun.value.status === 'RUNNING') {
-      startRunPolling()
+      startPolling(projectSpaceId.value, async (runs) => {
+        await loadAll()
+        ElMessage.success(runs[0]?.message ?? 'Self Learning Agent 整理完成')
+      })
     }
   } catch (err) {
     ElMessage.error(err instanceof Error ? err.message : '运行 Self Learning Agent 失败')
   } finally {
     runningAgent.value = false
-  }
-}
-
-// ---- Agent 运行状态轮询：提交后后台整理可能耗时数分钟，轮询至终态后自动刷新结果 ----
-
-const TERMINAL_RUN_STATUSES: LearningAgentRunStatus[] = ['SUCCEEDED', 'PARTIAL_FAILED', 'SKIPPED', 'FAILED']
-const RUN_POLL_INTERVAL_MS = 5_000
-const RUN_POLL_TIMEOUT_MS = 10 * 60_000
-
-let runPollTimer: ReturnType<typeof setInterval> | null = null
-let runPollStartedAt = 0
-let polledProjectSpaceId = 0
-
-function startRunPolling() {
-  stopRunPolling()
-  runPollStartedAt = Date.now()
-  // 记录提交时的项目空间，回调中校验未切换（路由切换后旧轮询不再写入新页面状态）
-  polledProjectSpaceId = projectSpaceId.value
-  runPollTimer = setInterval(pollAgentRun, RUN_POLL_INTERVAL_MS)
-}
-
-function stopRunPolling() {
-  if (runPollTimer) {
-    clearInterval(runPollTimer)
-    runPollTimer = null
-  }
-}
-
-async function pollAgentRun() {
-  if (Date.now() - runPollStartedAt > RUN_POLL_TIMEOUT_MS) {
-    stopRunPolling()
-    return
-  }
-  if (polledProjectSpaceId !== projectSpaceId.value) {
-    stopRunPolling()
-    return
-  }
-  try {
-    const runs = await api.listAgentRuns(polledProjectSpaceId)
-    if (polledProjectSpaceId !== projectSpaceId.value) {
-      stopRunPolling()
-      return
-    }
-    agentRuns.value = runs
-    if (runs.length && TERMINAL_RUN_STATUSES.includes(runs[0].status)) {
-      stopRunPolling()
-      await loadAll()
-      ElMessage.success(runs[0].message ?? 'Self Learning Agent 整理完成')
-    }
-  } catch {
-    stopRunPolling()
   }
 }
 
@@ -207,7 +158,6 @@ async function cleanupLegacyInsights() {
 }
 
 onMounted(loadAll)
-onUnmounted(stopRunPolling)
 </script>
 
 <template>

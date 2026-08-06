@@ -23,6 +23,9 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SelfLearningEntityLoader {
 
+    /** 启动恢复一次性处理的最大非终态运行记录数。 */
+    private static final int ACTIVE_AGENT_RUN_LIMIT = 100;
+
     private final ProjectSpaceService projectSpaceService;
     private final SelfLearningSettingsJpaRepository settingsRepository;
     private final RepositoryQueryPort repositoryQueryPort;
@@ -170,12 +173,15 @@ public class SelfLearningEntityLoader {
         return agentRunRepository.saveAll(runs);
     }
 
-    /** 查询所有非终态（QUEUED / RUNNING）的运行记录，用于启动恢复。 */
+    /** 查询所有非终态（QUEUED / RUNNING）的运行记录，用于启动恢复（最多 100 条）。 */
     public List<LearningAgentRun> activeAgentRuns() {
-        return agentRunRepository.findByStatusIn(List.of(
-                LearningAgentRunStatus.QUEUED,
-                LearningAgentRunStatus.RUNNING
-        ));
+        return agentRunRepository.findByStatusIn(
+                List.of(
+                        LearningAgentRunStatus.QUEUED,
+                        LearningAgentRunStatus.RUNNING
+                ),
+                PageRequest.of(0, ACTIVE_AGENT_RUN_LIMIT)
+        );
     }
 
     // ---------- 经验 / 术语 / 纠正 ----------
