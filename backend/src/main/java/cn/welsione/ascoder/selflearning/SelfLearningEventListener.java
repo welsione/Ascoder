@@ -4,6 +4,7 @@ import cn.welsione.ascoder.question.application.QuestionAnsweredEvent;
 import cn.welsione.ascoder.repository.RepositoryDeletedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -27,6 +28,12 @@ public class SelfLearningEventListener {
     private final LearningRawEventJpaRepository rawEventRepository;
     private final LearningInsightJpaRepository insightRepository;
 
+    /**
+     * 问题回答提交完成后异步沉淀自学习记录。
+     *
+     * <p>异步执行避免阻塞提问线程的 SSE complete 事件推送；失败仅告警不影响主流程。</p>
+     */
+    @Async("selfLearningEventExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onQuestionAnswered(QuestionAnsweredEvent event) {
         try {

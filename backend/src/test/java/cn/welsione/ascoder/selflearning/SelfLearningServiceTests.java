@@ -31,6 +31,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -104,6 +105,7 @@ class SelfLearningServiceTests {
                 conversationRecordHelper,
                 insightStateMachine,
                 insightReviewAgent,
+                transactionTemplate(),
                 insightFieldTruncator);
         agentRunService = new AgentRunService(
                 entityLoader,
@@ -279,7 +281,7 @@ class SelfLearningServiceTests {
 
         when(projectSpaceService.getEntity(7L)).thenReturn(projectSpace);
         when(settingsRepository.findByProjectSpace_Id(7L)).thenReturn(Optional.of(settings(true, false, false)));
-        when(rawEventRepository.findTop50ByProjectSpace_IdOrderByCreatedAtDesc(7L)).thenReturn(List.of(rawEvent));
+        when(rawEventRepository.findByProjectSpace_IdOrderByCreatedAtDesc(eq(7L), any(org.springframework.data.domain.Pageable.class))).thenReturn(List.of(rawEvent));
         when(insightRepository.findByProjectSpace_IdOrderByUpdatedAtDesc(7L)).thenAnswer(invocation -> savedInsights);
         when(insightAgent.summarize(projectSpace, List.of(rawEvent))).thenReturn(Optional.of(agentDraft()));
         when(insightRepository.save(any())).thenAnswer(invocation -> {
@@ -328,7 +330,7 @@ class SelfLearningServiceTests {
 
         when(projectSpaceService.getEntity(7L)).thenReturn(projectSpace);
         when(settingsRepository.findByProjectSpace_Id(7L)).thenReturn(Optional.of(settings(true, false, false)));
-        when(rawEventRepository.findTop50ByProjectSpace_IdOrderByCreatedAtDesc(7L)).thenReturn(List.of(rawEvent));
+        when(rawEventRepository.findByProjectSpace_IdOrderByCreatedAtDesc(eq(7L), any(org.springframework.data.domain.Pageable.class))).thenReturn(List.of(rawEvent));
         when(insightRepository.findByProjectSpace_IdOrderByUpdatedAtDesc(7L)).thenReturn(List.of());
         when(insightAgent.summarize(projectSpace, List.of(rawEvent))).thenReturn(Optional.of(draft));
         when(insightRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -362,7 +364,7 @@ class SelfLearningServiceTests {
 
         when(projectSpaceService.getEntity(7L)).thenReturn(projectSpace);
         when(settingsRepository.findByProjectSpace_Id(7L)).thenReturn(Optional.of(settings(true, false, false)));
-        when(rawEventRepository.findTop50ByProjectSpace_IdOrderByCreatedAtDesc(7L)).thenReturn(List.of(rawEvent));
+        when(rawEventRepository.findByProjectSpace_IdOrderByCreatedAtDesc(eq(7L), any(org.springframework.data.domain.Pageable.class))).thenReturn(List.of(rawEvent));
         when(insightRepository.findByProjectSpace_IdOrderByUpdatedAtDesc(7L)).thenReturn(List.of());
         when(insightAgent.summarize(projectSpace, List.of(rawEvent))).thenReturn(Optional.of(agentDraft()));
         when(insightRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -392,7 +394,7 @@ class SelfLearningServiceTests {
 
         when(projectSpaceService.getEntity(7L)).thenReturn(projectSpace);
         when(settingsRepository.findByProjectSpace_Id(7L)).thenReturn(Optional.of(settings(true, false, false)));
-        when(rawEventRepository.findTop50ByProjectSpace_IdOrderByCreatedAtDesc(7L)).thenReturn(List.of(rawEvent));
+        when(rawEventRepository.findByProjectSpace_IdOrderByCreatedAtDesc(eq(7L), any(org.springframework.data.domain.Pageable.class))).thenReturn(List.of(rawEvent));
         when(insightRepository.findByProjectSpace_IdOrderByUpdatedAtDesc(7L)).thenReturn(List.of());
         when(insightAgent.summarize(projectSpace, List.of(rawEvent)))
                 .thenThrow(new SelfLearningInsightException("模型超时"));

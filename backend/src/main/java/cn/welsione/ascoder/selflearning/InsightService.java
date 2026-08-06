@@ -46,9 +46,23 @@ public class InsightService {
         ProjectSpace space = entityLoader.projectSpace(projectSpaceId);
         LearningInsight insight = new LearningInsight();
         insight.setProjectSpace(space);
-        insight.setStatus(LearningInsightStatus.PENDING_REVIEW);
+        insight.setStatus(initialStatus(request));
         applyInsightRequest(insight, request);
         return LearningInsightResponse.from(entityLoader.saveInsight(insight));
+    }
+
+    /**
+     * 新建洞察的初始状态：仅允许草稿或待审核，其余状态（审核结果类）禁止新建时直接指定。
+     */
+    private LearningInsightStatus initialStatus(SaveLearningInsightRequest request) {
+        LearningInsightStatus requested = request.getStatus();
+        if (requested == null) {
+            return LearningInsightStatus.PENDING_REVIEW;
+        }
+        if (requested != LearningInsightStatus.DRAFT && requested != LearningInsightStatus.PENDING_REVIEW) {
+            throw new ValidationException("新建洞察状态只能为草稿或待审核");
+        }
+        return requested;
     }
 
     @Transactional
