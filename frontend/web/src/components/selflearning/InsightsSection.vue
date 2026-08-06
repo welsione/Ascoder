@@ -538,7 +538,7 @@ watch(() => props.refreshToken, loadInsights)
       </article>
     </div>
     <div v-else class="empty-box compact-empty">
-      <p>暂无候选洞察。</p>
+      <p>暂无候选洞察。点击页面顶部「后台整理」从原始记录生成，或在右上角手动新建。</p>
     </div>
 
     <el-dialog v-model="insightDialogVisible" :title="editingInsightId ? '编辑候选洞察' : '新建候选洞察'" width="720px">

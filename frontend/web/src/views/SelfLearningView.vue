@@ -6,7 +6,7 @@ import { ArrowLeft, Bot, BrainCircuit, DatabaseZap, FileCheck2, History, ShieldC
 import * as api from '../services/selfLearningApi'
 import { useProjectSpaceStore } from '../stores/projectSpace'
 import { useAgentRunPolling } from '../composables/useAgentRunPolling'
-import { agentRunStatusLabel, agentRunStatusType, compactText } from '../utils/selfLearningRender'
+import { agentRunStatusLabel, agentRunStatusType, failureSummaries } from '../utils/selfLearningRender'
 import RawEventsSection from '../components/selflearning/RawEventsSection.vue'
 import InsightsSection from '../components/selflearning/InsightsSection.vue'
 import KnowledgeSection from '../components/selflearning/KnowledgeSection.vue'
@@ -86,6 +86,16 @@ async function updateSettings(patch: Partial<SelfLearningSettings>) {
 
 function updateSettingFlag(key: keyof SelfLearningSettings, value: boolean | string | number) {
   updateSettings({ [key]: Boolean(value) })
+}
+
+/** 单条运行记录失败摘要（最多 2 条，避免原始 JSON 堆栈铺满界面）。 */
+function runFailures(run: { failureDetailsJson: string | null }) {
+  return failureSummaries(run.failureDetailsJson).slice(0, 2)
+}
+
+/** 失败消息超长时截断，完整内容通过 title 悬浮提示查看。 */
+function truncateFailure(message: string) {
+  return message.length > 90 ? `${message.slice(0, 90)}…` : message
 }
 
 async function runAgent() {
@@ -201,7 +211,7 @@ onMounted(loadAll)
         <strong>{{ summary?.rawEventCount ?? 0 }}</strong>
         <p>问答、工具调用、反馈和证据留痕</p>
       </article>
-      <article class="metric-card highlight">
+      <article class="metric-card" :class="{ highlight: (summary?.pendingInsightCount ?? 0) > 0 }">
         <Sparkles :size="20" :stroke-width="2" />
         <span>待审核洞察</span>
         <strong>{{ summary?.pendingInsightCount ?? 0 }}</strong>
@@ -250,11 +260,19 @@ onMounted(loadAll)
           <strong>{{ lastAgentRun.createdInsightCount }} 洞察 / {{ lastAgentRun.consumedRawEventCount }} 记录</strong>
         </div>
         <div v-if="agentRuns.length" class="agent-run-history">
+          <div class="run-history-title">
+            <strong>整理记录</strong>
+            <span>后台整理任务的执行结果，失败原因可点击查看</span>
+          </div>
           <div v-for="run in agentRuns.slice(0, 5)" :key="run.id" class="agent-run-history-item">
             <div>
               <strong>#{{ run.id }} {{ agentRunStatusLabel(run.status) }}</strong>
               <span>{{ run.message || run.errorMessage || '暂无运行消息' }}</span>
-              <span v-if="run.failureDetailsJson">失败详情：{{ compactText(run.failureDetailsJson, '') }}</span>
+              <ul v-if="run.failureDetailsJson" class="run-failure-summary">
+                <li v-for="(message, index) in runFailures(run)" :key="index" :title="message">
+                  {{ truncateFailure(message) }}
+                </li>
+              </ul>
             </div>
             <div class="agent-run-history-meta">
               <el-tag size="small" :type="agentRunStatusType(run.status)">{{ agentRunStatusLabel(run.status) }}</el-tag>
@@ -420,15 +438,43 @@ onMounted(loadAll)
 }
 
 .policy-panel {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(300px, 0.75fr);
   gap: var(--spacing-6);
   margin-top: var(--spacing-5);
   padding: var(--spacing-5);
 }
 
+.policy-copy {
+  min-width: 0;
+}
+
 .policy-copy h2 {
   margin: 0;
+}
+
+.policy-switches {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--spacing-3);
+  align-content: start;
+  padding-left: var(--spacing-6);
+  border-left: 1px solid var(--stroke);
+}
+
+.policy-switches label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-3);
+  padding: var(--spacing-3) var(--spacing-4);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-md);
+  background: var(--surface-muted);
+}
+
+.policy-switches label > span {
+  white-space: nowrap;
 }
 
 .agent-run-panel {
@@ -453,6 +499,7 @@ onMounted(loadAll)
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: var(--spacing-2);
+  flex-shrink: 0;
 }
 
 .agent-run-panel span,
@@ -477,6 +524,22 @@ onMounted(loadAll)
   margin-top: var(--spacing-4);
 }
 
+.run-history-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-2);
+  padding: 0 var(--spacing-1);
+}
+
+.run-history-title strong {
+  font-size: var(--font-size-base);
+}
+
+.run-history-title span {
+  color: var(--muted);
+  font-size: var(--font-size-sm);
+}
+
 .agent-run-history-item {
   display: flex;
   align-items: center;
@@ -499,12 +562,33 @@ onMounted(loadAll)
   font-size: var(--font-size-sm);
 }
 
+.agent-run-history-item > div:first-child {
+  min-width: 0;
+}
+
+.run-failure-summary {
+  margin: var(--spacing-2) 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--spacing-1);
+}
+
+.run-failure-summary li {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--danger, #dc2626);
+  font-size: var(--font-size-xs);
+}
+
 .agent-run-history-meta {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: var(--spacing-2);
+  flex-shrink: 0;
 }
 
 .policy-switches {
@@ -538,14 +622,23 @@ onMounted(loadAll)
     width: min(100% - 28px, 760px);
   }
 
-  .learning-hero,
-  .policy-panel {
+  .learning-hero {
     grid-template-columns: 1fr;
-    flex-direction: column;
   }
 
-  .metric-grid,
+  .policy-panel {
+    grid-template-columns: 1fr;
+  }
+
   .policy-switches {
+    grid-template-columns: 1fr;
+    padding-left: 0;
+    border-left: none;
+    padding-top: var(--spacing-4);
+    border-top: 1px solid var(--stroke);
+  }
+
+  .metric-grid {
     grid-template-columns: 1fr;
   }
 

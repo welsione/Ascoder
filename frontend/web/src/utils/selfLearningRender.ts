@@ -201,3 +201,21 @@ export function jsonFieldItems(value: string | null | undefined) {
   }
   return []
 }
+
+/**
+ * 从 Agent 运行失败的 JSON 详情中提取错误消息摘要列表。
+ *
+ * 详情结构为数组：[{"rawEventIds":[...],"errorMessage":"...","failedAt":"..."}]，
+ * 展示时只取 errorMessage，避免原始 JSON 堆栈铺满界面。
+ */
+export function failureSummaries(failureDetailsJson: string | null | undefined): string[] {
+  const parsed = parseJsonValue(failureDetailsJson)
+  if (!Array.isArray(parsed)) return []
+  return parsed
+    .map((item) => {
+      const object = asObject(item)
+      const message = object?.errorMessage ?? object?.message ?? object?.reason
+      return typeof message === 'string' ? message.trim() : ''
+    })
+    .filter((message) => message.length > 0)
+}
