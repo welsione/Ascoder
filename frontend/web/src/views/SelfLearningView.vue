@@ -478,8 +478,7 @@ onMounted(loadAll)
 .policy-switches label > span {
   min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.5;
 }
 
 .agent-run-panel {
@@ -594,23 +593,6 @@ onMounted(loadAll)
   justify-content: flex-end;
   gap: var(--spacing-2);
   flex-shrink: 0;
-}
-
-.policy-switches {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(210px, 1fr));
-  gap: var(--spacing-3);
-}
-
-.policy-switches label {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--spacing-3);
-  padding: var(--spacing-3) var(--spacing-4);
-  border: 1px solid var(--stroke);
-  border-radius: var(--radius-md);
-  background: var(--surface-muted);
 }
 
 .learning-workbench {
