@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, Bot, BrainCircuit, CheckCircle2, DatabaseZap, FileCheck2, GitBranch, History, Plus, ShieldCheck, Sparkles, Trash2 } from 'lucide-vue-next'
@@ -387,25 +387,74 @@ async function runAgent() {
   try {
     lastAgentRun.value = await api.runSelfLearningAgent(projectSpaceId.value)
     activeTab.value = 'insights'
-    const [nextSummary, nextRawEvents, nextInsights, nextAgentRuns] = await Promise.all([
-      api.getSummary(projectSpaceId.value),
-      api.listRawEvents(projectSpaceId.value),
-      api.listInsights(projectSpaceId.value, insightStatusFilter.value),
-      api.listAgentRuns(projectSpaceId.value),
-    ])
-    summary.value = nextSummary
-    settings.value = nextSummary.settings
-    rawEvents.value = nextRawEvents
-    insights.value = nextInsights
-    agentRuns.value = nextAgentRuns
-    selectedInsightId.value = nextInsights[0]?.id ?? null
+    await refreshAfterAgentRun()
     ElMessage.success(lastAgentRun.value.message)
+    if (lastAgentRun.value.status === 'QUEUED' || lastAgentRun.value.status === 'RUNNING') {
+      startRunPolling()
+    }
   } catch (err) {
     ElMessage.error(err instanceof Error ? err.message : '运行 Self Learning Agent 失败')
   } finally {
     runningAgent.value = false
   }
 }
+
+// ---- Agent 运行状态轮询：提交后后台整理可能耗时数分钟，轮询至终态后自动刷新结果 ----
+
+const TERMINAL_RUN_STATUSES: LearningAgentRunStatus[] = ['SUCCEEDED', 'PARTIAL_FAILED', 'SKIPPED', 'FAILED']
+const RUN_POLL_INTERVAL_MS = 5_000
+const RUN_POLL_TIMEOUT_MS = 10 * 60_000
+
+let runPollTimer: ReturnType<typeof setInterval> | null = null
+let runPollStartedAt = 0
+
+function startRunPolling() {
+  stopRunPolling()
+  runPollStartedAt = Date.now()
+  runPollTimer = setInterval(pollAgentRun, RUN_POLL_INTERVAL_MS)
+}
+
+function stopRunPolling() {
+  if (runPollTimer) {
+    clearInterval(runPollTimer)
+    runPollTimer = null
+  }
+}
+
+async function pollAgentRun() {
+  if (Date.now() - runPollStartedAt > RUN_POLL_TIMEOUT_MS) {
+    stopRunPolling()
+    return
+  }
+  try {
+    const runs = await api.listAgentRuns(projectSpaceId.value)
+    agentRuns.value = runs
+    if (runs.length && TERMINAL_RUN_STATUSES.includes(runs[0].status)) {
+      stopRunPolling()
+      await refreshAfterAgentRun()
+      ElMessage.success(runs[0].message ?? 'Self Learning Agent 整理完成')
+    }
+  } catch {
+    stopRunPolling()
+  }
+}
+
+async function refreshAfterAgentRun() {
+  const [nextSummary, nextRawEvents, nextInsights, nextAgentRuns] = await Promise.all([
+    api.getSummary(projectSpaceId.value),
+    api.listRawEvents(projectSpaceId.value),
+    api.listInsights(projectSpaceId.value, insightStatusFilter.value),
+    api.listAgentRuns(projectSpaceId.value),
+  ])
+  summary.value = nextSummary
+  settings.value = nextSummary.settings
+  rawEvents.value = nextRawEvents
+  insights.value = nextInsights
+  agentRuns.value = nextAgentRuns
+  selectedInsightId.value = nextInsights[0]?.id ?? null
+}
+
+onUnmounted(stopRunPolling)
 
 async function importHistory() {
   if (!settings.value?.enabled) {
