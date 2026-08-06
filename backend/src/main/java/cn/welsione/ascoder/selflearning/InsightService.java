@@ -32,6 +32,9 @@ public class InsightService {
     private final TransactionTemplate transactionTemplate;
     private final InsightFieldTruncator insightFieldTruncator;
 
+    /** 回答完成后自动沉淀的候选洞察默认置信度（规则产物，需人工审核提升）。 */
+    private static final double CANDIDATE_CONFIDENCE = 0.35;
+
     @Transactional(readOnly = true)
     public List<LearningInsightResponse> listInsights(Long projectSpaceId, LearningInsightStatus status) {
         entityLoader.projectSpace(projectSpaceId);
@@ -240,7 +243,7 @@ public class InsightService {
             insight.setConclusion(SelfLearningTextUtil.truncate(conclusion, 6000));
             insight.setApplicableScope("由 Self Learning Agent 根据完整会话原始记录整理，需管理员审核后才可归纳为正式知识。");
             insight.setWarnings("候选洞察不是当前代码事实，审核时需要确认代码证据和适用范围。");
-            insight.setConfidence(0.35);
+            insight.setConfidence(CANDIDATE_CONFIDENCE);
             entityLoader.saveInsight(insight);
         }
         log.info("完成自学习原始记录与候选洞察处理，projectSpaceId={}，questionId={}", projectSpaceId, questionId);

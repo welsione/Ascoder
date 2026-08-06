@@ -32,6 +32,8 @@ public class AgentRunService {
 
     private static final int DEFAULT_AGENT_RUN_LIMIT = 12;
     private static final int MAX_AGENT_RUN_LIMIT = 30;
+    private static final int RECENT_RAW_EVENT_WINDOW = 50;
+    private static final int MAX_RAW_EVENT_FAILURES = 3;
     private static final Pattern CODE_SYMBOL_PATTERN = Pattern.compile(
             "\\b[A-Z][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)*(?:\\(\\))?\\b"
     );
@@ -101,6 +103,7 @@ public class AgentRunService {
                 failedCount++;
                 failures.add(conversationFailureJson(rawEventIdsJson, ex.getMessage()));
                 updateAgentRunProgress(runId, createdCount, consumedCount, failedCount, rawEventIdsJson, SelfLearningTextUtil.toJsonArrayText(failures));
+                markRawEventsFailed(rawEventIdsJson);
                 log.warn("Self Learning Agent conversation 整理失败，projectSpaceId={}，rawEventIds={}，error={}",
                         projectSpaceId, rawEventIdsJson, ex.getMessage());
             }
@@ -279,6 +282,23 @@ public class AgentRunService {
         });
     }
 
+    /**
+     * 整理失败的原始记录累计失败次数，达到 {@link #MAX_RAW_EVENT_FAILURES} 后不再选中，
+     * 避免 LLM 持续失败时反复重试消耗 token。
+     */
+    private void markRawEventsFailed(String rawEventIdsJson) {
+        List<Long> rawEventIds = conversationRecordHelper.parseJsonIds(rawEventIdsJson);
+        if (rawEventIds.isEmpty()) {
+            return;
+        }
+        transactionTemplate.executeWithoutResult(status -> {
+            for (LearningRawEvent event : entityLoader.rawEventsByIds(rawEventIds)) {
+                event.incrementFailedCount();
+                entityLoader.saveRawEvent(event);
+            }
+        });
+    }
+
     private LearningAgentRunStatus agentRunStatus(int createdCount, int failedCount) {
         if (failedCount > 0 && createdCount == 0) {
             return LearningAgentRunStatus.FAILED;
@@ -327,10 +347,11 @@ public class AgentRunService {
                 );
             }
             Set<Long> usedRawEventIds = usedRawEventIds(projectSpaceId);
-            List<LearningRawEvent> recentRawEvents = entityLoader.recentRawEvents(projectSpaceId, 50);
+            List<LearningRawEvent> recentRawEvents = entityLoader.recentRawEvents(projectSpaceId, RECENT_RAW_EVENT_WINDOW);
             List<LearningRawEvent> candidates = recentRawEvents.stream()
                     .filter(item -> item.getId() != null && !usedRawEventIds.contains(item.getId()))
                     .filter(item -> item.getSummary() != null && !item.getSummary().isBlank())
+                    .filter(item -> item.getFailedCount() < MAX_RAW_EVENT_FAILURES)
                     .limit(normalizedLimit)
                     .toList();
             List<List<LearningRawEvent>> groups = groupRawEvents(candidates);
