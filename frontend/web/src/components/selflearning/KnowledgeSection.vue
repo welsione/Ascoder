@@ -126,6 +126,7 @@ async function saveKnowledge() {
       await api.createKnowledgeItem(props.projectSpaceId, knowledgeForm)
     }
     knowledgeDialogVisible.value = false
+    resetKnowledgeForm()
     await loadKnowledgeItems()
     ElMessage.success('正式知识已保存')
     emit('changed')

@@ -1,5 +1,6 @@
 package cn.welsione.ascoder.selflearning;
 
+import cn.welsione.ascoder.common.exception.ValidationException;
 import cn.welsione.ascoder.question.api.QuestionResponse;
 import cn.welsione.ascoder.question.application.QuestionAnsweredEvent;
 import cn.welsione.ascoder.question.application.QuestionQueryPort;
@@ -22,6 +23,9 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.SimpleTransactionStatus;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.ArrayList;
@@ -698,5 +702,82 @@ class SelfLearningServiceTests {
         draft.setTags("llm-agent,glossary");
         draft.setConfidence(0.61);
         return draft;
+    }
+
+    // ---------- 复核 / 微调（LLM 移出事务边界） ----------
+
+    private ProjectSpace reviewSpace() {
+        ProjectSpace space = new ProjectSpace();
+        ReflectionTestUtils.setField(space, "id", 7L);
+        return space;
+    }
+
+    private LearningInsight reviewInsight() {
+        LearningInsight insight = new LearningInsight();
+        ReflectionTestUtils.setField(insight, "id", 101L);
+        insight.setSourceRawEventIdsJson("[201]");
+        return insight;
+    }
+
+    private LearningRawEvent reviewRawEvent(ProjectSpace space) {
+        LearningRawEvent rawEvent = new LearningRawEvent();
+        ReflectionTestUtils.setField(rawEvent, "id", 201L);
+        ReflectionTestUtils.setField(rawEvent, "projectSpace", space);
+        return rawEvent;
+    }
+
+    private void stubReviewWork(ProjectSpace space, LearningInsight insight, LearningRawEvent rawEvent) {
+        when(projectSpaceService.getEntity(7L)).thenReturn(space);
+        when(insightRepository.findByIdAndProjectSpace_Id(101L, 7L)).thenReturn(Optional.of(insight));
+        when(rawEventRepository.findAllById(List.of(201L))).thenReturn(List.of(rawEvent));
+    }
+
+    @Test
+    void verifyInsightLoadsReviewWorkThenCallsReviewAgent() {
+        ProjectSpace space = reviewSpace();
+        LearningInsight insight = reviewInsight();
+        LearningRawEvent rawEvent = reviewRawEvent(space);
+        stubReviewWork(space, insight, rawEvent);
+
+        SelfLearningInsightVerification verification = new SelfLearningInsightVerification();
+        verification.setStatus("VERIFIED");
+        verification.setSummary("代码支持");
+        when(insightReviewAgent.verify(space, insight, List.of(rawEvent))).thenReturn(verification);
+
+        LearningInsightVerificationResponse response = insightService.verifyInsight(7L, 101L);
+
+        assertEquals("VERIFIED", response.getStatus());
+        assertEquals("代码支持", response.getSummary());
+        // 数据在短事务内加载，LLM 复核在事务外调用（断言参数透传完整）
+        verify(insightReviewAgent).verify(space, insight, List.of(rawEvent));
+    }
+
+    @Test
+    void refineInsightRequiresInstruction() {
+        // 指令为空时在数据加载前即拒绝，不触发任何 Agent 调用
+        assertThrows(ValidationException.class, () -> insightService.refineInsight(7L, 101L, new RefineLearningInsightRequest()));
+        verify(insightReviewAgent, never()).refine(any(), any(), any(), any());
+        verify(insightRepository, never()).findByIdAndProjectSpace_Id(any(), any());
+    }
+
+    @Test
+    void refineInsightLoadsReviewWorkThenCallsRefineAgent() {
+        ProjectSpace space = reviewSpace();
+        LearningInsight insight = reviewInsight();
+        LearningRawEvent rawEvent = reviewRawEvent(space);
+        stubReviewWork(space, insight, rawEvent);
+
+        SelfLearningInsightDraft draft = new SelfLearningInsightDraft();
+        draft.setTitle("更谨慎的结论标题");
+        draft.setConclusion("候选结论");
+        when(insightReviewAgent.refine(space, insight, List.of(rawEvent), "结论更谨慎一点")).thenReturn(draft);
+
+        RefineLearningInsightRequest request = new RefineLearningInsightRequest();
+        request.setInstruction("结论更谨慎一点");
+        RefineLearningInsightResponse response = insightService.refineInsight(7L, 101L, request);
+
+        assertEquals(101L, response.getInsightId());
+        assertEquals("更谨慎的结论标题", response.getSuggestion().getTitle());
+        verify(insightReviewAgent).refine(space, insight, List.of(rawEvent), "结论更谨慎一点");
     }
 }

@@ -118,10 +118,13 @@ const RUN_POLL_TIMEOUT_MS = 10 * 60_000
 
 let runPollTimer: ReturnType<typeof setInterval> | null = null
 let runPollStartedAt = 0
+let polledProjectSpaceId = 0
 
 function startRunPolling() {
   stopRunPolling()
   runPollStartedAt = Date.now()
+  // 记录提交时的项目空间，回调中校验未切换（路由切换后旧轮询不再写入新页面状态）
+  polledProjectSpaceId = projectSpaceId.value
   runPollTimer = setInterval(pollAgentRun, RUN_POLL_INTERVAL_MS)
 }
 
@@ -137,8 +140,16 @@ async function pollAgentRun() {
     stopRunPolling()
     return
   }
+  if (polledProjectSpaceId !== projectSpaceId.value) {
+    stopRunPolling()
+    return
+  }
   try {
-    const runs = await api.listAgentRuns(projectSpaceId.value)
+    const runs = await api.listAgentRuns(polledProjectSpaceId)
+    if (polledProjectSpaceId !== projectSpaceId.value) {
+      stopRunPolling()
+      return
+    }
     agentRuns.value = runs
     if (runs.length && TERMINAL_RUN_STATUSES.includes(runs[0].status)) {
       stopRunPolling()

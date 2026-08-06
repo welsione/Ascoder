@@ -104,6 +104,8 @@ async function loadInsights() {
     insights.value = await api.listInsights(props.projectSpaceId, insightStatusFilter.value)
     if (!insights.value.some((item) => item.id === selectedInsightId.value)) {
       selectedInsightId.value = insights.value[0]?.id ?? null
+      // 选中项被重置时同步清理复核/微调状态，避免展示过期结果
+      resetReviewState()
     }
   } catch (err) {
     ElMessage.error(err instanceof Error ? err.message : '加载候选洞察失败')
@@ -114,6 +116,11 @@ async function loadInsights() {
 
 function selectInsight(item: LearningInsight) {
   selectedInsightId.value = item.id
+  resetReviewState()
+}
+
+/** 清空复核/微调相关状态，避免切换洞察或筛选后展示过期复核结果。 */
+function resetReviewState() {
   verificationResult.value = null
   refineSuggestion.value = null
   refineInstruction.value = ''
